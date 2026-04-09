@@ -53,11 +53,29 @@ func graphErrorMessage(err error) string {
 			if main.GetCode() != nil {
 				msg = *main.GetCode()
 			}
-			if main.GetMessage() != nil {
+			if main.GetMessage() != nil && *main.GetMessage() != "" {
 				if msg != "" {
 					msg += ": "
 				}
 				msg += *main.GetMessage()
+			}
+			// Check error details for additional context
+			for _, d := range main.GetDetails() {
+				if d.GetCode() != nil || d.GetMessage() != nil {
+					detail := ""
+					if d.GetCode() != nil {
+						detail = *d.GetCode()
+					}
+					if d.GetMessage() != nil && *d.GetMessage() != "" {
+						if detail != "" {
+							detail += ": "
+						}
+						detail += *d.GetMessage()
+					}
+					if detail != "" {
+						msg += " (" + detail + ")"
+					}
+				}
 			}
 			if msg != "" {
 				return msg
@@ -65,7 +83,10 @@ func graphErrorMessage(err error) string {
 		}
 	}
 	if err != nil {
-		return err.Error()
+		s := err.Error()
+		if s != "" {
+			return s
+		}
 	}
 	return "unknown error"
 }
