@@ -12,4 +12,9 @@ type MailCmd struct {
 	Mark        MailMarkCmd        `cmd:"" help:"Mark message as read/unread"`
 	Folders     MailFoldersCmd     `cmd:"" help:"List mail folders"`
 	Attachments MailAttachmentsCmd `cmd:"" help:"List/download attachments"`
+	Drafts      MailDraftsCmd      `cmd:"" help:"Draft message operations"`
+	Flag        MailFlagCmd        `cmd:"" help:"Set follow-up flag on a message"`
+	Importance  MailImportanceCmd  `cmd:"" help:"Set importance on a message"`
+	Categorize  MailCategorizeCmd  `cmd:"" help:"Set categories on a message"`
+	OOO         MailOOOCmd        `cmd:"" help:"Out-of-office / auto-reply settings"`
 }

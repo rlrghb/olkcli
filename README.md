@@ -1,6 +1,6 @@
 # olk — Microsoft Outlook in Your Terminal
 
-A fast, scriptable CLI for Microsoft Outlook via the Microsoft Graph API. Manage email, calendar, and contacts from the command line.
+A fast, scriptable CLI for Microsoft Outlook via the Microsoft Graph API. Manage email, calendar, contacts, and tasks from the command line.
 
 Works with both **personal Microsoft accounts** and **enterprise (Azure AD / Entra ID)** accounts. Zero-config setup with device-code authentication — just run `olk auth login` and go.
 
@@ -8,13 +8,16 @@ Works with both **personal Microsoft accounts** and **enterprise (Azure AD / Ent
 
 ### Mail
 - **List & read** inbox messages with filtering by sender, date, read status
-- **Send** emails with To/CC/BCC, HTML bodies, stdin piping
+- **Send** emails with To/CC/BCC, HTML bodies, stdin piping, attachments, importance
 - **Search** using KQL (Keyword Query Language) syntax
 - **Reply, reply-all, forward** messages
 - **Move** messages between folders
 - **Delete** and **mark read/unread**
 - **List folders** with message counts
-- **View attachments**
+- **View and download attachments**
+- **Drafts**: create, list, send, delete draft messages
+- **Flags & categories**: flag for follow-up, set importance, assign categories
+- **Out-of-office**: get, set, and disable auto-reply / vacation responder
 
 ### Calendar
 - **List events** with configurable date ranges (default: 7 days ahead)
@@ -22,10 +25,18 @@ Works with both **personal Microsoft accounts** and **enterprise (Azure AD / Ent
 - **Update and delete** events
 - **Respond** to invitations (accept, decline, tentative)
 - **List calendars** across your account
+- **Check availability** / free-busy lookup for one or more users
 
 ### Contacts
 - **List, search, create, update, delete** contacts
 - Fields: name, email, phone, company, job title
+
+### Tasks (Microsoft To Do)
+- **List task lists** and **tasks** with status filtering
+- **Create, complete, delete** tasks with due dates, importance, and notes
+
+### User Profile
+- **`olk whoami`** — display current user info (name, email, job title, department)
 
 ## Installation
 
@@ -209,6 +220,7 @@ For common workflows, `olk` provides top-level shortcuts:
 ```
 olk auth login [--client-id ID] [--tenant-id ID]    Login via device code
 olk auth logout [EMAIL]                              Remove stored credentials
+olk auth clean --force                               Remove ALL accounts and tokens
 olk auth list                                        List authenticated accounts
 olk auth status                                      Check token validity
 ```
@@ -218,7 +230,7 @@ olk auth status                                      Check token validity
 ```
 olk mail list [-n 25] [-f FOLDER] [-u] [--from X] [--after DATE] [--before DATE]
 olk mail get <ID> [--format full|text|html]
-olk mail send --to X --subject Y [--body Z] [--cc X] [--bcc X] [--html]
+olk mail send --to X --subject Y [--body Z] [--cc X] [--bcc X] [--html] [--attach FILE] [--importance low|normal|high]
 olk mail search <QUERY> [-n 25]
 olk mail reply <ID> --body X [--reply-all]
 olk mail forward <ID> --to X [--comment Y]
@@ -226,7 +238,19 @@ olk mail move <ID> <FOLDER>
 olk mail delete <ID> [--force]
 olk mail mark <ID> --read|--unread
 olk mail folders
-olk mail attachments <ID>
+olk mail attachments <ID>                            List attachments
+olk mail attachments <ID> --save [--out DIR]         Download all attachments
+olk mail attachments <ID> --attachment-id X [--out DIR]  Download specific attachment
+olk mail drafts list [-n 25]                         List drafts
+olk mail drafts create --to X --subject Y [--body Z] [--cc X] [--bcc X] [--html]
+olk mail drafts send <DRAFT_ID>                      Send a draft
+olk mail drafts delete <DRAFT_ID> --force            Delete a draft
+olk mail flag <ID> flagged|complete|notFlagged       Set follow-up flag
+olk mail importance <ID> low|normal|high             Set importance
+olk mail categorize <ID> -c "Category Name"          Set categories
+olk mail ooo get                                     Get auto-reply settings
+olk mail ooo set -m "Message" [--start DATE] [--end DATE] [--audience none|contactsOnly|all]
+olk mail ooo off                                     Disable auto-reply
 ```
 
 ### Calendar
@@ -239,6 +263,7 @@ olk calendar update <ID> [--subject X] [--start Y] [--end Z] [--location L]
 olk calendar delete <ID> [--force]
 olk calendar respond <ID> accept|decline|tentative
 olk calendar calendars
+olk calendar availability --emails X [-d DAYS] [--after DATE] [--before DATE]
 ```
 
 ### Contacts
@@ -250,6 +275,23 @@ olk contacts create --first-name X --last-name Y [--email Z] [--phone P] [--comp
 olk contacts update <ID> [--first-name X] [--last-name Y] [--email Z] [--phone P] [--company C] [--title T]
 olk contacts delete <ID> [--force]
 olk contacts search <QUERY> [-n 25]
+```
+
+### Tasks (Microsoft To Do)
+
+```
+olk todo lists                                       List task lists
+olk todo list [--list ID] [-n 25] [--status STATUS]  List tasks
+olk todo get <TASK_ID> [--list ID]                   Get task details
+olk todo create -t "Title" [--due DATE] [--importance low|normal|high] [--body TEXT] [--list ID]
+olk todo complete <TASK_ID> [--list ID]              Mark task complete
+olk todo delete <TASK_ID> --force [--list ID]        Delete a task
+```
+
+### User Profile
+
+```
+olk whoami                                           Display current user info
 ```
 
 ## Configuration
@@ -323,6 +365,14 @@ Then ask your AI assistant to "check my inbox" or "send an email" and it will us
 - KQL search syntax for mail
 - How to handle auth errors
 - Safety rules (confirm before sending, never guess IDs, use `--force` for deletes)
+
+## Privacy & Data Handling
+
+- **No telemetry**: `olk` collects no analytics, usage data, or crash reports
+- **No third-party services**: All communication is directly between your machine and Microsoft Graph API
+- **Token storage**: OAuth refresh tokens are stored in your OS credential manager (macOS Keychain, Linux Secret Service, Windows Credential Manager) — never in plain-text files
+- **Data stays local**: Email bodies, attachments, and contacts are streamed to stdout and never cached to disk
+- **Clean removal**: Run `olk auth clean --force` to remove all stored accounts and tokens
 
 ## Architecture
 

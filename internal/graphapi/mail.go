@@ -179,7 +179,7 @@ func (c *Client) GetMessage(ctx context.Context, messageID string) (*MailMessage
 	return &m, nil
 }
 
-func (c *Client) SendMessage(ctx context.Context, subject string, body string, toRecipients []string, ccRecipients []string, bccRecipients []string, isHTML bool) error {
+func (c *Client) SendMessage(ctx context.Context, subject string, body string, toRecipients []string, ccRecipients []string, bccRecipients []string, isHTML bool, attachments []AttachmentInput, importance string) error {
 	msg := models.NewMessage()
 	msg.SetSubject(&subject)
 
@@ -212,6 +212,37 @@ func (c *Client) SendMessage(ctx context.Context, subject string, body string, t
 			return fmt.Errorf("invalid bcc recipient: %w", err)
 		}
 		msg.SetBccRecipients(bccR)
+	}
+
+	if len(attachments) > 0 {
+		var atts []models.Attachmentable
+		for _, a := range attachments {
+			fileAtt := models.NewFileAttachment()
+			odataType := "#microsoft.graph.fileAttachment"
+			fileAtt.SetOdataType(&odataType)
+			name := a.Name
+			fileAtt.SetName(&name)
+			ct := a.ContentType
+			fileAtt.SetContentType(&ct)
+			fileAtt.SetContentBytes(a.Content)
+			atts = append(atts, fileAtt)
+		}
+		msg.SetAttachments(atts)
+	}
+
+	if importance != "" {
+		var imp models.Importance
+		switch importance {
+		case "low":
+			imp = models.LOW_IMPORTANCE
+		case "normal":
+			imp = models.NORMAL_IMPORTANCE
+		case "high":
+			imp = models.HIGH_IMPORTANCE
+		default:
+			return fmt.Errorf("invalid importance: %q (must be low, normal, or high)", importance)
+		}
+		msg.SetImportance(&imp)
 	}
 
 	sendBody := users.NewItemSendMailPostRequestBody()
@@ -358,6 +389,46 @@ type Attachment struct {
 	Content     []byte `json:"-"`
 }
 
+// AttachmentInput represents an attachment to be sent with a message
+type AttachmentInput struct {
+	Name        string
+	ContentType string
+	Content     []byte
+}
+
+func (c *Client) DownloadAttachment(ctx context.Context, messageID, attachmentID string) (*Attachment, error) {
+	if err := validateID(messageID, "message ID"); err != nil {
+		return nil, err
+	}
+	if err := validateID(attachmentID, "attachment ID"); err != nil {
+		return nil, err
+	}
+	resp, err := c.inner.Me().Messages().ByMessageId(messageID).Attachments().ByAttachmentId(attachmentID).Get(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("downloading attachment: %w", err)
+	}
+
+	att := &Attachment{
+		Name:        derefStr(resp.GetName()),
+		ContentType: derefStr(resp.GetContentType()),
+	}
+	if resp.GetId() != nil {
+		att.ID = *resp.GetId()
+	}
+	if resp.GetSize() != nil {
+		att.Size = *resp.GetSize()
+	}
+
+	// Type-assert to FileAttachmentable to get content bytes
+	if fileAtt, ok := resp.(models.FileAttachmentable); ok {
+		att.Content = fileAtt.GetContentBytes()
+	} else {
+		return nil, fmt.Errorf("attachment %q is not a file attachment", att.Name)
+	}
+
+	return att, nil
+}
+
 func (c *Client) GetAttachments(ctx context.Context, messageID string) ([]Attachment, error) {
 	if err := validateID(messageID, "message ID"); err != nil {
 		return nil, err
@@ -382,6 +453,80 @@ func (c *Client) GetAttachments(ctx context.Context, messageID string) ([]Attach
 		attachments = append(attachments, att)
 	}
 	return attachments, nil
+}
+
+// FlagMessage sets the follow-up flag status on a message
+func (c *Client) FlagMessage(ctx context.Context, messageID string, flagStatus string) error {
+	if err := validateID(messageID, "message ID"); err != nil {
+		return err
+	}
+
+	flag := models.NewFollowupFlag()
+	var status models.FollowupFlagStatus
+	switch flagStatus {
+	case "flagged":
+		status = models.FLAGGED_FOLLOWUPFLAGSTATUS
+	case "complete":
+		status = models.COMPLETE_FOLLOWUPFLAGSTATUS
+	case "notFlagged":
+		status = models.NOTFLAGGED_FOLLOWUPFLAGSTATUS
+	default:
+		return fmt.Errorf("invalid flag status: %q (must be flagged, complete, or notFlagged)", flagStatus)
+	}
+	flag.SetFlagStatus(&status)
+
+	msg := models.NewMessage()
+	msg.SetFlag(flag)
+
+	_, err := c.inner.Me().Messages().ByMessageId(messageID).Patch(ctx, msg, nil)
+	if err != nil {
+		return fmt.Errorf("flagging message: %w", err)
+	}
+	return nil
+}
+
+// SetImportance sets the importance level on a message
+func (c *Client) SetImportance(ctx context.Context, messageID string, importance string) error {
+	if err := validateID(messageID, "message ID"); err != nil {
+		return err
+	}
+
+	var imp models.Importance
+	switch importance {
+	case "low":
+		imp = models.LOW_IMPORTANCE
+	case "normal":
+		imp = models.NORMAL_IMPORTANCE
+	case "high":
+		imp = models.HIGH_IMPORTANCE
+	default:
+		return fmt.Errorf("invalid importance: %q (must be low, normal, or high)", importance)
+	}
+
+	msg := models.NewMessage()
+	msg.SetImportance(&imp)
+
+	_, err := c.inner.Me().Messages().ByMessageId(messageID).Patch(ctx, msg, nil)
+	if err != nil {
+		return fmt.Errorf("setting importance: %w", err)
+	}
+	return nil
+}
+
+// CategorizeMessage sets the categories on a message
+func (c *Client) CategorizeMessage(ctx context.Context, messageID string, categories []string) error {
+	if err := validateID(messageID, "message ID"); err != nil {
+		return err
+	}
+
+	msg := models.NewMessage()
+	msg.SetCategories(categories)
+
+	_, err := c.inner.Me().Messages().ByMessageId(messageID).Patch(ctx, msg, nil)
+	if err != nil {
+		return fmt.Errorf("categorizing message: %w", err)
+	}
+	return nil
 }
 
 func convertMessage(msg models.Messageable) MailMessage {

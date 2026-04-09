@@ -15,7 +15,8 @@ type CalendarCmd struct {
 	Update    CalendarUpdateCmd    `cmd:"" help:"Update a calendar event"`
 	Delete    CalendarDeleteCmd    `cmd:"" help:"Delete a calendar event"`
 	Respond   CalendarRespondCmd   `cmd:"" help:"Respond to an event invitation"`
-	Calendars CalendarCalendarsCmd `cmd:"" help:"List available calendars"`
+	Calendars    CalendarCalendarsCmd    `cmd:"" help:"List available calendars"`
+	Availability CalendarAvailabilityCmd `cmd:"" help:"Check availability / free-busy"`
 }
 
 type CalendarEventsCmd struct {
@@ -151,6 +152,10 @@ func (c *CalendarCreateCmd) Run(ctx *RunContext) error {
 	end, err := parseTime(c.End)
 	if err != nil {
 		return fmt.Errorf("invalid --end: %w", err)
+	}
+
+	if !end.After(start) {
+		return fmt.Errorf("--end must be after --start")
 	}
 
 	if ctx.Flags.DryRun {

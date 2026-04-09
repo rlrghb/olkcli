@@ -138,7 +138,9 @@ type CLI struct {
 	Mail     MailCmd     `cmd:"" help:"Mail commands"`
 	Calendar CalendarCmd `cmd:"" help:"Calendar commands"`
 	Contacts ContactsCmd `cmd:"" help:"Contacts commands"`
+	Todo     TodoCmd     `cmd:"" help:"Microsoft To Do tasks"`
 	Version  VersionCmd  `cmd:"" help:"Show version information"`
+	Whoami   WhoamiCmd   `cmd:"" help:"Show current user profile"`
 
 	// Desire path shortcuts
 	Send   SendCmd   `cmd:"" help:"Send an email (shortcut for mail send)" hidden:""`

@@ -1,6 +1,6 @@
 ---
 name: olk
-description: Microsoft Outlook CLI for email, calendar, and contacts via Microsoft Graph API.
+description: Microsoft Outlook CLI for email, calendar, contacts, and tasks via Microsoft Graph API.
 homepage: https://github.com/rlrghb/olkcli
 metadata:
   {
@@ -24,7 +24,7 @@ metadata:
 
 # olk
 
-Use `olk` for Outlook Mail/Calendar/Contacts. Works with personal Microsoft accounts and enterprise Azure AD/Entra ID.
+Use `olk` for Outlook Mail/Calendar/Contacts/Tasks. Works with personal Microsoft accounts and enterprise Azure AD/Entra ID.
 
 Setup (once)
 
@@ -33,6 +33,7 @@ Setup (once)
 - `olk auth list` — list authenticated accounts
 - `olk auth status` — check token validity
 - `olk auth logout [EMAIL]` — remove stored credentials
+- `olk auth clean --force` — remove ALL stored accounts and tokens
 
 Mail
 
@@ -42,6 +43,8 @@ Mail
 - Send (HTML): `olk mail send --to a@b.com --subject "Hi" --body "<p>Hello</p>" --html`
 - Send (stdin): `echo "Hello" | olk mail send --to a@b.com --subject "Hi"`
 - Send (multi-recipient): `olk mail send --to a@b.com --to b@c.com --cc d@e.com --subject "Hi" --body "Hello"`
+- Send with attachments: `olk mail send --to a@b.com --subject "Report" --body "See attached" --attach report.pdf --attach data.csv`
+- Send with importance: `olk mail send --to a@b.com --subject "Urgent" --body "ASAP" --importance high`
 - Search (KQL): `olk mail search "from:boss@co.com subject:urgent" [-n 25]`
 - Reply: `olk mail reply <ID> --body "Thanks"`
 - Reply all: `olk mail reply <ID> --body "Thanks" --reply-all`
@@ -51,6 +54,30 @@ Mail
 - Mark read/unread: `olk mail mark <ID> --read` or `olk mail mark <ID> --unread`
 - List folders: `olk mail folders`
 - List attachments: `olk mail attachments <ID>`
+- Download all attachments: `olk mail attachments <ID> --save [--out DIR]`
+- Download specific attachment: `olk mail attachments <ID> --attachment-id <ATT_ID> [--out DIR]`
+
+Drafts
+
+- List drafts: `olk mail drafts list [-n 25]`
+- Create draft: `olk mail drafts create --to a@b.com --subject "Draft" --body "WIP" [--cc X] [--bcc X] [--html]`
+- Create draft (stdin): `echo "WIP" | olk mail drafts create --to a@b.com --subject "Draft"`
+- Send draft: `olk mail drafts send <DRAFT_ID>`
+- Delete draft: `olk mail drafts delete <DRAFT_ID> --force`
+
+Flags & Categories
+
+- Flag for follow-up: `olk mail flag <ID> flagged|complete|notFlagged`
+- Set importance: `olk mail importance <ID> low|normal|high`
+- Set categories: `olk mail categorize <ID> --category "Red Category" --category "Blue Category"`
+
+Out-of-Office
+
+- Get auto-reply settings: `olk mail ooo get`
+- Enable auto-reply: `olk mail ooo set --message "I'm out of office"`
+- Enable scheduled: `olk mail ooo set --message "On vacation" --start 2026-04-10 --end 2026-04-17 [--audience none|contactsOnly|all]`
+- External message: `olk mail ooo set --message "Internal msg" --external-message "External msg"`
+- Disable auto-reply: `olk mail ooo off`
 
 Well-known folder names: `inbox`, `sentitems`, `drafts`, `deleteditems`, `junkemail`, `archive`.
 
@@ -66,6 +93,7 @@ Calendar
 - Delete event: `olk calendar delete <ID> --force`
 - Respond to invite: `olk calendar respond <ID> accept|decline|tentative`
 - List calendars: `olk calendar calendars`
+- Check availability: `olk calendar availability --emails user@co.com [--emails user2@co.com] [-d DAYS] [--after DATE] [--before DATE]`
 
 Contacts
 
@@ -75,6 +103,21 @@ Contacts
 - Update: `olk contacts update <ID> [--first-name X] [--last-name Y] [--email Z] [--phone P] [--company C] [--title T]`
 - Delete: `olk contacts delete <ID> --force`
 - Search: `olk contacts search "John" [-n 25]`
+
+Tasks (Microsoft To Do)
+
+- List task lists: `olk todo lists`
+- List tasks: `olk todo list [--list LIST_ID] [-n 25] [--status notStarted|inProgress|completed|waitingOnOthers|deferred]`
+- Get task: `olk todo get <TASK_ID> [--list LIST_ID]`
+- Create task: `olk todo create --title "Buy groceries" [--due 2026-04-15] [--importance low|normal|high] [--body "Notes"] [--list LIST_ID]`
+- Complete task: `olk todo complete <TASK_ID> [--list LIST_ID]`
+- Delete task: `olk todo delete <TASK_ID> --force [--list LIST_ID]`
+
+If `--list` is omitted, the default (first) task list is used automatically.
+
+User Profile
+
+- `olk whoami` — display current user's name, email, job title, department, office, phone
 
 Shortcuts
 
@@ -112,16 +155,22 @@ Scripting Examples
 - Today's subjects: `olk today --json --results-only | jq -r '.[].subject'`
 - Export contacts CSV: `olk contacts list --plain --select name,email`
 - Send from script: `olk send --to ops@co.com --subject "Deploy done" --body "$(date): v1.2.3 deployed"`
+- Send with attachment: `olk send --to boss@co.com --subject "Report" --attach report.pdf`
 - Process inbox: `olk mail list --json --results-only | jq -r '.[] | select(.isRead == false) | "\(.from): \(.subject)"'`
+- Download all attachments: `olk mail attachments <ID> --save --out ./downloads`
+- Check if someone is free: `olk calendar availability --emails colleague@co.com --json --results-only | jq '.[] | .items'`
+- List incomplete tasks: `olk todo list --status notStarted --json --results-only | jq -r '.[].title'`
+- Set vacation responder: `olk mail ooo set --message "On vacation until April 17" --start 2026-04-10 --end 2026-04-17`
 
 Notes
 
 - Set `OLK_ACCOUNT=you@example.com` to avoid repeating `--account`.
+- Set `OLK_TODO_LIST=<list-id>` to avoid repeating `--list` for todo commands.
 - For scripting, prefer `--json --results-only` plus `jq`.
 - IDs are opaque Microsoft Graph strings. Always get them from `list` or `search` first — never guess.
 - Dates are ISO 8601: `2025-06-15` or `2025-06-15T09:00`.
 - Mail search uses KQL, not regex. Operators: `from:`, `to:`, `subject:`, `hasAttachment:`, `received>=`.
-- If `--body` is omitted from `mail send`, body is read from stdin.
+- If `--body` is omitted from `mail send` or `mail drafts create`, body is read from stdin.
 - Destructive commands (`delete`) require `--force` or will prompt for confirmation.
 - Confirm before sending mail or creating/deleting events.
 - If a command fails with an auth error, check `olk auth status` first.

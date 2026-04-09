@@ -30,7 +30,7 @@ func (c *Client) ListContacts(ctx context.Context, top int32) ([]Contact, error)
 
 	queryParams := &users.ItemContactsRequestBuilderGetQueryParameters{
 		Top:    &top,
-		Select: []string{"id", "displayName", "givenName", "surname", "emailAddresses", "phones", "companyName", "jobTitle"},
+		Select: []string{"id", "displayName", "givenName", "surname", "emailAddresses", "businessPhones", "homePhones", "mobilePhone", "companyName", "jobTitle"},
 	}
 
 	config := &users.ItemContactsRequestBuilderGetRequestConfiguration{
@@ -162,7 +162,7 @@ func (c *Client) SearchContacts(ctx context.Context, query string, top int32) ([
 	queryParams := &users.ItemContactsRequestBuilderGetQueryParameters{
 		Top:    &top,
 		Filter: &filter,
-		Select: []string{"id", "displayName", "givenName", "surname", "emailAddresses", "phones", "companyName", "jobTitle"},
+		Select: []string{"id", "displayName", "givenName", "surname", "emailAddresses", "businessPhones", "homePhones", "mobilePhone", "companyName", "jobTitle"},
 	}
 
 	config := &users.ItemContactsRequestBuilderGetRequestConfiguration{

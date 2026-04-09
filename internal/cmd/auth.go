@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 type AuthCmd struct {
 	Login  AuthLoginCmd  `cmd:"" help:"Login to a Microsoft account"`
 	Logout AuthLogoutCmd `cmd:"" help:"Logout from an account"`
+	Clean  AuthCleanCmd  `cmd:"" help:"Remove all stored accounts and tokens"`
 	List   AuthListCmd   `cmd:"" help:"List authenticated accounts"`
 	Status AuthStatusCmd `cmd:"" help:"Show authentication status"`
 }
@@ -110,6 +112,53 @@ func (c *AuthLogoutCmd) Run(ctx *RunContext) error {
 	}
 
 	fmt.Printf("Logged out %s\n", outfmt.Sanitize(email))
+	return nil
+}
+
+type AuthCleanCmd struct{}
+
+func (c *AuthCleanCmd) Run(ctx *RunContext) error {
+	if !ctx.Flags.Force {
+		return fmt.Errorf("this will remove ALL stored accounts and tokens; use --force to confirm")
+	}
+
+	cfg, err := ctx.Config()
+	if err != nil {
+		return err
+	}
+
+	// Use a temporary authenticator to list and remove accounts
+	auth, err := ctx.Authenticator("", "")
+	if err != nil {
+		return err
+	}
+
+	accounts, err := auth.ListAccounts()
+	if err != nil {
+		return err
+	}
+
+	var removed int
+	for _, acct := range accounts {
+		clientCfg := cfg.GetClient(acct.Email)
+		a, err := ctx.Authenticator(clientCfg.ClientID, clientCfg.TenantID)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "warning: skipping %s: %v\n", outfmt.Sanitize(acct.Email), err)
+			continue
+		}
+		if err := a.Logout(acct.Email); err != nil {
+			fmt.Fprintf(os.Stderr, "warning: could not remove %s: %v\n", outfmt.Sanitize(acct.Email), err)
+			continue
+		}
+		cfg.RemoveAccount(acct.Email)
+		removed++
+	}
+
+	if err := cfg.Save(); err != nil {
+		return fmt.Errorf("saving config: %w", err)
+	}
+
+	fmt.Printf("Removed %d account(s) and their tokens.\n", removed)
 	return nil
 }
 

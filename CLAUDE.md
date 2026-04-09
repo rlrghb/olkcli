@@ -4,7 +4,7 @@ This file provides context for Claude Code when working on the olk project.
 
 ## What is this project?
 
-`olk` is a CLI tool for Microsoft Outlook via the Microsoft Graph API. It provides terminal access to email, calendar, and contacts for both personal Microsoft accounts and enterprise Azure AD/Entra ID accounts.
+`olk` is a CLI tool for Microsoft Outlook via the Microsoft Graph API. It provides terminal access to email, calendar, contacts, and tasks for both personal Microsoft accounts and enterprise Azure AD/Entra ID accounts.
 
 ## Quick Reference
 
@@ -37,6 +37,11 @@ go mod tidy         # After changing dependencies
 1. Create `internal/cmd/mail_<name>.go` with the command struct and `Run` method
 2. Add the struct to `MailCmd` in `internal/cmd/mail.go`
 3. If needed, add the API method to `internal/graphapi/mail.go`
+
+### Adding a new todo subcommand
+1. Create `internal/cmd/todo_<name>.go` or add to `internal/cmd/todo.go`
+2. Add the struct to `TodoCmd` in `internal/cmd/todo.go`
+3. If needed, add the API method to `internal/graphapi/todo.go`
 
 ### Adding a new flag to all commands
 Add it to `RootFlags` in `internal/cmd/root.go` with `env:"OLK_*"` tag.

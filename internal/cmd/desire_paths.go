@@ -8,6 +8,7 @@ type SendCmd struct {
 	CC      []string `help:"CC recipients"`
 	BCC     []string `help:"BCC recipients"`
 	HTML    bool     `help:"Send body as HTML"`
+	Attach  []string `help:"File paths to attach" type:"path"`
 }
 
 func (c *SendCmd) Run(ctx *RunContext) error {
@@ -18,6 +19,7 @@ func (c *SendCmd) Run(ctx *RunContext) error {
 		CC:      c.CC,
 		BCC:     c.BCC,
 		HTML:    c.HTML,
+		Attach:  c.Attach,
 	}
 	return inner.Run(ctx)
 }
