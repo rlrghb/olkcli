@@ -18,14 +18,20 @@ Works with both **personal Microsoft accounts** and **enterprise (Azure AD / Ent
 - **Drafts**: create, list, send, delete draft messages
 - **Flags & categories**: flag for follow-up, set importance, assign categories
 - **Out-of-office**: get, set, and disable auto-reply / vacation responder
+- **Inbox rules**: list, create, and delete server-side mail rules
+- **Focused Inbox**: filter by `--focused` or `--other` classification
+- **Read receipts**: request read receipts with `--read-receipt`
 
 ### Calendar
 - **List events** with configurable date ranges (default: 7 days ahead)
+- **Calendar view** with expanded recurring event occurrences
+- **Recurring events** displayed with human-readable recurrence patterns
 - **Create events** with location, attendees, all-day, and online meeting support
 - **Update and delete** events
 - **Respond** to invitations (accept, decline, tentative)
 - **List calendars** across your account
 - **Check availability** / free-busy lookup for one or more users
+- **Find meeting times** — suggest available slots for multiple attendees
 
 ### Contacts
 - **List, search, create, update, delete** contacts
@@ -34,6 +40,9 @@ Works with both **personal Microsoft accounts** and **enterprise (Azure AD / Ent
 ### Tasks (Microsoft To Do)
 - **List task lists** and **tasks** with status filtering
 - **Create, complete, delete** tasks with due dates, importance, and notes
+
+### People / Directory
+- **Search** people in your organization by name — returns name, email, job title, department, company
 
 ### User Profile
 - **`olk whoami`** — display current user info (name, email, job title, department)
@@ -146,7 +155,7 @@ If your organization blocks the default client ID, or your admin requires apps t
 1. Go to [Azure Portal > App registrations](https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade) and click **New registration**
 2. Set **Supported account types** to match your needs (single tenant or multi-tenant)
 3. Under **Authentication > Advanced settings**, set **Allow public client flows** to **Yes** (required for device-code flow)
-4. Under **API permissions**, add **Microsoft Graph** delegated permissions: `Mail.ReadWrite`, `Calendars.ReadWrite`, `Contacts.ReadWrite`, `User.Read`, `offline_access`
+4. Under **API permissions**, add **Microsoft Graph** delegated permissions: `Mail.ReadWrite`, `Mail.Send`, `Calendars.ReadWrite`, `Contacts.ReadWrite`, `Tasks.ReadWrite`, `People.Read`, `User.Read`, `offline_access`
 5. Copy the **Application (client) ID** and **Directory (tenant) ID** from the app's Overview page
 
 Then use them:
@@ -228,9 +237,9 @@ olk auth status                                      Check token validity
 ### Mail
 
 ```
-olk mail list [-n 25] [-f FOLDER] [-u] [--from X] [--after DATE] [--before DATE]
+olk mail list [-n 25] [-f FOLDER] [-u] [--from X] [--after DATE] [--before DATE] [--focused] [--other]
 olk mail get <ID> [--format full|text|html]
-olk mail send --to X --subject Y [--body Z] [--cc X] [--bcc X] [--html] [--attach FILE] [--importance low|normal|high]
+olk mail send --to X --subject Y [--body Z] [--cc X] [--bcc X] [--html] [--attach FILE] [--importance low|normal|high] [--read-receipt]
 olk mail search <QUERY> [-n 25]
 olk mail reply <ID> --body X [--reply-all]
 olk mail forward <ID> --to X [--comment Y]
@@ -251,12 +260,16 @@ olk mail categorize <ID> -c "Category Name"          Set categories
 olk mail ooo get                                     Get auto-reply settings
 olk mail ooo set -m "Message" [--start DATE] [--end DATE] [--audience none|contactsOnly|all]
 olk mail ooo off                                     Disable auto-reply
+olk mail rules list                                  List inbox rules
+olk mail rules create --name X [--from Y] [--subject-contains Z] [--has-attachment] [--move FOLDER] [--mark-read] [--delete] [--forward-to EMAIL] [--set-importance low|normal|high]
+olk mail rules delete <ID> --force                   Delete an inbox rule
 ```
 
 ### Calendar
 
 ```
 olk calendar events [-d 7] [--after DATE] [--before DATE] [--calendar ID] [-n 25]
+olk calendar view [-d 7] [--after DATE] [--before DATE] [--calendar ID] [-n 50]
 olk calendar get <ID>
 olk calendar create --subject X --start Y --end Z [--location L] [--attendees A] [--all-day] [--online-meeting]
 olk calendar update <ID> [--subject X] [--start Y] [--end Z] [--location L]
@@ -264,6 +277,13 @@ olk calendar delete <ID> [--force]
 olk calendar respond <ID> accept|decline|tentative
 olk calendar calendars
 olk calendar availability --emails X [-d DAYS] [--after DATE] [--before DATE]
+olk calendar find-times --attendees X [--attendees Y] [-d 60] [--after DATE] [--before DATE]
+```
+
+### People
+
+```
+olk people search <QUERY> [-n 25]
 ```
 
 ### Contacts

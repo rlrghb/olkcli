@@ -38,6 +38,16 @@ go mod tidy         # After changing dependencies
 2. Add the struct to `MailCmd` in `internal/cmd/mail.go`
 3. If needed, add the API method to `internal/graphapi/mail.go`
 
+### Adding a new calendar subcommand
+1. Create `internal/cmd/calendar_<name>.go` with the command struct and `Run` method
+2. Add the struct to `CalendarCmd` in `internal/cmd/calendar.go`
+3. If needed, add the API method to `internal/graphapi/calendar.go`
+
+### Adding a new people subcommand
+1. Create `internal/cmd/people_<name>.go` or add to `internal/cmd/people.go`
+2. Add the struct to `PeopleCmd` in `internal/cmd/people.go`
+3. If needed, add the API method to `internal/graphapi/people.go`
+
 ### Adding a new todo subcommand
 1. Create `internal/cmd/todo_<name>.go` or add to `internal/cmd/todo.go`
 2. Add the struct to `TodoCmd` in `internal/cmd/todo.go`
@@ -56,3 +66,8 @@ The project uses `msgraph-sdk-go` v1.96.0 which has some naming quirks:
 - Contact emails use `models.NewEmailAddress()` not `NewTypedEmailAddress()`
 - Contact phones: `GetBusinessPhones()`, `GetHomePhones()`, `GetMobilePhone()` (no unified `GetPhones()`)
 - Message item request builders: `ItemMessagesMessageItemRequestBuilder*` (note double "Messages")
+- Message rules: `Me().MailFolders().ByMailFolderId("inbox").MessageRules()` for CRUD
+- People API: `Me().People()` with `$search` query parameter
+- FindMeetingTimes: `Me().FindMeetingTimes().Post()` returns `MeetingTimeSuggestionsResultable`
+- Recurrence pattern: `event.GetRecurrence().GetPattern().GetTypeEscaped()` (uses `GetTypeEscaped` not `GetType`)
+- ISODuration: use `serialization.NewDuration()` from `kiota-abstractions-go` for meeting duration

@@ -179,9 +179,13 @@ func (c *Client) GetMessage(ctx context.Context, messageID string) (*MailMessage
 	return &m, nil
 }
 
-func (c *Client) SendMessage(ctx context.Context, subject string, body string, toRecipients []string, ccRecipients []string, bccRecipients []string, isHTML bool, attachments []AttachmentInput, importance string) error {
+func (c *Client) SendMessage(ctx context.Context, subject string, body string, toRecipients []string, ccRecipients []string, bccRecipients []string, isHTML bool, attachments []AttachmentInput, importance string, readReceipt bool) error {
 	msg := models.NewMessage()
 	msg.SetSubject(&subject)
+
+	if readReceipt {
+		msg.SetIsReadReceiptRequested(&readReceipt)
+	}
 
 	bodyObj := models.NewItemBody()
 	bodyObj.SetContent(&body)

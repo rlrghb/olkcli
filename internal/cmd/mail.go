@@ -17,4 +17,5 @@ type MailCmd struct {
 	Importance  MailImportanceCmd  `cmd:"" help:"Set importance on a message"`
 	Categorize  MailCategorizeCmd  `cmd:"" help:"Set categories on a message"`
 	OOO         MailOOOCmd        `cmd:"" help:"Out-of-office / auto-reply settings"`
+	Rules       MailRulesCmd      `cmd:"" help:"Inbox rules"`
 }

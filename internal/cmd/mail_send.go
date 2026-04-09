@@ -20,7 +20,8 @@ type MailSendCmd struct {
 	BCC        []string `help:"BCC recipients"`
 	HTML       bool     `help:"Send body as HTML"`
 	Attach     []string `help:"File paths to attach" type:"path"`
-	Importance string   `help:"Message importance: low|normal|high" enum:",low,normal,high" default:""`
+	Importance  string   `help:"Message importance: low|normal|high" enum:",low,normal,high" default:""`
+	ReadReceipt bool     `help:"Request a read receipt"`
 }
 
 const (
@@ -99,7 +100,7 @@ func (c *MailSendCmd) Run(ctx *RunContext) error {
 		return nil
 	}
 
-	err = client.SendMessage(ctx.Ctx, c.Subject, body, c.To, c.CC, c.BCC, c.HTML, attachments, c.Importance)
+	err = client.SendMessage(ctx.Ctx, c.Subject, body, c.To, c.CC, c.BCC, c.HTML, attachments, c.Importance, c.ReadReceipt)
 	if err != nil {
 		return err
 	}

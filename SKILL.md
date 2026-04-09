@@ -37,7 +37,7 @@ Setup (once)
 
 Mail
 
-- List inbox: `olk mail list [-n 25] [-f FOLDER] [-u] [--from SENDER] [--after DATE] [--before DATE]`
+- List inbox: `olk mail list [-n 25] [-f FOLDER] [-u] [--from SENDER] [--after DATE] [--before DATE] [--focused] [--other]`
 - Read message: `olk mail get <ID> [--format full|text|html]`
 - Send (plain): `olk mail send --to a@b.com --subject "Hi" --body "Hello"`
 - Send (HTML): `olk mail send --to a@b.com --subject "Hi" --body "<p>Hello</p>" --html`
@@ -45,6 +45,7 @@ Mail
 - Send (multi-recipient): `olk mail send --to a@b.com --to b@c.com --cc d@e.com --subject "Hi" --body "Hello"`
 - Send with attachments: `olk mail send --to a@b.com --subject "Report" --body "See attached" --attach report.pdf --attach data.csv`
 - Send with importance: `olk mail send --to a@b.com --subject "Urgent" --body "ASAP" --importance high`
+- Send with read receipt: `olk mail send --to a@b.com --subject "Contract" --body "Please review" --read-receipt`
 - Search (KQL): `olk mail search "from:boss@co.com subject:urgent" [-n 25]`
 - Reply: `olk mail reply <ID> --body "Thanks"`
 - Reply all: `olk mail reply <ID> --body "Thanks" --reply-all`
@@ -79,6 +80,20 @@ Out-of-Office
 - External message: `olk mail ooo set --message "Internal msg" --external-message "External msg"`
 - Disable auto-reply: `olk mail ooo off`
 
+Inbox Rules
+
+- List rules: `olk mail rules list`
+- Create rule: `olk mail rules create --name "Archive boss" --from boss@co.com --move Archive`
+- Create rule with multiple actions: `olk mail rules create --name "Auto-read newsletters" --subject-contains "newsletter" --mark-read`
+- Create rule with forwarding: `olk mail rules create --name "Forward invoices" --subject-contains "invoice" --forward-to accounting@co.com`
+- Delete rule: `olk mail rules delete <RULE_ID> --force`
+
+Focused Inbox
+
+- List focused messages: `olk mail list --focused`
+- List other messages: `olk mail list --other`
+- Combine with filters: `olk mail list --focused --unread`
+
 Well-known folder names: `inbox`, `sentitems`, `drafts`, `deleteditems`, `junkemail`, `archive`.
 
 Calendar
@@ -94,6 +109,13 @@ Calendar
 - Respond to invite: `olk calendar respond <ID> accept|decline|tentative`
 - List calendars: `olk calendar calendars`
 - Check availability: `olk calendar availability --emails user@co.com [--emails user2@co.com] [-d DAYS] [--after DATE] [--before DATE]`
+- Calendar view (expanded recurring): `olk calendar view [-d 7] [--after DATE] [--before DATE] [--calendar ID] [-n 50]`
+- Find meeting times: `olk calendar find-times --attendees a@b.com --attendees c@d.com [-d 60] [--after DATE] [--before DATE]`
+
+People / Directory
+
+- Search people: `olk people search "john" [-n 25]`
+- Search by name: `olk people search "Jane Smith"`
 
 Contacts
 
@@ -161,6 +183,10 @@ Scripting Examples
 - Check if someone is free: `olk calendar availability --emails colleague@co.com --json --results-only | jq '.[] | .items'`
 - List incomplete tasks: `olk todo list --status notStarted --json --results-only | jq -r '.[].title'`
 - Set vacation responder: `olk mail ooo set --message "On vacation until April 17" --start 2026-04-10 --end 2026-04-17`
+- List inbox rules: `olk mail rules list --json --results-only | jq -r '.[] | select(.isEnabled) | .displayName'`
+- Find meeting times: `olk calendar find-times --attendees a@b.com --attendees c@d.com --json --results-only | jq '.[0]'`
+- Search people: `olk people search "engineering" --json --results-only | jq -r '.[].email'`
+- Focused inbox unread: `olk mail list --focused --unread --json --results-only | jq length`
 
 Notes
 

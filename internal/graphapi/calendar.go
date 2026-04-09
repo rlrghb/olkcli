@@ -3,8 +3,10 @@ package graphapi
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
+	"github.com/microsoft/kiota-abstractions-go/serialization"
 	"github.com/microsoftgraph/msgraph-sdk-go/models"
 	"github.com/microsoftgraph/msgraph-sdk-go/users"
 )
@@ -22,6 +24,7 @@ type CalendarEvent struct {
 	IsOnline    bool     `json:"isOnlineMeeting"`
 	OnlineURL   string   `json:"onlineMeetingUrl,omitempty"`
 	Status      string   `json:"showAs"`
+	Recurrence  string   `json:"recurrence,omitempty"`
 	BodyPreview string   `json:"bodyPreview"`
 	Body        string   `json:"body,omitempty"`
 }
@@ -44,7 +47,7 @@ func (c *Client) ListEvents(ctx context.Context, startTime, endTime time.Time, c
 		StartDateTime: &startStr,
 		EndDateTime:   &endStr,
 		Top:           &top,
-		Select:        []string{"id", "subject", "start", "end", "location", "organizer", "attendees", "isAllDay", "isOnlineMeeting", "onlineMeetingUrl", "showAs", "bodyPreview"},
+		Select:        []string{"id", "subject", "start", "end", "location", "organizer", "attendees", "isAllDay", "isOnlineMeeting", "onlineMeetingUrl", "showAs", "bodyPreview", "recurrence"},
 		Orderby:       []string{"start/dateTime"},
 	}
 
@@ -292,5 +295,186 @@ func convertEvent(e models.Eventable) CalendarEvent {
 	if e.GetBodyPreview() != nil {
 		ev.BodyPreview = *e.GetBodyPreview()
 	}
+	if e.GetRecurrence() != nil {
+		ev.Recurrence = formatRecurrence(e.GetRecurrence())
+	}
 	return ev
+}
+
+// formatRecurrence converts a recurrence pattern to a human-readable string.
+func formatRecurrence(r models.PatternedRecurrenceable) string {
+	if r.GetPattern() == nil {
+		return ""
+	}
+	p := r.GetPattern()
+	if p.GetTypeEscaped() == nil {
+		return ""
+	}
+
+	interval := int32(1)
+	if p.GetInterval() != nil {
+		interval = *p.GetInterval()
+	}
+
+	switch *p.GetTypeEscaped() {
+	case models.DAILY_RECURRENCEPATTERNTYPE:
+		if interval == 1 {
+			return "Daily"
+		}
+		return fmt.Sprintf("Every %d days", interval)
+	case models.WEEKLY_RECURRENCEPATTERNTYPE:
+		days := formatDaysOfWeek(p.GetDaysOfWeek())
+		if interval == 1 {
+			return fmt.Sprintf("Weekly on %s", days)
+		}
+		return fmt.Sprintf("Every %d weeks on %s", interval, days)
+	case models.ABSOLUTEMONTHLY_RECURRENCEPATTERNTYPE:
+		day := int32(1)
+		if p.GetDayOfMonth() != nil {
+			day = *p.GetDayOfMonth()
+		}
+		if interval == 1 {
+			return fmt.Sprintf("Monthly on day %d", day)
+		}
+		return fmt.Sprintf("Every %d months on day %d", interval, day)
+	case models.RELATIVEMONTHLY_RECURRENCEPATTERNTYPE:
+		days := formatDaysOfWeek(p.GetDaysOfWeek())
+		if interval == 1 {
+			return fmt.Sprintf("Monthly on %s", days)
+		}
+		return fmt.Sprintf("Every %d months on %s", interval, days)
+	case models.ABSOLUTEYEARLY_RECURRENCEPATTERNTYPE:
+		day := int32(1)
+		if p.GetDayOfMonth() != nil {
+			day = *p.GetDayOfMonth()
+		}
+		if interval == 1 {
+			return fmt.Sprintf("Yearly on day %d", day)
+		}
+		return fmt.Sprintf("Every %d years on day %d", interval, day)
+	case models.RELATIVEYEARLY_RECURRENCEPATTERNTYPE:
+		days := formatDaysOfWeek(p.GetDaysOfWeek())
+		if interval == 1 {
+			return fmt.Sprintf("Yearly on %s", days)
+		}
+		return fmt.Sprintf("Every %d years on %s", interval, days)
+	default:
+		return "Recurring"
+	}
+}
+
+func formatDaysOfWeek(days []models.DayOfWeek) string {
+	if len(days) == 0 {
+		return ""
+	}
+	names := make([]string, 0, len(days))
+	for _, d := range days {
+		names = append(names, strings.Title(d.String())) //nolint:staticcheck
+	}
+	return strings.Join(names, ", ")
+}
+
+// ListCalendarView returns expanded occurrences (including recurring) in a date range.
+func (c *Client) ListCalendarView(ctx context.Context, startTime, endTime time.Time, calendarID string, top int32) ([]CalendarEvent, error) {
+	// This uses the same calendarView endpoint as ListEvents, which already expands recurrences.
+	return c.ListEvents(ctx, startTime, endTime, calendarID, top)
+}
+
+// MeetingTimeSuggestion represents a suggested meeting time
+type MeetingTimeSuggestion struct {
+	Start                  string                    `json:"start"`
+	End                    string                    `json:"end"`
+	Confidence             float64                   `json:"confidence"`
+	OrganizerAvailability  string                    `json:"organizerAvailability"`
+	AttendeeAvailabilities []AttendeeAvailabilityInfo `json:"attendeeAvailabilities,omitempty"`
+}
+
+// AttendeeAvailabilityInfo represents an attendee's availability for a time slot
+type AttendeeAvailabilityInfo struct {
+	Email        string `json:"email"`
+	Availability string `json:"availability"`
+}
+
+// FindMeetingTimes finds available meeting times for the given attendees
+func (c *Client) FindMeetingTimes(ctx context.Context, attendees []string, start, end time.Time, durationMinutes int32) ([]MeetingTimeSuggestion, error) {
+	for _, email := range attendees {
+		if err := ValidateEmail(email); err != nil {
+			return nil, fmt.Errorf("invalid attendee email: %w", err)
+		}
+	}
+
+	body := users.NewItemFindMeetingTimesPostRequestBody()
+
+	// Set attendees
+	var attList []models.AttendeeBaseable
+	for _, email := range attendees {
+		att := models.NewAttendeeBase()
+		addr := models.NewEmailAddress()
+		e := email
+		addr.SetAddress(&e)
+		att.SetEmailAddress(addr)
+		required := models.REQUIRED_ATTENDEETYPE
+		att.SetTypeEscaped(&required)
+		attList = append(attList, att)
+	}
+	body.SetAttendees(attList)
+
+	// Set time constraint
+	tc := models.NewTimeConstraint()
+	slot := models.NewTimeSlot()
+	startDt := models.NewDateTimeTimeZone()
+	startStr := start.UTC().Format("2006-01-02T15:04:05")
+	utc := "UTC"
+	startDt.SetDateTime(&startStr)
+	startDt.SetTimeZone(&utc)
+	slot.SetStart(startDt)
+
+	endDt := models.NewDateTimeTimeZone()
+	endStr := end.UTC().Format("2006-01-02T15:04:05")
+	endDt.SetDateTime(&endStr)
+	endDt.SetTimeZone(&utc)
+	slot.SetEnd(endDt)
+
+	tc.SetTimeSlots([]models.TimeSlotable{slot})
+	body.SetTimeConstraint(tc)
+
+	// Set duration
+	duration := serialization.NewDuration(0, 0, 0, 0, int(durationMinutes), 0, 0)
+	body.SetMeetingDuration(duration)
+
+	resp, err := c.inner.Me().FindMeetingTimes().Post(ctx, body, nil)
+	if err != nil {
+		return nil, fmt.Errorf("finding meeting times: %w", err)
+	}
+
+	var suggestions []MeetingTimeSuggestion
+	for _, s := range resp.GetMeetingTimeSuggestions() {
+		suggestion := MeetingTimeSuggestion{}
+		if s.GetConfidence() != nil {
+			suggestion.Confidence = *s.GetConfidence()
+		}
+		if s.GetOrganizerAvailability() != nil {
+			suggestion.OrganizerAvailability = s.GetOrganizerAvailability().String()
+		}
+		if ts := s.GetMeetingTimeSlot(); ts != nil {
+			if ts.GetStart() != nil && ts.GetStart().GetDateTime() != nil {
+				suggestion.Start = *ts.GetStart().GetDateTime()
+			}
+			if ts.GetEnd() != nil && ts.GetEnd().GetDateTime() != nil {
+				suggestion.End = *ts.GetEnd().GetDateTime()
+			}
+		}
+		for _, a := range s.GetAttendeeAvailability() {
+			ai := AttendeeAvailabilityInfo{}
+			if a.GetAvailability() != nil {
+				ai.Availability = a.GetAvailability().String()
+			}
+			if a.GetAttendee() != nil && a.GetAttendee().GetEmailAddress() != nil && a.GetAttendee().GetEmailAddress().GetAddress() != nil {
+				ai.Email = *a.GetAttendee().GetEmailAddress().GetAddress()
+			}
+			suggestion.AttendeeAvailabilities = append(suggestion.AttendeeAvailabilities, ai)
+		}
+		suggestions = append(suggestions, suggestion)
+	}
+	return suggestions, nil
 }

@@ -5,7 +5,7 @@
 - `cmd/olk/`: CLI entrypoint — minimal, delegates to `internal/cmd.Execute()`.
 - `internal/cmd/`: Command implementations using kong structs. Each command group has its own file(s): `mail_*.go`, `calendar*.go`, `todo.go`, `whoami.go`, etc.
 - `internal/msauth/`: Microsoft OAuth2 implementation — device code flow, token refresh, credential bridge.
-- `internal/graphapi/`: Microsoft Graph API wrapper — mail, calendar, contacts, todo, availability, mailbox settings.
+- `internal/graphapi/`: Microsoft Graph API wrapper — mail, calendar, contacts, todo, availability, mailbox settings, mail rules, people.
 - `internal/config/`: Configuration and XDG paths (`~/.config/olk/`).
 - `internal/secrets/`: OS keyring integration via `99designs/keyring`.
 - `internal/outfmt/`: Output formatting — JSON envelope, aligned tables, TSV.

@@ -17,6 +17,8 @@ type CalendarCmd struct {
 	Respond   CalendarRespondCmd   `cmd:"" help:"Respond to an event invitation"`
 	Calendars    CalendarCalendarsCmd    `cmd:"" help:"List available calendars"`
 	Availability CalendarAvailabilityCmd `cmd:"" help:"Check availability / free-busy"`
+	View         CalendarViewCmd         `cmd:"" help:"Calendar view with expanded recurring events"`
+	FindTimes    CalendarFindTimesCmd    `cmd:"" help:"Find available meeting times" name:"find-times"`
 }
 
 type CalendarEventsCmd struct {
@@ -74,14 +76,14 @@ func (c *CalendarEventsCmd) Run(ctx *RunContext) error {
 		return printer.PrintJSON(events, len(events), "")
 	}
 
-	headers := []string{"ID", "SUBJECT", "START", "END", "LOCATION", "STATUS"}
+	headers := []string{"ID", "SUBJECT", "START", "END", "LOCATION", "STATUS", "RECURRENCE"}
 	var rows [][]string
 	for _, e := range events {
 		id := outfmt.Truncate(e.ID, 15)
 		subject := outfmt.Truncate(e.Subject, 40)
 		startStr := outfmt.Truncate(e.Start, 16)
 		endStr := outfmt.Truncate(e.End, 16)
-		rows = append(rows, []string{id, subject, startStr, endStr, e.Location, e.Status})
+		rows = append(rows, []string{id, subject, startStr, endStr, e.Location, e.Status, e.Recurrence})
 	}
 
 	return printer.Print(headers, rows, events, len(events), "")
@@ -113,6 +115,9 @@ func (c *CalendarGetCmd) Run(ctx *RunContext) error {
 	fmt.Printf("Location:  %s\n", outfmt.Sanitize(event.Location))
 	fmt.Printf("Organizer: %s\n", outfmt.Sanitize(event.Organizer))
 	fmt.Printf("Status:    %s\n", outfmt.Sanitize(event.Status))
+	if event.Recurrence != "" {
+		fmt.Printf("Recurrence: %s\n", outfmt.Sanitize(event.Recurrence))
+	}
 	fmt.Printf("All Day:   %v\n", event.IsAllDay)
 	fmt.Printf("Online:    %v\n", event.IsOnline)
 	if event.OnlineURL != "" {

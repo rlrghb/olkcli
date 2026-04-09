@@ -139,6 +139,7 @@ type CLI struct {
 	Calendar CalendarCmd `cmd:"" help:"Calendar commands"`
 	Contacts ContactsCmd `cmd:"" help:"Contacts commands"`
 	Todo     TodoCmd     `cmd:"" help:"Microsoft To Do tasks"`
+	People   PeopleCmd   `cmd:"" help:"People directory search"`
 	Version  VersionCmd  `cmd:"" help:"Show version information"`
 	Whoami   WhoamiCmd   `cmd:"" help:"Show current user profile"`
 

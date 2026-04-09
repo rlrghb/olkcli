@@ -7,6 +7,7 @@ const (
 	ScopeCalendar      = "Calendars.ReadWrite"
 	ScopeContacts      = "Contacts.ReadWrite"
 	ScopeTasks         = "Tasks.ReadWrite"
+	ScopePeople        = "People.Read"
 	ScopeUser          = "User.Read"
 	ScopeOfflineAccess = "offline_access"
 )
@@ -20,6 +21,7 @@ func DefaultScopes() []string {
 		ScopeCalendar,
 		ScopeContacts,
 		ScopeTasks,
+		ScopePeople,
 	}
 }
 
@@ -31,5 +33,6 @@ func ReadOnlyScopes() []string {
 		"Calendars.Read",
 		"Contacts.Read",
 		"Tasks.Read",
+		"People.Read",
 	}
 }

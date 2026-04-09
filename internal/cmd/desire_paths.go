@@ -2,24 +2,26 @@ package cmd
 
 // SendCmd is a shortcut for `olk mail send`
 type SendCmd struct {
-	To      []string `help:"Recipient email addresses" required:"" short:"t"`
-	Subject string   `help:"Email subject" required:"" short:"s"`
-	Body    string   `help:"Email body" short:"b"`
-	CC      []string `help:"CC recipients"`
-	BCC     []string `help:"BCC recipients"`
-	HTML    bool     `help:"Send body as HTML"`
-	Attach  []string `help:"File paths to attach" type:"path"`
+	To          []string `help:"Recipient email addresses" required:"" short:"t"`
+	Subject     string   `help:"Email subject" required:"" short:"s"`
+	Body        string   `help:"Email body" short:"b"`
+	CC          []string `help:"CC recipients"`
+	BCC         []string `help:"BCC recipients"`
+	HTML        bool     `help:"Send body as HTML"`
+	Attach      []string `help:"File paths to attach" type:"path"`
+	ReadReceipt bool     `help:"Request a read receipt"`
 }
 
 func (c *SendCmd) Run(ctx *RunContext) error {
 	inner := &MailSendCmd{
-		To:      c.To,
-		Subject: c.Subject,
-		Body:    c.Body,
-		CC:      c.CC,
-		BCC:     c.BCC,
-		HTML:    c.HTML,
-		Attach:  c.Attach,
+		To:          c.To,
+		Subject:     c.Subject,
+		Body:        c.Body,
+		CC:          c.CC,
+		BCC:         c.BCC,
+		HTML:        c.HTML,
+		Attach:      c.Attach,
+		ReadReceipt: c.ReadReceipt,
 	}
 	return inner.Run(ctx)
 }
