@@ -284,6 +284,46 @@ olk send --to ops@company.com --subject "Deploy complete" --body "$(date): v1.2.
 olk mail list --json --results-only | jq -r '.[] | select(.isRead == false) | "\(.from): \(.subject)"'
 ```
 
+## AI Agent Integration
+
+`olk` ships with a [`SKILL.md`](SKILL.md) that follows the [Agent Skills](https://agentskills.io) open standard. This lets AI coding assistants discover and use `olk` commands on your behalf — checking mail, scheduling meetings, managing contacts, all from within your AI workflow.
+
+### Supported Platforms
+
+| Platform | How it works |
+|----------|-------------|
+| [Claude Code](https://claude.com/claude-code) | Copy `SKILL.md` into your Claude skills directory. Invoke with `/olk` or let Claude use it automatically. |
+| [OpenClaw](https://openclaw.ai) | Reads `SKILL.md` with metadata gating (`requires.bins: ["olk"]`). Auto-installs via `go install` if missing. |
+| Other [AgentSkills](https://agentskills.io)-compatible tools | Any tool supporting the Agent Skills standard can pick up the `SKILL.md` for command discovery and usage instructions. |
+
+### Installation
+
+**Claude Code** (personal — available across all projects):
+
+```bash
+mkdir -p ~/.claude/skills/olk
+cp SKILL.md ~/.claude/skills/olk/SKILL.md
+```
+
+**Claude Code** (project-scoped — available only in this repo):
+
+```bash
+mkdir -p .claude/skills/olk
+cp SKILL.md .claude/skills/olk/SKILL.md
+```
+
+**OpenClaw**: Place `SKILL.md` in your OpenClaw skills directory, or point OpenClaw to this repo.
+
+Then ask your AI assistant to "check my inbox" or "send an email" and it will use `olk`.
+
+### What the skill teaches AI agents
+
+- All commands, flags, and output formats
+- When to use `--json --results-only` for programmatic parsing
+- KQL search syntax for mail
+- How to handle auth errors
+- Safety rules (confirm before sending, never guess IDs, use `--force` for deletes)
+
 ## Architecture
 
 ```
@@ -297,6 +337,7 @@ olkcli/
 │   ├── secrets/                 # OS keyring integration
 │   ├── outfmt/                  # Output formatting (JSON/table/TSV)
 │   └── errfmt/                  # Error formatting
+├── SKILL.md                     # Agent Skills standard — AI assistant integration
 ├── Makefile
 ├── .goreleaser.yaml
 └── go.mod

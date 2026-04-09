@@ -10,6 +10,7 @@
 - `internal/secrets/`: OS keyring integration via `99designs/keyring`.
 - `internal/outfmt/`: Output formatting — JSON envelope, aligned tables, TSV.
 - `internal/errfmt/`: Graph API error mapping to actionable user messages.
+- `SKILL.md`: [Agent Skills](https://agentskills.io) standard file — teaches AI assistants (Claude Code, OpenClaw, etc.) how to use `olk` commands.
 - `bin/`: build outputs (gitignored).
 
 ## Build, Test, and Development Commands
