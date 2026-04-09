@@ -291,8 +291,8 @@ olk people search <QUERY> [-n 25]
 ```
 olk contacts list [-n 25] [--folder ID]
 olk contacts get <ID>
-olk contacts create --first-name X --last-name Y [--email Z] [--phone P] [--company C] [--title T]
-olk contacts update <ID> [--first-name X] [--last-name Y] [--email Z] [--phone P] [--company C] [--title T]
+olk contacts create --first-name X --last-name Y [--email Z] [-p MOBILE] [--business-phone P] [--home-phone P] [--company C] [--title T]
+olk contacts update <ID> [--first-name X] [--last-name Y] [--email Z] [-p MOBILE] [--business-phone P] [--home-phone P] [--company C] [--title T]
 olk contacts delete <ID> [--force]
 olk contacts search <QUERY> [-n 25]
 ```

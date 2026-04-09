@@ -15,14 +15,16 @@ var safeSearchQuery = regexp.MustCompile(`^[a-zA-Z0-9 @._-]+$`)
 
 // Contact is a simplified contact representation
 type Contact struct {
-	ID          string   `json:"id"`
-	DisplayName string   `json:"displayName"`
-	FirstName   string   `json:"givenName"`
-	LastName    string   `json:"surname"`
-	Emails      []string `json:"emailAddresses"`
-	Phones      []string `json:"phones,omitempty"`
-	Company     string   `json:"companyName"`
-	JobTitle    string   `json:"jobTitle"`
+	ID             string   `json:"id"`
+	DisplayName    string   `json:"displayName"`
+	FirstName      string   `json:"givenName"`
+	LastName       string   `json:"surname"`
+	Emails         []string `json:"emailAddresses"`
+	BusinessPhones []string `json:"businessPhones,omitempty"`
+	HomePhones     []string `json:"homePhones,omitempty"`
+	MobilePhone    string   `json:"mobilePhone,omitempty"`
+	Company        string   `json:"companyName"`
+	JobTitle       string   `json:"jobTitle"`
 }
 
 func (c *Client) ListContacts(ctx context.Context, top int32) ([]Contact, error) {
@@ -61,7 +63,7 @@ func (c *Client) GetContact(ctx context.Context, contactID string) (*Contact, er
 	return &contact, nil
 }
 
-func (c *Client) CreateContact(ctx context.Context, firstName, lastName, email, phone, company, jobTitle string) (*Contact, error) {
+func (c *Client) CreateContact(ctx context.Context, firstName, lastName, email, businessPhone, homePhone, mobilePhone, company, jobTitle string) (*Contact, error) {
 	ct := models.NewContact()
 	if firstName != "" {
 		ct.SetGivenName(&firstName)
@@ -77,11 +79,23 @@ func (c *Client) CreateContact(ctx context.Context, firstName, lastName, email, 
 		addr.SetAddress(&email)
 		ct.SetEmailAddresses([]models.EmailAddressable{addr})
 	}
-	if phone != "" {
-		if err := ValidatePhone(phone); err != nil {
-			return nil, fmt.Errorf("invalid contact phone: %w", err)
+	if businessPhone != "" {
+		if err := ValidatePhone(businessPhone); err != nil {
+			return nil, fmt.Errorf("invalid business phone: %w", err)
 		}
-		ct.SetBusinessPhones([]string{phone})
+		ct.SetBusinessPhones([]string{businessPhone})
+	}
+	if homePhone != "" {
+		if err := ValidatePhone(homePhone); err != nil {
+			return nil, fmt.Errorf("invalid home phone: %w", err)
+		}
+		ct.SetHomePhones([]string{homePhone})
+	}
+	if mobilePhone != "" {
+		if err := ValidatePhone(mobilePhone); err != nil {
+			return nil, fmt.Errorf("invalid mobile phone: %w", err)
+		}
+		ct.SetMobilePhone(&mobilePhone)
 	}
 	if company != "" {
 		ct.SetCompanyName(&company)
@@ -98,7 +112,7 @@ func (c *Client) CreateContact(ctx context.Context, firstName, lastName, email, 
 	return &contact, nil
 }
 
-func (c *Client) UpdateContact(ctx context.Context, contactID string, firstName, lastName, email, phone, company, jobTitle *string) (*Contact, error) {
+func (c *Client) UpdateContact(ctx context.Context, contactID string, firstName, lastName, email, businessPhone, homePhone, mobilePhone, company, jobTitle *string) (*Contact, error) {
 	ct := models.NewContact()
 	if firstName != nil {
 		ct.SetGivenName(firstName)
@@ -114,11 +128,23 @@ func (c *Client) UpdateContact(ctx context.Context, contactID string, firstName,
 		addr.SetAddress(email)
 		ct.SetEmailAddresses([]models.EmailAddressable{addr})
 	}
-	if phone != nil {
-		if err := ValidatePhone(*phone); err != nil {
-			return nil, fmt.Errorf("invalid contact phone: %w", err)
+	if businessPhone != nil {
+		if err := ValidatePhone(*businessPhone); err != nil {
+			return nil, fmt.Errorf("invalid business phone: %w", err)
 		}
-		ct.SetBusinessPhones([]string{*phone})
+		ct.SetBusinessPhones([]string{*businessPhone})
+	}
+	if homePhone != nil {
+		if err := ValidatePhone(*homePhone); err != nil {
+			return nil, fmt.Errorf("invalid home phone: %w", err)
+		}
+		ct.SetHomePhones([]string{*homePhone})
+	}
+	if mobilePhone != nil {
+		if err := ValidatePhone(*mobilePhone); err != nil {
+			return nil, fmt.Errorf("invalid mobile phone: %w", err)
+		}
+		ct.SetMobilePhone(mobilePhone)
 	}
 	if company != nil {
 		ct.SetCompanyName(company)
@@ -200,14 +226,10 @@ func convertContact(ct models.Contactable) Contact {
 			contact.Emails = append(contact.Emails, *e.GetAddress())
 		}
 	}
-	for _, p := range ct.GetBusinessPhones() {
-		contact.Phones = append(contact.Phones, p)
-	}
-	for _, p := range ct.GetHomePhones() {
-		contact.Phones = append(contact.Phones, p)
-	}
+	contact.BusinessPhones = ct.GetBusinessPhones()
+	contact.HomePhones = ct.GetHomePhones()
 	if ct.GetMobilePhone() != nil {
-		contact.Phones = append(contact.Phones, *ct.GetMobilePhone())
+		contact.MobilePhone = *ct.GetMobilePhone()
 	}
 	if ct.GetCompanyName() != nil {
 		contact.Company = *ct.GetCompanyName()

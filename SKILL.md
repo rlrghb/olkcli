@@ -121,8 +121,8 @@ Contacts
 
 - List: `olk contacts list [-n 25]`
 - Get: `olk contacts get <ID>`
-- Create: `olk contacts create --first-name John --last-name Doe [--email j@d.com] [--phone 555-1234] [--company Acme] [--title Engineer]`
-- Update: `olk contacts update <ID> [--first-name X] [--last-name Y] [--email Z] [--phone P] [--company C] [--title T]`
+- Create: `olk contacts create --first-name John --last-name Doe [--email j@d.com] [-p 555-1234] [--business-phone P] [--home-phone P] [--company Acme] [--title Engineer]`
+- Update: `olk contacts update <ID> [--first-name X] [--last-name Y] [--email Z] [-p MOBILE] [--business-phone P] [--home-phone P] [--company C] [--title T]`
 - Delete: `olk contacts delete <ID> --force`
 - Search: `olk contacts search "John" [-n 25]`
 
