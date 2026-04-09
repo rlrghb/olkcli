@@ -1,0 +1,44 @@
+version: 2
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: olkcli
+    main: ./cmd/olkcli
+    binary: olkcli
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X github.com/rlrghb/olkcli/internal/cmd.Version={{.Version}}
+      - -X github.com/rlrghb/olkcli/internal/cmd.Commit={{.Commit}}
+      - -X github.com/rlrghb/olkcli/internal/cmd.Date={{.Date}}
+
+archives:
+  - id: olkcli
+    builds:
+      - olkcli
+    name_template: "olkcli_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        format: zip
+
+checksum:
+  name_template: "checksums.txt"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^ci:"
