@@ -1,8 +1,11 @@
 package graphapi
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
+
+	"github.com/microsoftgraph/msgraph-sdk-go/models/odataerrors"
 )
 
 // safeIDPattern matches typical Microsoft Graph IDs (alphanumeric, hyphens, underscores, equals, plus, slash for base64).
@@ -39,6 +42,32 @@ func ValidatePhone(phone string) error {
 		return fmt.Errorf("invalid phone number: %q", phone)
 	}
 	return nil
+}
+
+// graphErrorMessage extracts a readable message from a Graph API error.
+func graphErrorMessage(err error) string {
+	var odataErr *odataerrors.ODataError
+	if errors.As(err, &odataErr) {
+		if main := odataErr.GetErrorEscaped(); main != nil {
+			msg := ""
+			if main.GetCode() != nil {
+				msg = *main.GetCode()
+			}
+			if main.GetMessage() != nil {
+				if msg != "" {
+					msg += ": "
+				}
+				msg += *main.GetMessage()
+			}
+			if msg != "" {
+				return msg
+			}
+		}
+	}
+	if err != nil {
+		return err.Error()
+	}
+	return "unknown error"
 }
 
 // clampTop normalizes the top/limit parameter to a safe range.
