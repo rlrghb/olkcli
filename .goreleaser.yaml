@@ -5,9 +5,9 @@ before:
     - go mod tidy
 
 builds:
-  - id: olkcli
-    main: ./cmd/olkcli
-    binary: olkcli
+  - id: olk
+    main: ./cmd/olk
+    binary: olk
     env:
       - CGO_ENABLED=0
     goos:
@@ -24,10 +24,10 @@ builds:
       - -X github.com/rlrghb/olkcli/internal/cmd.Date={{.Date}}
 
 archives:
-  - id: olkcli
+  - id: olk
     builds:
-      - olkcli
-    name_template: "olkcli_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+      - olk
+    name_template: "olk_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     format_overrides:
       - goos: windows
         format: zip

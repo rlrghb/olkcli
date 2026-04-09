@@ -8,12 +8,12 @@ LDFLAGS  = -s -w \
 	-X $(MODULE)/internal/cmd.Commit=$(COMMIT) \
 	-X $(MODULE)/internal/cmd.Date=$(DATE)
 
-BINARY   = ./bin/olkcli
+BINARY   = ./bin/olk
 
 .PHONY: build test lint install clean version
 
 build:
-	go build -ldflags '$(LDFLAGS)' -o $(BINARY) ./cmd/olkcli
+	go build -ldflags '$(LDFLAGS)' -o $(BINARY) ./cmd/olk
 
 test:
 	go test -race -count=1 ./...
@@ -22,7 +22,7 @@ lint:
 	golangci-lint run ./...
 
 install: build
-	cp $(BINARY) $(GOPATH)/bin/olkcli
+	cp $(BINARY) $(GOPATH)/bin/olk
 
 clean:
 	rm -rf ./bin

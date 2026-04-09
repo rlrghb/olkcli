@@ -2,11 +2,11 @@
 
 ## Project Structure
 
-- `cmd/olkcli/`: CLI entrypoint — minimal, delegates to `internal/cmd.Execute()`.
+- `cmd/olk/`: CLI entrypoint — minimal, delegates to `internal/cmd.Execute()`.
 - `internal/cmd/`: Command implementations using kong structs. Each command group has its own file(s).
 - `internal/msauth/`: Microsoft OAuth2 implementation — device code flow, token refresh, credential bridge.
 - `internal/graphapi/`: Microsoft Graph API wrapper — mail, calendar, contacts operations.
-- `internal/config/`: Configuration and XDG paths (`~/.config/olkcli/`).
+- `internal/config/`: Configuration and XDG paths (`~/.config/olk/`).
 - `internal/secrets/`: OS keyring integration via `99designs/keyring`.
 - `internal/outfmt/`: Output formatting — JSON envelope, aligned tables, TSV.
 - `internal/errfmt/`: Graph API error mapping to actionable user messages.
@@ -14,7 +14,7 @@
 
 ## Build, Test, and Development Commands
 
-- `make build`: build `bin/olkcli` with version ldflags.
+- `make build`: build `bin/olk` with version ldflags.
 - `make test`: run tests with race detector.
 - `make lint`: run `golangci-lint`.
 - `make install`: build and copy to `$GOPATH/bin`.
@@ -53,4 +53,4 @@
 
 - Never commit OAuth tokens or client secrets.
 - Prefer OS keychain backends; the file fallback is for headless environments only.
-- Config dir (`~/.config/olkcli/`) uses 0700 permissions; token files use 0600.
+- Config dir (`~/.config/olk/`) uses 0700 permissions; token files use 0600.

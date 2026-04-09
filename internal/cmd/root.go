@@ -105,7 +105,7 @@ func (r *RunContext) GraphClient() (*graphapi.Client, error) {
 		email = cfg.GetDefaultAccount()
 	}
 	if email == "" {
-		return nil, fmt.Errorf("no account configured. Run 'olkcli auth login' first")
+		return nil, fmt.Errorf("no account configured. Run 'olk auth login' first")
 	}
 
 	// Get client config for this account
@@ -152,7 +152,7 @@ type CLI struct {
 func Execute() int {
 	cli := &CLI{}
 	ctx := kong.Parse(cli,
-		kong.Name("olkcli"),
+		kong.Name("olk"),
 		kong.Description("Microsoft Outlook CLI - Access email, calendar, and contacts from the command line"),
 		kong.UsageOnError(),
 		kong.ConfigureHelp(kong.HelpOptions{

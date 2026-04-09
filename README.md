@@ -1,8 +1,8 @@
-# olkcli — Microsoft Outlook in Your Terminal
+# olk — Microsoft Outlook in Your Terminal
 
 A fast, scriptable CLI for Microsoft Outlook via the Microsoft Graph API. Manage email, calendar, and contacts from the command line.
 
-Works with both **personal Microsoft accounts** and **enterprise (Azure AD / Entra ID)** accounts. Zero-config setup with device-code authentication — just run `olkcli auth login` and go.
+Works with both **personal Microsoft accounts** and **enterprise (Azure AD / Entra ID)** accounts. Zero-config setup with device-code authentication — just run `olk auth login` and go.
 
 ## Key Capabilities
 
@@ -35,53 +35,53 @@ Works with both **personal Microsoft accounts** and **enterprise (Azure AD / Ent
 git clone https://github.com/rlrghb/olkcli.git
 cd olkcli
 make build
-# Binary is at ./bin/olkcli
+# Binary is at ./bin/olk
 ```
 
 ### Go Install
 
 ```bash
-go install github.com/rlrghb/olkcli/cmd/olkcli@latest
+go install github.com/rlrghb/olkcli/cmd/olk@latest
 ```
 
 ### Homebrew (coming soon)
 
 ```bash
-brew install rlrghb/tap/olkcli
+brew install rlrghb/tap/olk
 ```
 
 ## Quick Start
 
 ```bash
 # Authenticate (opens browser for device-code flow)
-olkcli auth login
+olk auth login
 
 # List recent inbox messages
-olkcli mail list
+olk mail list
 
 # Read a specific message
-olkcli mail get <message-id>
+olk mail get <message-id>
 
 # Send an email
-olkcli mail send --to user@example.com --subject "Hello" --body "Hi there"
+olk mail send --to user@example.com --subject "Hello" --body "Hi there"
 
 # Pipe body from stdin
-echo "Hello from the CLI" | olkcli mail send --to user@example.com --subject "Piped"
+echo "Hello from the CLI" | olk mail send --to user@example.com --subject "Piped"
 
 # Search mail
-olkcli mail search "from:boss@company.com subject:urgent"
+olk mail search "from:boss@company.com subject:urgent"
 
 # View this week's calendar
-olkcli calendar events
+olk calendar events
 
 # Today's events
-olkcli today
+olk today
 
 # Create a meeting
-olkcli calendar create --subject "Standup" --start 2024-01-15T09:00 --end 2024-01-15T09:30 --attendees colleague@company.com
+olk calendar create --subject "Standup" --start 2024-01-15T09:00 --end 2024-01-15T09:30 --attendees colleague@company.com
 
 # List contacts
-olkcli contacts list
+olk contacts list
 ```
 
 ## Output Formats
@@ -95,7 +95,7 @@ olkcli contacts list
 ### JSON Envelope
 
 ```bash
-olkcli mail list --json
+olk mail list --json
 ```
 
 ```json
@@ -109,13 +109,13 @@ olkcli mail list --json
 Use `--results-only` to get just the array:
 
 ```bash
-olkcli mail list --json --results-only | jq '.[0].subject'
+olk mail list --json --results-only | jq '.[0].subject'
 ```
 
 ### Field Selection
 
 ```bash
-olkcli mail list --select from,subject
+olk mail list --select from,subject
 ```
 
 ## Authentication
@@ -123,17 +123,25 @@ olkcli mail list --select from,subject
 ### Default (Zero Config)
 
 ```bash
-olkcli auth login
+olk auth login
 ```
 
 Uses an embedded public client ID with device-code flow. Works for both personal and enterprise accounts.
 
 ### Custom App Registration
 
-For enterprise environments with their own Azure app registration:
+If your organization blocks the default client ID, or your admin requires apps to be registered under your tenant, you'll need to create your own app registration:
+
+1. Go to [Azure Portal > App registrations](https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade) and click **New registration**
+2. Set **Supported account types** to match your needs (single tenant or multi-tenant)
+3. Under **Authentication > Advanced settings**, set **Allow public client flows** to **Yes** (required for device-code flow)
+4. Under **API permissions**, add **Microsoft Graph** delegated permissions: `Mail.ReadWrite`, `Calendars.ReadWrite`, `Contacts.ReadWrite`, `User.Read`, `offline_access`
+5. Copy the **Application (client) ID** and **Directory (tenant) ID** from the app's Overview page
+
+Then use them:
 
 ```bash
-olkcli auth login --client-id YOUR_CLIENT_ID --tenant-id YOUR_TENANT_ID
+olk auth login --client-id YOUR_CLIENT_ID --tenant-id YOUR_TENANT_ID
 ```
 
 Or via environment variables:
@@ -141,23 +149,23 @@ Or via environment variables:
 ```bash
 export OLK_CLIENT_ID=your-client-id
 export OLK_TENANT_ID=your-tenant-id
-olkcli auth login
+olk auth login
 ```
 
 ### Multi-Account
 
 ```bash
 # Login to a second account
-olkcli auth login
+olk auth login
 
 # List accounts
-olkcli auth list
+olk auth list
 
 # Use a specific account
-olkcli mail list --account user2@example.com
+olk mail list --account user2@example.com
 
 # Check auth status
-olkcli auth status
+olk auth status
 ```
 
 ### Token Storage
@@ -169,16 +177,16 @@ Refresh tokens are stored in the OS credential manager:
 
 ## Shortcuts
 
-For common workflows, `olkcli` provides top-level shortcuts:
+For common workflows, `olk` provides top-level shortcuts:
 
 | Shortcut | Expands To |
 |----------|-----------|
-| `olkcli send` | `olkcli mail send` |
-| `olkcli ls` | `olkcli mail list` |
-| `olkcli inbox` | `olkcli mail list` |
-| `olkcli search <q>` | `olkcli mail search <q>` |
-| `olkcli today` | `olkcli calendar events --days 1` |
-| `olkcli week` | `olkcli calendar events --days 7` |
+| `olk send` | `olk mail send` |
+| `olk ls` | `olk mail list` |
+| `olk inbox` | `olk mail list` |
+| `olk search <q>` | `olk mail search <q>` |
+| `olk today` | `olk calendar events --days 1` |
+| `olk week` | `olk calendar events --days 7` |
 
 ## Global Flags
 
@@ -199,57 +207,57 @@ For common workflows, `olkcli` provides top-level shortcuts:
 ### Auth
 
 ```
-olkcli auth login [--client-id ID] [--tenant-id ID]    Login via device code
-olkcli auth logout [EMAIL]                              Remove stored credentials
-olkcli auth list                                        List authenticated accounts
-olkcli auth status                                      Check token validity
+olk auth login [--client-id ID] [--tenant-id ID]    Login via device code
+olk auth logout [EMAIL]                              Remove stored credentials
+olk auth list                                        List authenticated accounts
+olk auth status                                      Check token validity
 ```
 
 ### Mail
 
 ```
-olkcli mail list [-n 25] [-f FOLDER] [-u] [--from X] [--after DATE] [--before DATE]
-olkcli mail get <ID> [--format full|text|html]
-olkcli mail send --to X --subject Y [--body Z] [--cc X] [--bcc X] [--html]
-olkcli mail search <QUERY> [-n 25]
-olkcli mail reply <ID> --body X [--reply-all]
-olkcli mail forward <ID> --to X [--comment Y]
-olkcli mail move <ID> <FOLDER>
-olkcli mail delete <ID> [--force]
-olkcli mail mark <ID> --read|--unread
-olkcli mail folders
-olkcli mail attachments <ID>
+olk mail list [-n 25] [-f FOLDER] [-u] [--from X] [--after DATE] [--before DATE]
+olk mail get <ID> [--format full|text|html]
+olk mail send --to X --subject Y [--body Z] [--cc X] [--bcc X] [--html]
+olk mail search <QUERY> [-n 25]
+olk mail reply <ID> --body X [--reply-all]
+olk mail forward <ID> --to X [--comment Y]
+olk mail move <ID> <FOLDER>
+olk mail delete <ID> [--force]
+olk mail mark <ID> --read|--unread
+olk mail folders
+olk mail attachments <ID>
 ```
 
 ### Calendar
 
 ```
-olkcli calendar events [-d 7] [--after DATE] [--before DATE] [--calendar ID] [-n 25]
-olkcli calendar get <ID>
-olkcli calendar create --subject X --start Y --end Z [--location L] [--attendees A] [--all-day] [--online-meeting]
-olkcli calendar update <ID> [--subject X] [--start Y] [--end Z] [--location L]
-olkcli calendar delete <ID> [--force]
-olkcli calendar respond <ID> accept|decline|tentative
-olkcli calendar calendars
+olk calendar events [-d 7] [--after DATE] [--before DATE] [--calendar ID] [-n 25]
+olk calendar get <ID>
+olk calendar create --subject X --start Y --end Z [--location L] [--attendees A] [--all-day] [--online-meeting]
+olk calendar update <ID> [--subject X] [--start Y] [--end Z] [--location L]
+olk calendar delete <ID> [--force]
+olk calendar respond <ID> accept|decline|tentative
+olk calendar calendars
 ```
 
 ### Contacts
 
 ```
-olkcli contacts list [-n 25] [--folder ID]
-olkcli contacts get <ID>
-olkcli contacts create --first-name X --last-name Y [--email Z] [--phone P] [--company C] [--title T]
-olkcli contacts update <ID> [--first-name X] [--last-name Y] [--email Z] [--phone P] [--company C] [--title T]
-olkcli contacts delete <ID> [--force]
-olkcli contacts search <QUERY> [-n 25]
+olk contacts list [-n 25] [--folder ID]
+olk contacts get <ID>
+olk contacts create --first-name X --last-name Y [--email Z] [--phone P] [--company C] [--title T]
+olk contacts update <ID> [--first-name X] [--last-name Y] [--email Z] [--phone P] [--company C] [--title T]
+olk contacts delete <ID> [--force]
+olk contacts search <QUERY> [-n 25]
 ```
 
 ## Configuration
 
-Config is stored at `~/.config/olkcli/`:
+Config is stored at `~/.config/olk/`:
 
 ```
-~/.config/olkcli/
+~/.config/olk/
 ├── config.json          # Default account, client IDs
 └── accounts/            # Account metadata (email, display name)
     └── user@example.com.json
@@ -261,26 +269,26 @@ Override the config directory with `OLK_CONFIG_DIR`.
 
 ```bash
 # Count unread messages
-olkcli mail list --unread --json --results-only | jq length
+olk mail list --unread --json --results-only | jq length
 
 # Get subjects of today's events
-olkcli today --json --results-only | jq -r '.[].subject'
+olk today --json --results-only | jq -r '.[].subject'
 
 # Export contacts as CSV
-olkcli contacts list --plain --select name,email
+olk contacts list --plain --select name,email
 
 # Send from a script
-olkcli send --to ops@company.com --subject "Deploy complete" --body "$(date): v1.2.3 deployed"
+olk send --to ops@company.com --subject "Deploy complete" --body "$(date): v1.2.3 deployed"
 
 # Process inbox with jq
-olkcli mail list --json --results-only | jq -r '.[] | select(.isRead == false) | "\(.from): \(.subject)"'
+olk mail list --json --results-only | jq -r '.[] | select(.isRead == false) | "\(.from): \(.subject)"'
 ```
 
 ## Architecture
 
 ```
 olkcli/
-├── cmd/olkcli/main.go           # Entry point
+├── cmd/olk/main.go              # Entry point
 ├── internal/
 │   ├── cmd/                     # CLI commands (kong)
 │   ├── msauth/                  # Microsoft OAuth2 (device code, token refresh)
@@ -297,7 +305,7 @@ olkcli/
 ## Development
 
 ```bash
-make build      # Build to ./bin/olkcli
+make build      # Build to ./bin/olk
 make test       # Run tests
 make lint       # Run golangci-lint
 make install    # Install to $GOPATH/bin

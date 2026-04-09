@@ -7,7 +7,7 @@ import (
 	"sync"
 )
 
-// Config represents the olkcli configuration
+// Config represents the olk configuration
 type Config struct {
 	DefaultAccount string            `json:"default_account,omitempty"`
 	Clients        map[string]Client `json:"clients,omitempty"`

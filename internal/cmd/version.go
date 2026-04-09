@@ -23,6 +23,6 @@ func (c *VersionCmd) Run(ctx *RunContext) error {
 		fmt.Println(string(data))
 		return nil
 	}
-	fmt.Printf("olkcli %s (commit: %s, built: %s)\n", Version, Commit, Date)
+	fmt.Printf("olk %s (commit: %s, built: %s)\n", Version, Commit, Date)
 	return nil
 }

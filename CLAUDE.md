@@ -1,15 +1,15 @@
 # CLAUDE.md
 
-This file provides context for Claude Code when working on the olkcli project.
+This file provides context for Claude Code when working on the olk project.
 
 ## What is this project?
 
-`olkcli` is a CLI tool for Microsoft Outlook via the Microsoft Graph API. It provides terminal access to email, calendar, and contacts for both personal Microsoft accounts and enterprise Azure AD/Entra ID accounts.
+`olk` is a CLI tool for Microsoft Outlook via the Microsoft Graph API. It provides terminal access to email, calendar, and contacts for both personal Microsoft accounts and enterprise Azure AD/Entra ID accounts.
 
 ## Quick Reference
 
 ```bash
-make build          # Build binary to ./bin/olkcli
+make build          # Build binary to ./bin/olk
 make test           # Run tests
 make lint           # Lint with golangci-lint
 go mod tidy         # After changing dependencies
@@ -29,7 +29,7 @@ go mod tidy         # After changing dependencies
 - Graph SDK uses pointer types everywhere — always nil-check: `if x.GetFoo() != nil { *x.GetFoo() }`
 - Each command is in its own file: `mail_list.go`, `mail_get.go`, etc.
 - Desire paths in `desire_paths.go` delegate to real commands (e.g. `SendCmd` creates `MailSendCmd`)
-- Config lives at `~/.config/olkcli/`, tokens in OS keyring keyed by `olkcli:token:<email>`
+- Config lives at `~/.config/olk/`, tokens in OS keyring keyed by `olk:token:<email>`
 
 ## Common Tasks
 

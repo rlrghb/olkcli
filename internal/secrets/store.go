@@ -10,8 +10,8 @@ import (
 )
 
 const (
-	serviceName   = "olkcli"
-	tokenPrefix   = "olkcli:token:"
+	serviceName   = "olk"
+	tokenPrefix   = "olk:token:"
 )
 
 // Store defines the interface for credential storage.
@@ -88,7 +88,7 @@ func (s *KeyringStore) Keys() ([]string, error) {
 }
 
 // TokenKey returns the canonical keyring key for a given email address.
-// Format: olkcli:token:<email>
+// Format: olk:token:<email>
 func TokenKey(email string) string {
 	return tokenPrefix + strings.ToLower(email)
 }

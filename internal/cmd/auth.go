@@ -1,8 +1,10 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/rlrghb/olkcli/internal/config"
 	"github.com/rlrghb/olkcli/internal/msauth"
@@ -37,7 +39,12 @@ func (c *AuthLoginCmd) Run(ctx *RunContext) error {
 	if c.ReadOnly {
 		scopes = msauth.ReadOnlyScopes()
 	}
-	info, err := auth.LoginDeviceCode(ctx.Ctx, scopes)
+	// Use a dedicated context for login — the global --timeout (default 60s)
+	// is too short for device-code flow which needs minutes for the user to
+	// open a browser and enter the code.
+	loginCtx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
+	defer cancel()
+	info, err := auth.LoginDeviceCode(loginCtx, scopes)
 	if err != nil {
 		return err
 	}
@@ -126,7 +133,7 @@ func (c *AuthListCmd) Run(ctx *RunContext) error {
 	}
 
 	if len(accounts) == 0 {
-		fmt.Println("No accounts configured. Run 'olkcli auth login' to get started.")
+		fmt.Println("No accounts configured. Run 'olk auth login' to get started.")
 		return nil
 	}
 
@@ -163,7 +170,7 @@ func (c *AuthStatusCmd) Run(ctx *RunContext) error {
 		email = cfg.GetDefaultAccount()
 	}
 	if email == "" {
-		fmt.Println("No account configured. Run 'olkcli auth login' to get started.")
+		fmt.Println("No account configured. Run 'olk auth login' to get started.")
 		return nil
 	}
 
@@ -171,7 +178,7 @@ func (c *AuthStatusCmd) Run(ctx *RunContext) error {
 	_, err = ctx.GraphClient()
 	if err != nil {
 		fmt.Printf("Account: %s\nStatus: Invalid (token expired or revoked)\n", outfmt.Sanitize(email))
-		fmt.Println("Run 'olkcli auth login' to re-authenticate.")
+		fmt.Println("Run 'olk auth login' to re-authenticate.")
 		return nil
 	}
 

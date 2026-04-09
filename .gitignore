@@ -33,7 +33,7 @@ go.work.sum
 
 # Local build output
 bin/
-/olkcli
+/olk
 
 # OS files
 .DS_Store

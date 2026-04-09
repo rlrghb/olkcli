@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 )
 
-const appName = "olkcli"
+const appName = "olk"
 
 func ConfigDir() string {
 	if dir := os.Getenv("OLK_CONFIG_DIR"); dir != "" {

@@ -1,6 +1,6 @@
 package cmd
 
-// SendCmd is a shortcut for `olkcli mail send`
+// SendCmd is a shortcut for `olk mail send`
 type SendCmd struct {
 	To      []string `help:"Recipient email addresses" required:"" short:"t"`
 	Subject string   `help:"Email subject" required:"" short:"s"`
@@ -22,7 +22,7 @@ func (c *SendCmd) Run(ctx *RunContext) error {
 	return inner.Run(ctx)
 }
 
-// LsCmd is a shortcut for `olkcli mail list`
+// LsCmd is a shortcut for `olk mail list`
 type LsCmd struct {
 	Folder string `help:"Mail folder" short:"f"`
 	Top    int32  `help:"Number of messages" default:"25" short:"n"`
@@ -38,7 +38,7 @@ func (c *LsCmd) Run(ctx *RunContext) error {
 	return inner.Run(ctx)
 }
 
-// InboxCmd is a shortcut for `olkcli mail list`
+// InboxCmd is a shortcut for `olk mail list`
 type InboxCmd struct {
 	Top    int32 `help:"Number of messages" default:"25" short:"n"`
 	Unread bool  `help:"Unread only" short:"u"`
@@ -52,7 +52,7 @@ func (c *InboxCmd) Run(ctx *RunContext) error {
 	return inner.Run(ctx)
 }
 
-// SearchCmd is a shortcut for `olkcli mail search`
+// SearchCmd is a shortcut for `olk mail search`
 type SearchCmd struct {
 	Query string `arg:"" help:"Search query"`
 	Top   int32  `help:"Max results" default:"25" short:"n"`
@@ -66,7 +66,7 @@ func (c *SearchCmd) Run(ctx *RunContext) error {
 	return inner.Run(ctx)
 }
 
-// TodayCmd is a shortcut for `olkcli calendar events --days 1`
+// TodayCmd is a shortcut for `olk calendar events --days 1`
 type TodayCmd struct {
 	Top int32 `help:"Max events" default:"25" short:"n"`
 }
@@ -79,7 +79,7 @@ func (c *TodayCmd) Run(ctx *RunContext) error {
 	return inner.Run(ctx)
 }
 
-// WeekCmd is a shortcut for `olkcli calendar events --days 7`
+// WeekCmd is a shortcut for `olk calendar events --days 7`
 type WeekCmd struct {
 	Top int32 `help:"Max events" default:"25" short:"n"`
 }

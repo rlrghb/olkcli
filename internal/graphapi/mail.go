@@ -85,8 +85,11 @@ func (c *Client) ListMessages(ctx context.Context, opts ListMessagesOptions) ([]
 	orderBy := opts.OrderBy
 
 	queryParams := &users.ItemMessagesRequestBuilderGetQueryParameters{
-		Top:     &top,
-		Orderby: []string{orderBy},
+		Top: &top,
+	}
+	// Microsoft Graph does not support $orderBy combined with $search.
+	if opts.Search == "" {
+		queryParams.Orderby = []string{orderBy}
 	}
 	if opts.Filter != "" {
 		queryParams.Filter = &opts.Filter
@@ -116,9 +119,11 @@ func (c *Client) ListMessages(ctx context.Context, opts ListMessagesOptions) ([]
 			return nil, err
 		}
 		folderQueryParams := &users.ItemMailFoldersItemMessagesRequestBuilderGetQueryParameters{
-			Top:     &top,
-			Orderby: []string{orderBy},
-			Select:  queryParams.Select,
+			Top:    &top,
+			Select: queryParams.Select,
+		}
+		if opts.Search == "" {
+			folderQueryParams.Orderby = []string{orderBy}
 		}
 		if opts.Filter != "" {
 			folderQueryParams.Filter = &opts.Filter
