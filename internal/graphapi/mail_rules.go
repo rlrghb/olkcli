@@ -21,7 +21,7 @@ type MailRule struct {
 func (c *Client) ListMailRules(ctx context.Context) ([]MailRule, error) {
 	resp, err := c.inner.Me().MailFolders().ByMailFolderId("inbox").MessageRules().Get(ctx, nil)
 	if err != nil {
-		return nil, fmt.Errorf("listing mail rules: %s (note: mail rules require a work/school account)", graphErrorMessage(err))
+		return nil, fmt.Errorf("listing mail rules: %s (note: this feature requires a work/school account)", graphErrorMessage(err))
 	}
 
 	var rules []MailRule
@@ -109,7 +109,7 @@ func (c *Client) CreateMailRule(ctx context.Context, name string, from string, s
 
 	created, err := c.inner.Me().MailFolders().ByMailFolderId("inbox").MessageRules().Post(ctx, rule, nil)
 	if err != nil {
-		return nil, fmt.Errorf("creating mail rule: %s (note: mail rules require a work/school account)", graphErrorMessage(err))
+		return nil, fmt.Errorf("creating mail rule: %s (note: this feature requires a work/school account)", graphErrorMessage(err))
 	}
 
 	result := convertMailRule(created)
