@@ -64,7 +64,7 @@ make build
 go install github.com/rlrghb/olkcli/cmd/olk@latest
 ```
 
-### Homebrew (coming soon)
+### Homebrew
 
 ```bash
 brew install rlrghb/tap/olk

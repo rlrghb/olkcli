@@ -25,12 +25,15 @@ builds:
 
 archives:
   - id: olk
-    builds:
+    ids:
       - olk
     name_template: "olk_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    formats:
+      - tar.gz
     format_overrides:
       - goos: windows
-        format: zip
+        formats:
+          - zip
 
 checksum:
   name_template: "checksums.txt"
@@ -42,3 +45,14 @@ changelog:
       - "^docs:"
       - "^test:"
       - "^ci:"
+
+homebrew_casks:
+  - repository:
+      owner: rlrghb
+      name: homebrew-tap
+    name: olk
+    binaries:
+      - olk
+    homepage: https://github.com/rlrghb/olkcli
+    description: CLI for Microsoft Outlook via Microsoft Graph API
+    license: MIT
