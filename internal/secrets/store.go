@@ -60,10 +60,10 @@ func NewKeyringStore() (*KeyringStore, error) {
 		FilePasswordFunc: keyring.TerminalPrompt,
 	}
 
-	// On macOS, restrict to Keychain only so the OS shows its native
-	// password dialog instead of falling back to a terminal passphrase prompt.
+	// On macOS, prefer Keychain (native UI with "Always Allow") but fall
+	// back to file backend when cgo is unavailable (e.g. Homebrew binary).
 	if runtime.GOOS == "darwin" {
-		cfg.AllowedBackends = []keyring.BackendType{keyring.KeychainBackend}
+		cfg.AllowedBackends = []keyring.BackendType{keyring.KeychainBackend, keyring.FileBackend}
 	}
 
 	ring, err := keyring.Open(cfg)
