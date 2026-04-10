@@ -35,6 +35,10 @@ go.work.sum
 bin/
 /olk
 
+# GoReleaser
+dist/
+darwin-dist/
+
 # OS files
 .DS_Store
 Thumbs.db
