@@ -70,6 +70,12 @@ go install github.com/rlrghb/olkcli/cmd/olk@latest
 brew install rlrghb/tap/olk
 ```
 
+On macOS, if you see "olk can't be opened because Apple cannot verify it", run:
+
+```bash
+xattr -d com.apple.quarantine $(brew --prefix)/bin/olk
+```
+
 ## Quick Start
 
 ```bash
