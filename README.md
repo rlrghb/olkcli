@@ -17,8 +17,8 @@ Works with both **personal Microsoft accounts** and **enterprise (Azure AD / Ent
 - **View and download attachments**
 - **Drafts**: create, list, send, delete draft messages
 - **Flags & categories**: flag for follow-up, set importance, assign categories, manage category definitions
-- **Out-of-office**: get, set, and disable auto-reply / vacation responder
-- **Inbox rules**: list, create, and delete server-side mail rules
+- **Out-of-office**: get, set, and disable auto-reply / vacation responder *(enterprise only)*
+- **Inbox rules**: list, create, and delete server-side mail rules *(enterprise only)*
 - **Focused Inbox**: filter by `--focused` or `--other` classification
 - **Read receipts**: request read receipts with `--read-receipt`
 
@@ -31,7 +31,7 @@ Works with both **personal Microsoft accounts** and **enterprise (Azure AD / Ent
 - **Respond** to invitations (accept, decline, tentative)
 - **List calendars** across your account
 - **Check availability** / free-busy lookup for one or more users
-- **Find meeting times** — suggest available slots for multiple attendees
+- **Find meeting times** — suggest available slots for multiple attendees *(enterprise only)*
 
 ### Contacts
 - **List, search, create, update, delete** contacts
@@ -42,7 +42,7 @@ Works with both **personal Microsoft accounts** and **enterprise (Azure AD / Ent
 - **Create, update, complete, delete** tasks with due dates, importance, and notes
 
 ### People / Directory
-- **Search** people in your organization by name — returns name, email, job title, department, company. Uses relevance-ranked People API with automatic directory fallback for enterprise tenants
+- **Search** people by name — returns name, email, job title, department, company. Personal accounts search known contacts; enterprise accounts also search the organization directory
 
 ### User Profile
 - **`olk whoami`** — display current user info (name, email, job title, department)
@@ -400,6 +400,28 @@ Then ask your AI assistant to "check my inbox" or "send an email" and it will us
 - KQL search syntax for mail
 - How to handle auth errors
 - Safety rules (confirm before sending, never guess IDs, use `--force` for deletes)
+
+## Account Compatibility
+
+Most features work with both personal and enterprise accounts. A few features require an enterprise (work/school) account:
+
+| Feature | Personal | Enterprise |
+|---------|----------|------------|
+| Mail (list, send, search, reply, forward, move, delete) | Yes | Yes |
+| Mail folders (list, create, rename, delete) | Yes | Yes |
+| Mail drafts | Yes | Yes |
+| Flags, importance, categories | Yes | Yes |
+| Calendar (events, create, update, delete, respond) | Yes | Yes |
+| Recurring events | Yes | Yes |
+| Contacts | Yes | Yes |
+| Tasks (Microsoft To Do) | Yes | Yes |
+| People search | Yes | Yes |
+| Out-of-office / auto-reply | No | Yes |
+| Inbox rules | No | Yes |
+| Focused Inbox | Yes | Yes |
+| Availability / free-busy | Yes | Yes |
+| Find meeting times | No | Yes |
+| Directory search (fallback) | No | Yes |
 
 ## Privacy & Data Handling
 

@@ -80,7 +80,7 @@ Flags & Categories
 - Delete category: `olk mail categories delete <ID> --force`
 - Color presets: `none`, `preset0` (red) through `preset24`
 
-Out-of-Office
+Out-of-Office (enterprise/work accounts only)
 
 - Get auto-reply settings: `olk mail ooo get`
 - Enable auto-reply: `olk mail ooo set --message "I'm out of office"`
@@ -88,7 +88,7 @@ Out-of-Office
 - External message: `olk mail ooo set --message "Internal msg" --external-message "External msg"`
 - Disable auto-reply: `olk mail ooo off`
 
-Inbox Rules
+Inbox Rules (enterprise/work accounts only)
 
 - List rules: `olk mail rules list`
 - Create rule: `olk mail rules create --name "Archive boss" --from boss@co.com --move Archive`
@@ -120,13 +120,13 @@ Calendar
 - List calendars: `olk calendar calendars`
 - Check availability: `olk calendar availability --emails user@co.com [--emails user2@co.com] [-d DAYS] [--after DATE] [--before DATE]`
 - Calendar view (expanded recurring): `olk calendar view [-d 7] [--after DATE] [--before DATE] [--calendar ID] [-n 50]`
-- Find meeting times: `olk calendar find-times --attendees a@b.com --attendees c@d.com [-d 60] [--after DATE] [--before DATE]`
+- Find meeting times (enterprise only): `olk calendar find-times --attendees a@b.com --attendees c@d.com [-d 60] [--after DATE] [--before DATE]`
 
 People / Directory
 
 - Search people: `olk people search "john" [-n 25]`
 - Search by name: `olk people search "Jane Smith"`
-- On enterprise tenants, automatically falls back to directory search if the People API returns no results
+- Personal accounts search known contacts; enterprise accounts also search the organization directory
 
 Contacts
 
@@ -214,3 +214,4 @@ Notes
 - Destructive commands (`delete`) require `--force` or will prompt for confirmation.
 - Confirm before sending mail or creating/deleting events.
 - If a command fails with an auth error, check `olk auth status` first.
+- Some features are enterprise-only (work/school accounts): out-of-office, inbox rules, find meeting times, and directory search.
