@@ -93,9 +93,15 @@ func LoadToken(store secrets.Store, email string) (*TokenData, error) {
 	if err != nil {
 		return nil, fmt.Errorf("loading token from keyring: %w", err)
 	}
+	if raw == "" {
+		return nil, nil
+	}
 	var data TokenData
 	if err := json.Unmarshal([]byte(raw), &data); err != nil {
 		return nil, fmt.Errorf("unmarshaling token data: %w", err)
+	}
+	if data.RefreshToken == "" {
+		return nil, fmt.Errorf("token data is missing refresh token")
 	}
 	return &data, nil
 }

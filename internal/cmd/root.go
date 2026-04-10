@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/alecthomas/kong"
@@ -40,32 +41,33 @@ type RunContext struct {
 	store  secrets.Store
 	auth   *msauth.Authenticator
 	cfg    *config.Config
+
+	storeOnce sync.Once
+	storeErr  error
+	cfgOnce   sync.Once
+	cfgErr    error
 }
 
 // Store returns the keyring store, initializing if needed
 func (r *RunContext) Store() (secrets.Store, error) {
-	if r.store != nil {
-		return r.store, nil
+	r.storeOnce.Do(func() {
+		r.store, r.storeErr = secrets.NewKeyringStore()
+	})
+	if r.storeErr != nil {
+		return nil, fmt.Errorf("initializing keyring: %w", r.storeErr)
 	}
-	store, err := secrets.NewKeyringStore()
-	if err != nil {
-		return nil, fmt.Errorf("initializing keyring: %w", err)
-	}
-	r.store = store
-	return store, nil
+	return r.store, nil
 }
 
 // Config returns the config, loading if needed
 func (r *RunContext) Config() (*config.Config, error) {
-	if r.cfg != nil {
-		return r.cfg, nil
+	r.cfgOnce.Do(func() {
+		r.cfg, r.cfgErr = config.Load()
+	})
+	if r.cfgErr != nil {
+		return nil, fmt.Errorf("loading config: %w", r.cfgErr)
 	}
-	cfg, err := config.Load()
-	if err != nil {
-		return nil, fmt.Errorf("loading config: %w", err)
-	}
-	r.cfg = cfg
-	return cfg, nil
+	return r.cfg, nil
 }
 
 // Authenticator returns the auth manager

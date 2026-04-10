@@ -2,6 +2,8 @@ package msauth
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -9,11 +11,13 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/rlrghb/olkcli/internal/config"
+	"github.com/rlrghb/olkcli/internal/graphapi"
 	"github.com/rlrghb/olkcli/internal/secrets"
 )
 
@@ -44,6 +48,7 @@ type Authenticator struct {
 	Store    secrets.Store
 	ClientID string
 	TenantID string
+	mu       sync.Mutex
 }
 
 // NewAuthenticator creates a new Authenticator with the given credential store
@@ -58,9 +63,9 @@ func NewAuthenticator(store secrets.Store, clientID, tenantID string) *Authentic
 
 // graphMeResponse represents the relevant fields from the Microsoft Graph /me endpoint.
 type graphMeResponse struct {
-	Mail                string `json:"mail"`
-	UserPrincipalName   string `json:"userPrincipalName"`
-	DisplayName         string `json:"displayName"`
+	Mail              string `json:"mail"`
+	UserPrincipalName string `json:"userPrincipalName"`
+	DisplayName       string `json:"displayName"`
 }
 
 // LoginDeviceCode performs the device code flow, retrieves the user profile,
@@ -121,10 +126,16 @@ func (a *Authenticator) LoginDeviceCode(ctx context.Context, scopes []string) (*
 // It loads the stored token, refreshes it if expired, and returns a
 // StaticTokenCredential suitable for use with the Azure/Microsoft Graph SDKs.
 func (a *Authenticator) GetCredential(ctx context.Context, email string) (azcore.TokenCredential, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
 	// Step 1: Load token from keyring.
 	tokenData, err := LoadToken(a.Store, email)
 	if err != nil {
 		return nil, fmt.Errorf("loading token for %s: %w", email, err)
+	}
+	if tokenData == nil {
+		return nil, fmt.Errorf("no token found for %s", email)
 	}
 
 	// Step 2: If expired (or about to expire within 5 minutes), refresh.
@@ -244,7 +255,7 @@ func saveAccountInfo(info *AccountInfo) error {
 		return fmt.Errorf("ensuring config directory: %w", err)
 	}
 
-	data, err := json.MarshalIndent(info, "", "  ")
+	data, err := json.Marshal(info)
 	if err != nil {
 		return fmt.Errorf("marshaling account info: %w", err)
 	}
@@ -292,9 +303,10 @@ func atomicWriteFile(path string, data []byte, perm os.FileMode) error {
 // accountFilePath returns the path to the account JSON file for the given email.
 func accountFilePath(email string) string {
 	safe := strings.ToLower(email)
-	// Use filepath.Base to strip any directory components
+	if err := graphapi.ValidateEmail(safe); err != nil {
+		h := sha256.Sum256([]byte(email))
+		return filepath.Join(config.AccountsDir(), hex.EncodeToString(h[:8])+".json")
+	}
 	safe = filepath.Base(safe)
-	// Additional sanitization: remove any remaining path-unsafe characters
-	safe = strings.ReplaceAll(safe, "..", "_")
 	return filepath.Join(config.AccountsDir(), safe+".json")
 }
