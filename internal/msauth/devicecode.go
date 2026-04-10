@@ -132,7 +132,6 @@ func PollForToken(ctx context.Context, clientID, tenantID, deviceCode string, in
 		interval = 5
 	}
 
-	// Enforce a maximum polling duration based on the device code expiry.
 	if expiresIn > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, time.Duration(expiresIn)*time.Second)
@@ -145,11 +144,15 @@ func PollForToken(ctx context.Context, clientID, tenantID, deviceCode string, in
 		"device_code": {deviceCode},
 	}
 
+	timer := time.NewTimer(time.Duration(interval) * time.Second)
+	defer timer.Stop()
+
 	for {
 		select {
 		case <-ctx.Done():
 			return nil, ctx.Err()
-		case <-time.After(time.Duration(interval) * time.Second):
+		case <-timer.C:
+			timer.Reset(time.Duration(interval) * time.Second)
 		}
 
 		req, err := http.NewRequestWithContext(ctx, http.MethodPost, tokenURL(tenantID), strings.NewReader(data.Encode()))
@@ -163,24 +166,27 @@ func PollForToken(ctx context.Context, clientID, tenantID, deviceCode string, in
 			return nil, fmt.Errorf("polling for token: %w", err)
 		}
 
-		body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20)) // 1 MB limit
+		body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 		resp.Body.Close()
 		if err != nil {
 			return nil, fmt.Errorf("reading token response: %w", err)
 		}
 
-		// Check for pending/slow_down errors.
 		if resp.StatusCode != http.StatusOK {
 			var errResp ErrorResponse
 			if jsonErr := json.Unmarshal(body, &errResp); jsonErr == nil {
 				switch errResp.Error {
 				case "authorization_pending":
-					// User hasn't completed auth yet; keep polling.
 					continue
 				case "slow_down":
-					// Server asks us to slow down; increase interval.
 					interval += 5
 					continue
+				case "expired_token":
+					return nil, fmt.Errorf("device code expired: the code expired before authentication was completed")
+				case "authorization_declined":
+					return nil, fmt.Errorf("authentication declined: authorization was declined by the user")
+				case "bad_verification_code":
+					return nil, fmt.Errorf("invalid verification code")
 				default:
 					return nil, fmt.Errorf("token request failed: %s: %s", sanitizeStr(errResp.Error), sanitizeStr(errResp.ErrorDescription))
 				}
