@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"strings"
 
 	"github.com/microsoftgraph/msgraph-sdk-go/models/odataerrors"
 )
@@ -89,6 +90,16 @@ func graphErrorMessage(err error) string {
 		}
 	}
 	return "unknown error"
+}
+
+// enterpriseError wraps a Graph API error with a hint that the feature
+// may require a work/school account, if the error is access-denied.
+func enterpriseError(action string, err error) error {
+	msg := graphErrorMessage(err)
+	if strings.Contains(strings.ToLower(msg), "access") && strings.Contains(strings.ToLower(msg), "denied") {
+		return fmt.Errorf("%s: %s\n  Note: this feature requires a work/school (Microsoft 365) account and is not available for personal Microsoft accounts (Outlook.com, Hotmail, Live.com)", action, msg)
+	}
+	return fmt.Errorf("%s: %s", action, msg)
 }
 
 // clampTop normalizes the top/limit parameter to a safe range.

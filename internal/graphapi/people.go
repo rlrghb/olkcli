@@ -37,7 +37,7 @@ func (c *Client) SearchPeople(ctx context.Context, query string, top int32) ([]P
 
 	resp, err := c.inner.Me().People().Get(ctx, config)
 	if err != nil {
-		return nil, fmt.Errorf("searching people: %s (note: this feature requires a work/school account)", graphErrorMessage(err))
+		return nil, enterpriseError("searching people", err)
 	}
 
 	var people []Person

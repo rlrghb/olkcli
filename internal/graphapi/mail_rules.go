@@ -21,7 +21,7 @@ type MailRule struct {
 func (c *Client) ListMailRules(ctx context.Context) ([]MailRule, error) {
 	resp, err := c.inner.Me().MailFolders().ByMailFolderId("inbox").MessageRules().Get(ctx, nil)
 	if err != nil {
-		return nil, fmt.Errorf("listing mail rules: %s (note: this feature requires a work/school account)", graphErrorMessage(err))
+		return nil, enterpriseError("listing mail rules", err)
 	}
 
 	var rules []MailRule
@@ -111,7 +111,7 @@ func (c *Client) CreateMailRule(ctx context.Context, name string, from string, s
 
 	created, err := c.inner.Me().MailFolders().ByMailFolderId("inbox").MessageRules().Post(ctx, rule, nil)
 	if err != nil {
-		return nil, fmt.Errorf("creating mail rule: %s (note: this feature requires a work/school account)", graphErrorMessage(err))
+		return nil, enterpriseError("creating mail rule", err)
 	}
 
 	result := convertMailRule(created)
@@ -124,7 +124,7 @@ func (c *Client) DeleteMailRule(ctx context.Context, ruleID string) error {
 	}
 	err := c.inner.Me().MailFolders().ByMailFolderId("inbox").MessageRules().ByMessageRuleId(ruleID).Delete(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("deleting mail rule: %s", graphErrorMessage(err))
+		return enterpriseError("deleting mail rule", err)
 	}
 	return nil
 }

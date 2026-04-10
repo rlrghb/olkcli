@@ -26,7 +26,7 @@ func (c *Client) GetAutoReply(ctx context.Context) (*AutoReplySettings, error) {
 		},
 	})
 	if err != nil {
-		return nil, fmt.Errorf("getting mailbox settings: %w", err)
+		return nil, enterpriseError("getting mailbox settings", err)
 	}
 
 	ars := resp.GetAutomaticRepliesSetting()
@@ -123,7 +123,7 @@ func (c *Client) SetAutoReply(ctx context.Context, status, internalMsg, external
 
 	_, err := c.inner.Me().MailboxSettings().Patch(ctx, settings, nil)
 	if err != nil {
-		return fmt.Errorf("updating auto-reply settings: %w", err)
+		return enterpriseError("updating auto-reply settings", err)
 	}
 	return nil
 }

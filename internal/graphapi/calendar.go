@@ -524,7 +524,7 @@ func (c *Client) FindMeetingTimes(ctx context.Context, attendees []string, start
 
 	resp, err := c.inner.Me().FindMeetingTimes().Post(ctx, body, nil)
 	if err != nil {
-		return nil, fmt.Errorf("finding meeting times: %s (note: this feature requires a work/school account)", graphErrorMessage(err))
+		return nil, enterpriseError("finding meeting times", err)
 	}
 
 	// Check if the API returned a reason for no suggestions
