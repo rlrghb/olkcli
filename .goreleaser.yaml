@@ -1,5 +1,9 @@
 version: 2
 
+dist: dist
+
+timeout: 120m
+
 before:
   hooks:
     - go mod tidy

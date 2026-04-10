@@ -11,6 +11,7 @@ permissions:
 jobs:
   release:
     runs-on: macos-latest
+    timeout-minutes: 120
     steps:
       - name: Checkout
         uses: actions/checkout@v4
