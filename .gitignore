@@ -38,6 +38,7 @@ bin/
 # GoReleaser
 dist/
 darwin-dist/
+prebuilt-archives/
 
 # OS files
 .DS_Store
