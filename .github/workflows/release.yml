@@ -9,9 +9,9 @@ permissions:
   contents: write
 
 jobs:
-  release:
-    runs-on: macos-latest
-    timeout-minutes: 120
+  pre-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -23,11 +23,49 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Build linux and windows archives
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          version: latest
+          args: release --config .goreleaser-prebuild.yaml --clean --timeout 30m
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload archives
+        uses: actions/upload-artifact@v4
+        with:
+          name: prebuilt-archives
+          path: |
+            dist/*.tar.gz
+            dist/*.zip
+          retention-days: 1
+
+  release:
+    runs-on: macos-latest
+    needs: pre-build
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Download prebuilt archives
+        uses: actions/download-artifact@v4
+        with:
+          name: prebuilt-archives
+          path: prebuilt-archives/
+
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
           version: latest
-          args: release --clean --timeout 120m
+          args: release --clean --timeout 60m
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAP_GITHUB_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}

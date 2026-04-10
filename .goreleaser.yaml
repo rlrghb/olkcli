@@ -21,38 +21,19 @@ builds:
       - -X github.com/rlrghb/olkcli/internal/cmd.Commit={{.Commit}}
       - -X github.com/rlrghb/olkcli/internal/cmd.Date={{.Date}}
 
-  - id: olk-other
-    main: ./cmd/olk
-    binary: olk
-    env:
-      - CGO_ENABLED=0
-    goos:
-      - linux
-      - windows
-    goarch:
-      - amd64
-      - arm64
-    ldflags:
-      - -s -w
-      - -X github.com/rlrghb/olkcli/internal/cmd.Version={{.Version}}
-      - -X github.com/rlrghb/olkcli/internal/cmd.Commit={{.Commit}}
-      - -X github.com/rlrghb/olkcli/internal/cmd.Date={{.Date}}
-
 archives:
-  - id: olk
-    ids:
-      - olk-darwin
-      - olk-other
-    name_template: "olk_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+  - name_template: "olk_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     formats:
       - tar.gz
-    format_overrides:
-      - goos: windows
-        formats:
-          - zip
 
 checksum:
   name_template: "checksums.txt"
+  extra_files:
+    - glob: ./prebuilt-archives/*
+
+release:
+  extra_files:
+    - glob: ./prebuilt-archives/*
 
 changelog:
   sort: asc

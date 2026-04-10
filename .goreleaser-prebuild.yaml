@@ -1,0 +1,40 @@
+version: 2
+
+project_name: olk
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: olk-other
+    main: ./cmd/olk
+    binary: olk
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X github.com/rlrghb/olkcli/internal/cmd.Version={{.Version}}
+      - -X github.com/rlrghb/olkcli/internal/cmd.Commit={{.Commit}}
+      - -X github.com/rlrghb/olkcli/internal/cmd.Date={{.Date}}
+
+archives:
+  - name_template: "olk_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    formats:
+      - tar.gz
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+
+release:
+  disable: true
+
+changelog:
+  disable: true
