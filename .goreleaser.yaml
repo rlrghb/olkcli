@@ -11,7 +11,6 @@ builds:
     env:
       - CGO_ENABLED=0
     goos:
-      - darwin
       - linux
       - windows
     goarch:
@@ -37,6 +36,8 @@ archives:
 
 checksum:
   name_template: "checksums.txt"
+  extra_files:
+    - glob: darwin-dist/*.tar.gz
 
 changelog:
   sort: asc
@@ -45,6 +46,10 @@ changelog:
       - "^docs:"
       - "^test:"
       - "^ci:"
+
+release:
+  extra_files:
+    - glob: darwin-dist/*.tar.gz
 
 homebrew_casks:
   - repository:
