@@ -3,10 +3,14 @@ package graphapi
 import (
 	"context"
 	"fmt"
+	"regexp"
 
 	abs "github.com/microsoft/kiota-abstractions-go"
 	"github.com/microsoftgraph/msgraph-sdk-go/users"
 )
+
+// safePeopleQuery matches only alphanumeric, spaces, @, dots, hyphens, underscores.
+var safePeopleQuery = regexp.MustCompile(`^[a-zA-Z0-9 @._-]+$`)
 
 // Person is a simplified person for output
 type Person struct {
@@ -19,6 +23,10 @@ type Person struct {
 
 func (c *Client) SearchPeople(ctx context.Context, query string, top int32) ([]Person, error) {
 	top = clampTop(top)
+
+	if !safePeopleQuery.MatchString(query) {
+		return nil, fmt.Errorf("search query contains invalid characters (only letters, numbers, spaces, @, ., _, - allowed)")
+	}
 
 	config := &users.ItemPeopleRequestBuilderGetRequestConfiguration{
 		QueryParameters: &users.ItemPeopleRequestBuilderGetQueryParameters{
@@ -63,6 +71,10 @@ func (c *Client) SearchPeople(ctx context.Context, query string, top int32) ([]P
 // SearchDirectory searches the organization directory via /users with $search
 func (c *Client) SearchDirectory(ctx context.Context, query string, top int32) ([]Person, error) {
 	top = clampTop(top)
+
+	if !safePeopleQuery.MatchString(query) {
+		return nil, fmt.Errorf("search query contains invalid characters (only letters, numbers, spaces, @, ., _, - allowed)")
+	}
 
 	search := fmt.Sprintf("\"displayName:%s\" OR \"mail:%s\"", query, query)
 	config := &users.UsersRequestBuilderGetRequestConfiguration{
