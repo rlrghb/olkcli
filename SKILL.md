@@ -17,13 +17,6 @@ metadata:
               "bins": ["olk"],
               "label": "Install olk (Homebrew)",
             },
-            {
-              "id": "go",
-              "kind": "go",
-              "module": "github.com/rlrghb/olkcli/cmd/olk@latest",
-              "bins": ["olk"],
-              "label": "Install olk (go install)",
-            },
           ],
       },
   }
