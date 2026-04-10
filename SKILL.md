@@ -72,6 +72,10 @@ Flags & Categories
 - Set importance: `olk mail importance <ID> low|normal|high`
 - Set categories: `olk mail categorize <ID> -c "Red Category" -c "Blue Category"`
 - Clear categories: `olk mail categorize <ID> -c none`
+- List category definitions: `olk mail categories list`
+- Create category: `olk mail categories create -n "My Category" [--preset preset0]`
+- Delete category: `olk mail categories delete <ID> --force`
+- Color presets: `none`, `preset0` (red) through `preset24`
 
 Out-of-Office
 

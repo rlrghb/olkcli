@@ -16,7 +16,7 @@ Works with both **personal Microsoft accounts** and **enterprise (Azure AD / Ent
 - **List folders** with message counts
 - **View and download attachments**
 - **Drafts**: create, list, send, delete draft messages
-- **Flags & categories**: flag for follow-up, set importance, assign categories
+- **Flags & categories**: flag for follow-up, set importance, assign categories, manage category definitions
 - **Out-of-office**: get, set, and disable auto-reply / vacation responder
 - **Inbox rules**: list, create, and delete server-side mail rules
 - **Focused Inbox**: filter by `--focused` or `--other` classification
@@ -263,6 +263,9 @@ olk mail drafts delete <DRAFT_ID> --force            Delete a draft
 olk mail flag <ID> flagged|complete|notFlagged       Set follow-up flag
 olk mail importance <ID> low|normal|high             Set importance
 olk mail categorize <ID> -c "Category Name"          Set categories (use -c none to clear)
+olk mail categories list                             List category definitions
+olk mail categories create -n "Name" [--preset X]    Create a category (preset0-preset24 or none)
+olk mail categories delete <ID> --force              Delete a category
 olk mail ooo get                                     Get auto-reply settings
 olk mail ooo set -m "Message" [--start DATE] [--end DATE] [--audience none|contactsOnly|all]
 olk mail ooo off                                     Disable auto-reply
