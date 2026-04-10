@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/99designs/keyring"
@@ -39,7 +40,7 @@ func NewKeyringStore() (*KeyringStore, error) {
 		return nil, fmt.Errorf("creating keyring directory: %w", err)
 	}
 
-	ring, err := keyring.Open(keyring.Config{
+	cfg := keyring.Config{
 		ServiceName: serviceName,
 
 		// macOS
@@ -57,7 +58,15 @@ func NewKeyringStore() (*KeyringStore, error) {
 		// available (e.g. headless Linux without Secret Service).
 		FileDir:          keyringDir,
 		FilePasswordFunc: keyring.TerminalPrompt,
-	})
+	}
+
+	// On macOS, restrict to Keychain only so the OS shows its native
+	// password dialog instead of falling back to a terminal passphrase prompt.
+	if runtime.GOOS == "darwin" {
+		cfg.AllowedBackends = []keyring.BackendType{keyring.KeychainBackend}
+	}
+
+	ring, err := keyring.Open(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("opening keyring: %w", err)
 	}
