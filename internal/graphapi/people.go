@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	abs "github.com/microsoft/kiota-abstractions-go"
 	"github.com/microsoftgraph/msgraph-sdk-go/users"
 )
 
@@ -44,6 +45,49 @@ func (c *Client) SearchPeople(ctx context.Context, query string, top int32) ([]P
 			if addrs[0].GetAddress() != nil {
 				person.Email = *addrs[0].GetAddress()
 			}
+		}
+		people = append(people, person)
+	}
+
+	// Fall back to directory search if People API returned no results
+	if len(people) == 0 {
+		dirPeople, dirErr := c.SearchDirectory(ctx, query, top)
+		if dirErr == nil && len(dirPeople) > 0 {
+			return dirPeople, nil
+		}
+	}
+
+	return people, nil
+}
+
+// SearchDirectory searches the organization directory via /users with $search
+func (c *Client) SearchDirectory(ctx context.Context, query string, top int32) ([]Person, error) {
+	top = clampTop(top)
+
+	search := fmt.Sprintf("\"displayName:%s\" OR \"mail:%s\"", query, query)
+	config := &users.UsersRequestBuilderGetRequestConfiguration{
+		QueryParameters: &users.UsersRequestBuilderGetQueryParameters{
+			Top:    &top,
+			Search: &search,
+			Select: []string{"displayName", "mail", "jobTitle", "department", "companyName"},
+		},
+		Headers: abs.NewRequestHeaders(),
+	}
+	config.Headers.Add("ConsistencyLevel", "eventual")
+
+	resp, err := c.inner.Users().Get(ctx, config)
+	if err != nil {
+		return nil, fmt.Errorf("searching directory: %s", graphErrorMessage(err))
+	}
+
+	var people []Person
+	for _, u := range resp.GetValue() {
+		person := Person{
+			DisplayName: derefStr(u.GetDisplayName()),
+			Email:       derefStr(u.GetMail()),
+			JobTitle:    derefStr(u.GetJobTitle()),
+			Department:  derefStr(u.GetDepartment()),
+			Company:     derefStr(u.GetCompanyName()),
 		}
 		people = append(people, person)
 	}

@@ -36,6 +36,8 @@ func (c *Client) CreateMailRule(ctx context.Context, name string, from string, s
 	rule.SetDisplayName(&name)
 	enabled := true
 	rule.SetIsEnabled(&enabled)
+	seq := int32(1)
+	rule.SetSequence(&seq)
 
 	// Conditions
 	conditions := models.NewMessageRulePredicates()

@@ -13,16 +13,22 @@ type MailCategorizeCmd struct {
 }
 
 func (c *MailCategorizeCmd) Run(ctx *RunContext) error {
-	for _, cat := range c.Categories {
-		if len(cat) == 0 {
-			return fmt.Errorf("category name cannot be empty")
+	// Allow clearing categories with --categories none or --categories ""
+	clear := len(c.Categories) == 1 && (c.Categories[0] == "none" || c.Categories[0] == "")
+	if clear {
+		c.Categories = []string{}
+	} else {
+		for _, cat := range c.Categories {
+			if len(cat) == 0 {
+				return fmt.Errorf("category name cannot be empty")
+			}
+			if len(cat) > 255 {
+				return fmt.Errorf("category name too long (max 255 characters): %q", outfmt.Truncate(cat, 30))
+			}
 		}
-		if len(cat) > 255 {
-			return fmt.Errorf("category name too long (max 255 characters): %q", outfmt.Truncate(cat, 30))
+		if len(c.Categories) > 25 {
+			return fmt.Errorf("too many categories (max 25)")
 		}
-	}
-	if len(c.Categories) > 25 {
-		return fmt.Errorf("too many categories (max 25)")
 	}
 
 	client, err := ctx.GraphClient()
@@ -40,6 +46,10 @@ func (c *MailCategorizeCmd) Run(ctx *RunContext) error {
 		return err
 	}
 
-	fmt.Println("Categories updated.")
+	if clear {
+		fmt.Println("Categories cleared.")
+	} else {
+		fmt.Println("Categories updated.")
+	}
 	return nil
 }

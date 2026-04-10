@@ -48,6 +48,7 @@ type MailMessage struct {
 	BodyPreview    string   `json:"bodyPreview"`
 	Body           string   `json:"body,omitempty"`
 	BodyType       string   `json:"bodyType,omitempty"`
+	Categories     []string `json:"categories,omitempty"`
 }
 
 // MailFolder is a simplified folder representation
@@ -106,7 +107,7 @@ func (c *Client) ListMessages(ctx context.Context, opts ListMessagesOptions) ([]
 		}
 		queryParams.Select = opts.Select
 	} else {
-		queryParams.Select = []string{"id", "subject", "from", "toRecipients", "receivedDateTime", "isRead", "hasAttachments", "bodyPreview"}
+		queryParams.Select = []string{"id", "subject", "from", "toRecipients", "receivedDateTime", "isRead", "hasAttachments", "bodyPreview", "categories"}
 	}
 
 	config = &users.ItemMessagesRequestBuilderGetRequestConfiguration{
@@ -564,6 +565,9 @@ func convertMessage(msg models.Messageable) MailMessage {
 	}
 	if msg.GetBodyPreview() != nil {
 		m.BodyPreview = *msg.GetBodyPreview()
+	}
+	if cats := msg.GetCategories(); len(cats) > 0 {
+		m.Categories = cats
 	}
 	return m
 }
