@@ -32,9 +32,19 @@ func (c *Client) ListDrafts(ctx context.Context, top int32) ([]DraftMessage, err
 		return nil, fmt.Errorf("listing drafts: %w", err)
 	}
 
-	var drafts []DraftMessage
+	drafts := make([]DraftMessage, 0, top)
 	for _, msg := range resp.GetValue() {
 		drafts = append(drafts, convertDraft(msg))
+	}
+	for nextLink := getNextLink(resp); nextLink != ""; {
+		nextResp, err := c.inner.Me().MailFolders().ByMailFolderId("drafts").Messages().WithUrl(nextLink).Get(ctx, nil)
+		if err != nil {
+			return nil, fmt.Errorf("listing drafts: %w", err)
+		}
+		for _, msg := range nextResp.GetValue() {
+			drafts = append(drafts, convertDraft(msg))
+		}
+		nextLink = getNextLink(nextResp)
 	}
 	return drafts, nil
 }

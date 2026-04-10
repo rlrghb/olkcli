@@ -12,12 +12,12 @@ import (
 
 // allowedOrderBy is the set of valid $orderby field values.
 var allowedOrderBy = map[string]bool{
-	"receivedDateTime desc": true,
-	"receivedDateTime asc":  true,
-	"receivedDateTime":      true,
-	"subject desc":          true,
-	"subject asc":           true,
-	"subject":               true,
+	"receivedDateTime desc":          true,
+	"receivedDateTime asc":           true,
+	"receivedDateTime":               true,
+	"subject desc":                   true,
+	"subject asc":                    true,
+	"subject":                        true,
 	"from/emailAddress/address desc": true,
 	"from/emailAddress/address asc":  true,
 	"from/emailAddress/address":      true,
@@ -87,7 +87,6 @@ func (c *Client) ListMessages(ctx context.Context, opts ListMessagesOptions) ([]
 	queryParams := &users.ItemMessagesRequestBuilderGetQueryParameters{
 		Top: &top,
 	}
-	// Microsoft Graph does not support $orderBy combined with $search or inferenceClassification filter.
 	skipOrderBy := opts.Search != "" || strings.Contains(opts.Filter, "inferenceClassification")
 	if !skipOrderBy {
 		queryParams.Orderby = []string{orderBy}
@@ -113,7 +112,7 @@ func (c *Client) ListMessages(ctx context.Context, opts ListMessagesOptions) ([]
 		QueryParameters: queryParams,
 	}
 
-	var result []MailMessage
+	result := make([]MailMessage, 0, opts.Top)
 
 	if opts.FolderID != "" {
 		if err := validateID(opts.FolderID, "folder ID"); err != nil {
@@ -141,6 +140,16 @@ func (c *Client) ListMessages(ctx context.Context, opts ListMessagesOptions) ([]
 		for _, msg := range resp.GetValue() {
 			result = append(result, convertMessage(msg))
 		}
+		for nextLink := getNextLink(resp); nextLink != ""; {
+			nextResp, err := c.inner.Me().MailFolders().ByMailFolderId(opts.FolderID).Messages().WithUrl(nextLink).Get(ctx, nil)
+			if err != nil {
+				return nil, fmt.Errorf("listing messages: %w", err)
+			}
+			for _, msg := range nextResp.GetValue() {
+				result = append(result, convertMessage(msg))
+			}
+			nextLink = getNextLink(nextResp)
+		}
 		return result, nil
 	}
 
@@ -150,6 +159,16 @@ func (c *Client) ListMessages(ctx context.Context, opts ListMessagesOptions) ([]
 	}
 	for _, msg := range resp.GetValue() {
 		result = append(result, convertMessage(msg))
+	}
+	for nextLink := getNextLink(resp); nextLink != ""; {
+		nextResp, err := c.inner.Me().Messages().WithUrl(nextLink).Get(ctx, nil)
+		if err != nil {
+			return nil, fmt.Errorf("listing messages: %w", err)
+		}
+		for _, msg := range nextResp.GetValue() {
+			result = append(result, convertMessage(msg))
+		}
+		nextLink = getNextLink(nextResp)
 	}
 	return result, nil
 }
@@ -356,7 +375,7 @@ func (c *Client) ListMailFolders(ctx context.Context) ([]MailFolder, error) {
 		return nil, fmt.Errorf("listing folders: %w", err)
 	}
 
-	var folders []MailFolder
+	folders := make([]MailFolder, 0, top)
 	for _, f := range resp.GetValue() {
 		folder := MailFolder{
 			DisplayName: derefStr(f.GetDisplayName()),
@@ -374,6 +393,31 @@ func (c *Client) ListMailFolders(ctx context.Context) ([]MailFolder, error) {
 			folder.ParentFolderID = *f.GetParentFolderId()
 		}
 		folders = append(folders, folder)
+	}
+	for nextLink := getNextLink(resp); nextLink != ""; {
+		nextResp, err := c.inner.Me().MailFolders().WithUrl(nextLink).Get(ctx, nil)
+		if err != nil {
+			return nil, fmt.Errorf("listing folders: %w", err)
+		}
+		for _, f := range nextResp.GetValue() {
+			folder := MailFolder{
+				DisplayName: derefStr(f.GetDisplayName()),
+			}
+			if f.GetId() != nil {
+				folder.ID = *f.GetId()
+			}
+			if f.GetTotalItemCount() != nil {
+				folder.TotalCount = *f.GetTotalItemCount()
+			}
+			if f.GetUnreadItemCount() != nil {
+				folder.UnreadCount = *f.GetUnreadItemCount()
+			}
+			if f.GetParentFolderId() != nil {
+				folder.ParentFolderID = *f.GetParentFolderId()
+			}
+			folders = append(folders, folder)
+		}
+		nextLink = getNextLink(nextResp)
 	}
 	return folders, nil
 }
@@ -443,7 +487,7 @@ func (c *Client) GetAttachments(ctx context.Context, messageID string) ([]Attach
 		return nil, fmt.Errorf("getting attachments: %w", err)
 	}
 
-	var attachments []Attachment
+	attachments := make([]Attachment, 0, 10)
 	for _, a := range resp.GetValue() {
 		att := Attachment{
 			Name:        derefStr(a.GetName()),
@@ -456,6 +500,26 @@ func (c *Client) GetAttachments(ctx context.Context, messageID string) ([]Attach
 			att.Size = *a.GetSize()
 		}
 		attachments = append(attachments, att)
+	}
+	for nextLink := getNextLink(resp); nextLink != ""; {
+		nextResp, err := c.inner.Me().Messages().ByMessageId(messageID).Attachments().WithUrl(nextLink).Get(ctx, nil)
+		if err != nil {
+			return nil, fmt.Errorf("getting attachments: %w", err)
+		}
+		for _, a := range nextResp.GetValue() {
+			att := Attachment{
+				Name:        derefStr(a.GetName()),
+				ContentType: derefStr(a.GetContentType()),
+			}
+			if a.GetId() != nil {
+				att.ID = *a.GetId()
+			}
+			if a.GetSize() != nil {
+				att.Size = *a.GetSize()
+			}
+			attachments = append(attachments, att)
+		}
+		nextLink = getNextLink(nextResp)
 	}
 	return attachments, nil
 }

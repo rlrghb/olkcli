@@ -24,9 +24,19 @@ func (c *Client) ListMailRules(ctx context.Context) ([]MailRule, error) {
 		return nil, fmt.Errorf("listing mail rules: %s (note: this feature requires a work/school account)", graphErrorMessage(err))
 	}
 
-	var rules []MailRule
+	rules := make([]MailRule, 0, 10)
 	for _, r := range resp.GetValue() {
 		rules = append(rules, convertMailRule(r))
+	}
+	for nextLink := getNextLink(resp); nextLink != ""; {
+		nextResp, err := c.inner.Me().MailFolders().ByMailFolderId("inbox").MessageRules().WithUrl(nextLink).Get(ctx, nil)
+		if err != nil {
+			return nil, fmt.Errorf("listing mail rules: %w", err)
+		}
+		for _, r := range nextResp.GetValue() {
+			rules = append(rules, convertMailRule(r))
+		}
+		nextLink = getNextLink(nextResp)
 	}
 	return rules, nil
 }

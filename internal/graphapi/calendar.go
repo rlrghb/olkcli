@@ -51,7 +51,7 @@ func (c *Client) ListEvents(ctx context.Context, startTime, endTime time.Time, c
 		Orderby:       []string{"start/dateTime"},
 	}
 
-	var events []CalendarEvent
+	events := make([]CalendarEvent, 0, top)
 
 	if calendarID != "" {
 		if err := validateID(calendarID, "calendar ID"); err != nil {
@@ -73,6 +73,16 @@ func (c *Client) ListEvents(ctx context.Context, startTime, endTime time.Time, c
 		for _, e := range resp.GetValue() {
 			events = append(events, convertEvent(e))
 		}
+		for nextLink := getNextLink(resp); nextLink != ""; {
+			nextResp, err := c.inner.Me().Calendars().ByCalendarId(calendarID).CalendarView().WithUrl(nextLink).Get(ctx, nil)
+			if err != nil {
+				return nil, fmt.Errorf("listing events: %w", err)
+			}
+			for _, e := range nextResp.GetValue() {
+				events = append(events, convertEvent(e))
+			}
+			nextLink = getNextLink(nextResp)
+		}
 		return events, nil
 	}
 
@@ -87,6 +97,16 @@ func (c *Client) ListEvents(ctx context.Context, startTime, endTime time.Time, c
 
 	for _, e := range resp.GetValue() {
 		events = append(events, convertEvent(e))
+	}
+	for nextLink := getNextLink(resp); nextLink != ""; {
+		nextResp, err := c.inner.Me().CalendarView().WithUrl(nextLink).Get(ctx, nil)
+		if err != nil {
+			return nil, fmt.Errorf("listing events: %w", err)
+		}
+		for _, e := range nextResp.GetValue() {
+			events = append(events, convertEvent(e))
+		}
+		nextLink = getNextLink(nextResp)
 	}
 	return events, nil
 }
@@ -215,13 +235,22 @@ func (c *Client) RespondToEvent(ctx context.Context, eventID string, response st
 	switch response {
 	case "accept":
 		body := users.NewItemEventsItemAcceptPostRequestBody()
-		return c.inner.Me().Events().ByEventId(eventID).Accept().Post(ctx, body, nil)
+		if err := c.inner.Me().Events().ByEventId(eventID).Accept().Post(ctx, body, nil); err != nil {
+			return fmt.Errorf("accepting event: %w", err)
+		}
+		return nil
 	case "decline":
 		body := users.NewItemEventsItemDeclinePostRequestBody()
-		return c.inner.Me().Events().ByEventId(eventID).Decline().Post(ctx, body, nil)
+		if err := c.inner.Me().Events().ByEventId(eventID).Decline().Post(ctx, body, nil); err != nil {
+			return fmt.Errorf("declining event: %w", err)
+		}
+		return nil
 	case "tentative":
 		body := users.NewItemEventsItemTentativelyAcceptPostRequestBody()
-		return c.inner.Me().Events().ByEventId(eventID).TentativelyAccept().Post(ctx, body, nil)
+		if err := c.inner.Me().Events().ByEventId(eventID).TentativelyAccept().Post(ctx, body, nil); err != nil {
+			return fmt.Errorf("tentatively accepting event: %w", err)
+		}
+		return nil
 	default:
 		return fmt.Errorf("invalid response: %q (must be accept, decline, or tentative)", response)
 	}
@@ -233,7 +262,7 @@ func (c *Client) ListCalendars(ctx context.Context) ([]CalendarInfo, error) {
 		return nil, fmt.Errorf("listing calendars: %w", err)
 	}
 
-	var calendars []CalendarInfo
+	calendars := make([]CalendarInfo, 0, 10)
 	for _, cal := range resp.GetValue() {
 		ci := CalendarInfo{}
 		if cal.GetId() != nil {
@@ -249,6 +278,29 @@ func (c *Client) ListCalendars(ctx context.Context) ([]CalendarInfo, error) {
 			ci.Owner = *cal.GetOwner().GetAddress()
 		}
 		calendars = append(calendars, ci)
+	}
+	for nextLink := getNextLink(resp); nextLink != ""; {
+		nextResp, err := c.inner.Me().Calendars().WithUrl(nextLink).Get(ctx, nil)
+		if err != nil {
+			return nil, fmt.Errorf("listing calendars: %w", err)
+		}
+		for _, cal := range nextResp.GetValue() {
+			ci := CalendarInfo{}
+			if cal.GetId() != nil {
+				ci.ID = *cal.GetId()
+			}
+			if cal.GetName() != nil {
+				ci.Name = *cal.GetName()
+			}
+			if cal.GetColor() != nil {
+				ci.Color = cal.GetColor().String()
+			}
+			if cal.GetOwner() != nil && cal.GetOwner().GetAddress() != nil {
+				ci.Owner = *cal.GetOwner().GetAddress()
+			}
+			calendars = append(calendars, ci)
+		}
+		nextLink = getNextLink(nextResp)
 	}
 	return calendars, nil
 }
@@ -382,10 +434,10 @@ func (c *Client) ListCalendarView(ctx context.Context, startTime, endTime time.T
 
 // MeetingTimeSuggestion represents a suggested meeting time
 type MeetingTimeSuggestion struct {
-	Start                  string                    `json:"start"`
-	End                    string                    `json:"end"`
-	Confidence             float64                   `json:"confidence"`
-	OrganizerAvailability  string                    `json:"organizerAvailability"`
+	Start                  string                     `json:"start"`
+	End                    string                     `json:"end"`
+	Confidence             float64                    `json:"confidence"`
+	OrganizerAvailability  string                     `json:"organizerAvailability"`
 	AttendeeAvailabilities []AttendeeAvailabilityInfo `json:"attendeeAvailabilities,omitempty"`
 }
 

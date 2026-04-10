@@ -31,7 +31,7 @@ func (c *Client) SearchPeople(ctx context.Context, query string, top int32) ([]P
 		return nil, fmt.Errorf("searching people: %s (note: this feature requires a work/school account)", graphErrorMessage(err))
 	}
 
-	var people []Person
+	people := make([]Person, 0, top)
 	for _, p := range resp.GetValue() {
 		person := Person{
 			DisplayName: derefStr(p.GetDisplayName()),
@@ -39,13 +39,33 @@ func (c *Client) SearchPeople(ctx context.Context, query string, top int32) ([]P
 			Department:  derefStr(p.GetDepartment()),
 			Company:     derefStr(p.GetCompanyName()),
 		}
-		// Get primary email from scored email addresses
 		if addrs := p.GetScoredEmailAddresses(); len(addrs) > 0 {
 			if addrs[0].GetAddress() != nil {
 				person.Email = *addrs[0].GetAddress()
 			}
 		}
 		people = append(people, person)
+	}
+	for nextLink := getNextLink(resp); nextLink != ""; {
+		nextResp, err := c.inner.Me().People().WithUrl(nextLink).Get(ctx, nil)
+		if err != nil {
+			return nil, fmt.Errorf("searching people: %w", err)
+		}
+		for _, p := range nextResp.GetValue() {
+			person := Person{
+				DisplayName: derefStr(p.GetDisplayName()),
+				JobTitle:    derefStr(p.GetJobTitle()),
+				Department:  derefStr(p.GetDepartment()),
+				Company:     derefStr(p.GetCompanyName()),
+			}
+			if addrs := p.GetScoredEmailAddresses(); len(addrs) > 0 {
+				if addrs[0].GetAddress() != nil {
+					person.Email = *addrs[0].GetAddress()
+				}
+			}
+			people = append(people, person)
+		}
+		nextLink = getNextLink(nextResp)
 	}
 	return people, nil
 }

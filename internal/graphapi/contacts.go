@@ -44,9 +44,19 @@ func (c *Client) ListContacts(ctx context.Context, top int32) ([]Contact, error)
 		return nil, fmt.Errorf("listing contacts: %w", err)
 	}
 
-	var contacts []Contact
+	contacts := make([]Contact, 0, top)
 	for _, ct := range resp.GetValue() {
 		contacts = append(contacts, convertContact(ct))
+	}
+	for nextLink := getNextLink(resp); nextLink != ""; {
+		nextResp, err := c.inner.Me().Contacts().WithUrl(nextLink).Get(ctx, nil)
+		if err != nil {
+			return nil, fmt.Errorf("listing contacts: %w", err)
+		}
+		for _, ct := range nextResp.GetValue() {
+			contacts = append(contacts, convertContact(ct))
+		}
+		nextLink = getNextLink(nextResp)
 	}
 	return contacts, nil
 }
@@ -200,9 +210,19 @@ func (c *Client) SearchContacts(ctx context.Context, query string, top int32) ([
 		return nil, fmt.Errorf("searching contacts: %w", err)
 	}
 
-	var contacts []Contact
+	contacts := make([]Contact, 0, top)
 	for _, ct := range resp.GetValue() {
 		contacts = append(contacts, convertContact(ct))
+	}
+	for nextLink := getNextLink(resp); nextLink != ""; {
+		nextResp, err := c.inner.Me().Contacts().WithUrl(nextLink).Get(ctx, nil)
+		if err != nil {
+			return nil, fmt.Errorf("searching contacts: %w", err)
+		}
+		for _, ct := range nextResp.GetValue() {
+			contacts = append(contacts, convertContact(ct))
+		}
+		nextLink = getNextLink(nextResp)
 	}
 	return contacts, nil
 }

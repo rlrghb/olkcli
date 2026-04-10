@@ -44,7 +44,7 @@ func (c *Client) ListTodoLists(ctx context.Context) ([]TodoList, error) {
 		return nil, fmt.Errorf("listing todo lists: %w", err)
 	}
 
-	var result []TodoList
+	result := make([]TodoList, 0, 10)
 	for _, l := range resp.GetValue() {
 		tl := TodoList{
 			DisplayName: derefStr(l.GetDisplayName()),
@@ -56,6 +56,25 @@ func (c *Client) ListTodoLists(ctx context.Context) ([]TodoList, error) {
 			tl.IsOwner = *l.GetIsOwner()
 		}
 		result = append(result, tl)
+	}
+	for nextLink := getNextLink(resp); nextLink != ""; {
+		nextResp, err := c.inner.Me().Todo().Lists().WithUrl(nextLink).Get(ctx, nil)
+		if err != nil {
+			return nil, fmt.Errorf("listing todo lists: %w", err)
+		}
+		for _, l := range nextResp.GetValue() {
+			tl := TodoList{
+				DisplayName: derefStr(l.GetDisplayName()),
+			}
+			if l.GetId() != nil {
+				tl.ID = *l.GetId()
+			}
+			if l.GetIsOwner() != nil {
+				tl.IsOwner = *l.GetIsOwner()
+			}
+			result = append(result, tl)
+		}
+		nextLink = getNextLink(nextResp)
 	}
 	return result, nil
 }
@@ -91,9 +110,19 @@ func (c *Client) ListTodoTasks(ctx context.Context, listID string, top int32, st
 		return nil, fmt.Errorf("listing todo tasks: %w", err)
 	}
 
-	var result []TodoTask
+	result := make([]TodoTask, 0, top)
 	for _, t := range resp.GetValue() {
 		result = append(result, convertTodoTask(t))
+	}
+	for nextLink := getNextLink(resp); nextLink != ""; {
+		nextResp, err := c.inner.Me().Todo().Lists().ByTodoTaskListId(listID).Tasks().WithUrl(nextLink).Get(ctx, nil)
+		if err != nil {
+			return nil, fmt.Errorf("listing todo tasks: %w", err)
+		}
+		for _, t := range nextResp.GetValue() {
+			result = append(result, convertTodoTask(t))
+		}
+		nextLink = getNextLink(nextResp)
 	}
 	return result, nil
 }
