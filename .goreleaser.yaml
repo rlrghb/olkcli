@@ -5,7 +5,23 @@ before:
     - go mod tidy
 
 builds:
-  - id: olk
+  - id: olk-darwin
+    main: ./cmd/olk
+    binary: olk
+    env:
+      - CGO_ENABLED=1
+    goos:
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X github.com/rlrghb/olkcli/internal/cmd.Version={{.Version}}
+      - -X github.com/rlrghb/olkcli/internal/cmd.Commit={{.Commit}}
+      - -X github.com/rlrghb/olkcli/internal/cmd.Date={{.Date}}
+
+  - id: olk-other
     main: ./cmd/olk
     binary: olk
     env:
@@ -25,7 +41,8 @@ builds:
 archives:
   - id: olk
     ids:
-      - olk
+      - olk-darwin
+      - olk-other
     name_template: "olk_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     formats:
       - tar.gz
@@ -36,8 +53,6 @@ archives:
 
 checksum:
   name_template: "checksums.txt"
-  extra_files:
-    - glob: darwin-dist/*.tar.gz
 
 changelog:
   sort: asc
@@ -46,10 +61,6 @@ changelog:
       - "^docs:"
       - "^test:"
       - "^ci:"
-
-release:
-  extra_files:
-    - glob: darwin-dist/*.tar.gz
 
 homebrew_casks:
   - repository:
