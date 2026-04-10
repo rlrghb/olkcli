@@ -421,7 +421,7 @@ func formatDaysOfWeek(days []models.DayOfWeek) string {
 	}
 	names := make([]string, 0, len(days))
 	for _, d := range days {
-		names = append(names, strings.Title(d.String())) //nolint:staticcheck
+		names = append(names, strings.Title(d.String())) //nolint:staticcheck // strings.Title is deprecated but no alternative for title case
 	}
 	return strings.Join(names, ", ")
 }

@@ -47,13 +47,13 @@ func (c *MailAttachmentsCmd) Run(ctx *RunContext) error {
 		}
 
 		outDir := c.Out
-		if err := os.MkdirAll(outDir, 0750); err != nil {
+		if err := os.MkdirAll(outDir, 0o750); err != nil {
 			return fmt.Errorf("creating output directory: %w", err)
 		}
 
 		filename := sanitizeFilename(att.Name)
 		outPath := filepath.Join(outDir, filename)
-		if err := os.WriteFile(outPath, att.Content, 0600); err != nil {
+		if err := os.WriteFile(outPath, att.Content, 0o600); err != nil {
 			return fmt.Errorf("writing file: %w", err)
 		}
 		fmt.Printf("Saved: %s\n", outPath)
@@ -73,7 +73,7 @@ func (c *MailAttachmentsCmd) Run(ctx *RunContext) error {
 	// Download all attachments if --save is set
 	if c.Save {
 		outDir := c.Out
-		if err := os.MkdirAll(outDir, 0750); err != nil {
+		if err := os.MkdirAll(outDir, 0o750); err != nil {
 			return fmt.Errorf("creating output directory: %w", err)
 		}
 
@@ -88,7 +88,7 @@ func (c *MailAttachmentsCmd) Run(ctx *RunContext) error {
 
 			filename := sanitizeFilename(att.Name)
 			outPath := filepath.Join(outDir, filename)
-			if err := os.WriteFile(outPath, att.Content, 0600); err != nil {
+			if err := os.WriteFile(outPath, att.Content, 0o600); err != nil {
 				return fmt.Errorf("writing file %q: %w", filename, err)
 			}
 			fmt.Printf("Saved: %s\n", outPath)

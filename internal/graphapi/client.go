@@ -23,4 +23,3 @@ func NewClient(cred azcore.TokenCredential) (*Client, error) {
 func (c *Client) Inner() *msgraphsdk.GraphServiceClient {
 	return c.inner
 }
-

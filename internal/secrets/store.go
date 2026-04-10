@@ -11,8 +11,8 @@ import (
 )
 
 const (
-	serviceName   = "olk"
-	tokenPrefix   = "olk:token:"
+	serviceName = "olk"
+	tokenPrefix = "olk:token:"
 )
 
 // Store defines the interface for credential storage.
@@ -32,29 +32,22 @@ type KeyringStore struct {
 
 // NewKeyringStore creates a new KeyringStore backed by the OS credential manager.
 func NewKeyringStore() (*KeyringStore, error) {
-	// Pre-create keyring fallback directory with restrictive permissions
-	// to prevent other users from reading tokens on multi-user systems.
 	keyringDir := filepath.Join(config.ConfigDir(), "keyring")
-	if err := os.MkdirAll(keyringDir, 0700); err != nil {
+	if err := os.MkdirAll(keyringDir, 0o700); err != nil {
 		return nil, fmt.Errorf("creating keyring directory: %w", err)
 	}
 
 	ring, err := keyring.Open(keyring.Config{
 		ServiceName: serviceName,
 
-		// macOS
 		KeychainTrustApplication:       true,
 		KeychainSynchronizable:         false,
 		KeychainAccessibleWhenUnlocked: true,
 
-		// Linux / FreeBSD
 		LibSecretCollectionName: serviceName,
 
-		// Windows
 		WinCredPrefix: serviceName,
 
-		// Fall back to an encrypted file store when no native backend is
-		// available (e.g. headless Linux without Secret Service).
 		FileDir:          keyringDir,
 		FilePasswordFunc: keyring.TerminalPrompt,
 	})

@@ -14,7 +14,7 @@ type MailCategorizeCmd struct {
 
 func (c *MailCategorizeCmd) Run(ctx *RunContext) error {
 	for _, cat := range c.Categories {
-		if len(cat) == 0 {
+		if cat == "" {
 			return fmt.Errorf("category name cannot be empty")
 		}
 		if len(cat) > 255 {

@@ -228,7 +228,7 @@ func (c *AuthStatusCmd) Run(ctx *RunContext) error {
 	if err != nil {
 		fmt.Printf("Account: %s\nStatus: Invalid (token expired or revoked)\n", outfmt.Sanitize(email))
 		fmt.Println("Run 'olk auth login' to re-authenticate.")
-		return nil
+		return nil //nolint:nilerr // intentional: status check doesn't fail the command
 	}
 
 	fmt.Printf("Account: %s\nStatus: Authenticated\n", outfmt.Sanitize(email))

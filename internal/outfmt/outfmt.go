@@ -101,9 +101,10 @@ func (p *Printer) Print(headers []string, rows [][]string, jsonData interface{},
 		return p.PrintJSON(jsonData, count, nextLink)
 	case FormatPlain:
 		return p.PrintPlain(headers, rows)
-	default:
+	case FormatTable:
 		return p.PrintTable(headers, rows)
 	}
+	return nil
 }
 
 func (p *Printer) selectedFields(headers []string) []int {

@@ -39,7 +39,6 @@ type RunContext struct {
 	Flags  *RootFlags
 	client *graphapi.Client
 	store  secrets.Store
-	auth   *msauth.Authenticator
 	cfg    *config.Config
 
 	storeOnce sync.Once
@@ -169,7 +168,7 @@ func Execute() int {
 	)
 
 	ctx_bg := context.Background()
-	timeout := cli.RootFlags.Timeout
+	timeout := cli.Timeout
 	if timeout <= 0 {
 		timeout = 60
 	}

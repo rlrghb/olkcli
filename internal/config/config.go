@@ -62,7 +62,7 @@ func (c *Config) Save() error {
 	if err != nil {
 		return err
 	}
-	return atomicWriteFile(ConfigFilePath(), data, 0600)
+	return atomicWriteFile(ConfigFilePath(), data, 0o600)
 }
 
 // atomicWriteFile writes data to a temp file then renames it to the target path,
