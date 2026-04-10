@@ -70,7 +70,8 @@ Flags & Categories
 
 - Flag for follow-up: `olk mail flag <ID> flagged|complete|notFlagged`
 - Set importance: `olk mail importance <ID> low|normal|high`
-- Set categories: `olk mail categorize <ID> --category "Red Category" --category "Blue Category"`
+- Set categories: `olk mail categorize <ID> -c "Red Category" -c "Blue Category"`
+- Clear categories: `olk mail categorize <ID> -c none`
 
 Out-of-Office
 
@@ -116,6 +117,7 @@ People / Directory
 
 - Search people: `olk people search "john" [-n 25]`
 - Search by name: `olk people search "Jane Smith"`
+- On enterprise tenants, automatically falls back to directory search if the People API returns no results
 
 Contacts
 

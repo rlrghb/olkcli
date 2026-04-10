@@ -42,7 +42,7 @@ Works with both **personal Microsoft accounts** and **enterprise (Azure AD / Ent
 - **Create, complete, delete** tasks with due dates, importance, and notes
 
 ### People / Directory
-- **Search** people in your organization by name — returns name, email, job title, department, company
+- **Search** people in your organization by name — returns name, email, job title, department, company. Uses relevance-ranked People API with automatic directory fallback for enterprise tenants
 
 ### User Profile
 - **`olk whoami`** — display current user info (name, email, job title, department)
@@ -161,7 +161,7 @@ If your organization blocks the default client ID, or your admin requires apps t
 1. Go to [Azure Portal > App registrations](https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade) and click **New registration**
 2. Set **Supported account types** to match your needs (single tenant or multi-tenant)
 3. Under **Authentication > Advanced settings**, set **Allow public client flows** to **Yes** (required for device-code flow)
-4. Under **API permissions**, add **Microsoft Graph** delegated permissions: `Mail.ReadWrite`, `Mail.Send`, `Calendars.ReadWrite`, `Contacts.ReadWrite`, `Tasks.ReadWrite`, `People.Read`, `User.Read`, `offline_access`
+4. Under **API permissions**, add **Microsoft Graph** delegated permissions: `Mail.ReadWrite`, `Mail.Send`, `Calendars.ReadWrite`, `Contacts.ReadWrite`, `Tasks.ReadWrite`, `People.Read`, `User.Read`, `User.ReadBasic.All`, `MailboxSettings.ReadWrite`, `offline_access`
 5. Copy the **Application (client) ID** and **Directory (tenant) ID** from the app's Overview page
 
 Then use them:
@@ -262,7 +262,7 @@ olk mail drafts send <DRAFT_ID>                      Send a draft
 olk mail drafts delete <DRAFT_ID> --force            Delete a draft
 olk mail flag <ID> flagged|complete|notFlagged       Set follow-up flag
 olk mail importance <ID> low|normal|high             Set importance
-olk mail categorize <ID> -c "Category Name"          Set categories
+olk mail categorize <ID> -c "Category Name"          Set categories (use -c none to clear)
 olk mail ooo get                                     Get auto-reply settings
 olk mail ooo set -m "Message" [--start DATE] [--end DATE] [--audience none|contactsOnly|all]
 olk mail ooo off                                     Disable auto-reply
