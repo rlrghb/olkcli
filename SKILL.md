@@ -11,6 +11,13 @@ metadata:
         "install":
           [
             {
+              "id": "brew",
+              "kind": "brew",
+              "formula": "rlrghb/tap/olk",
+              "bins": ["olk"],
+              "label": "Install olk (Homebrew)",
+            },
+            {
               "id": "go",
               "kind": "go",
               "module": "github.com/rlrghb/olkcli/cmd/olk@latest",
