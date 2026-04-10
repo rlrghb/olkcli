@@ -10,7 +10,7 @@ type MailCmd struct {
 	Move        MailMoveCmd        `cmd:"" help:"Move a message to a folder"`
 	Delete      MailDeleteCmd      `cmd:"" help:"Delete a message"`
 	Mark        MailMarkCmd        `cmd:"" help:"Mark message as read/unread"`
-	Folders     MailFoldersCmd     `cmd:"" help:"List mail folders"`
+	Folders     MailFoldersCmd     `cmd:"" help:"Mail folder operations"`
 	Attachments MailAttachmentsCmd `cmd:"" help:"List/download attachments"`
 	Drafts      MailDraftsCmd      `cmd:"" help:"Draft message operations"`
 	Flag        MailFlagCmd        `cmd:"" help:"Set follow-up flag on a message"`

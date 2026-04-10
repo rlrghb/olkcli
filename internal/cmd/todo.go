@@ -9,11 +9,12 @@ import (
 
 // TodoCmd is the top-level command group for Microsoft To Do tasks.
 type TodoCmd struct {
-	Lists    TodoListsCmd    `cmd:"" help:"List task lists"`
+	Lists    TodoListsCmd    `cmd:"" help:"Task list operations"`
 	List     TodoListCmd     `cmd:"" help:"List tasks in a list"`
 	Get      TodoGetCmd      `cmd:"" help:"Get task details"`
 	Create   TodoCreateCmd   `cmd:"" help:"Create a task"`
 	Complete TodoCompleteCmd `cmd:"" help:"Mark a task as complete"`
+	Update   TodoUpdateCmd   `cmd:"" help:"Update a task"`
 	Delete   TodoDeleteCmd   `cmd:"" help:"Delete a task"`
 }
 
@@ -36,10 +37,17 @@ func resolveListID(ctx *RunContext, listID string) (string, error) {
 	return lists[0].ID, nil
 }
 
-// TodoListsCmd lists all task lists.
-type TodoListsCmd struct{}
+// TodoListsCmd manages task lists.
+type TodoListsCmd struct {
+	List   TodoListsListCmd   `cmd:"" default:"1" help:"List task lists"`
+	Create TodoListsCreateCmd `cmd:"" help:"Create a task list"`
+	Delete TodoListsDeleteCmd `cmd:"" help:"Delete a task list"`
+}
 
-func (c *TodoListsCmd) Run(ctx *RunContext) error {
+// TodoListsListCmd lists all task lists (default subcommand).
+type TodoListsListCmd struct{}
+
+func (c *TodoListsListCmd) Run(ctx *RunContext) error {
 	client, err := ctx.GraphClient()
 	if err != nil {
 		return err
@@ -70,6 +78,64 @@ func (c *TodoListsCmd) Run(ctx *RunContext) error {
 	}
 
 	return printer.Print(headers, rows, lists, len(lists), "")
+}
+
+// TodoListsCreateCmd creates a new task list.
+type TodoListsCreateCmd struct {
+	Name string `help:"List name" required:"" short:"n"`
+}
+
+func (c *TodoListsCreateCmd) Run(ctx *RunContext) error {
+	if len(c.Name) == 0 {
+		return fmt.Errorf("list name cannot be empty")
+	}
+
+	client, err := ctx.GraphClient()
+	if err != nil {
+		return err
+	}
+
+	if ctx.Flags.DryRun {
+		fmt.Printf("Would create task list %q\n", outfmt.Sanitize(c.Name))
+		return nil
+	}
+
+	list, err := client.CreateTodoList(ctx.Ctx, c.Name)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Task list created: %s (ID: %s)\n", outfmt.Sanitize(list.DisplayName), outfmt.Sanitize(list.ID))
+	return nil
+}
+
+// TodoListsDeleteCmd deletes a task list.
+type TodoListsDeleteCmd struct {
+	ID string `arg:"" help:"Task list ID"`
+}
+
+func (c *TodoListsDeleteCmd) Run(ctx *RunContext) error {
+	if !ctx.Flags.Force {
+		return fmt.Errorf("delete task list %s: use --force to confirm deletion", outfmt.Sanitize(outfmt.Truncate(c.ID, 30)))
+	}
+
+	client, err := ctx.GraphClient()
+	if err != nil {
+		return err
+	}
+
+	if ctx.Flags.DryRun {
+		fmt.Printf("Would delete task list %s\n", outfmt.Sanitize(c.ID))
+		return nil
+	}
+
+	err = client.DeleteTodoList(ctx.Ctx, c.ID)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("Task list deleted.")
+	return nil
 }
 
 // TodoListCmd lists tasks in a task list.
@@ -232,6 +298,60 @@ func (c *TodoCompleteCmd) Run(ctx *RunContext) error {
 	}
 
 	fmt.Println("Task completed.")
+	return nil
+}
+
+// TodoUpdateCmd updates a task's properties.
+type TodoUpdateCmd struct {
+	ID         string `arg:"" help:"Task ID"`
+	List       string `help:"Task list ID" env:"OLK_TODO_LIST"`
+	Title      string `help:"New title" short:"t"`
+	Due        string `help:"New due date (ISO 8601, empty string to clear)" short:"d"`
+	Importance string `help:"New importance level" enum:"low,normal,high," default:""`
+	Body       string `help:"New body text" short:"b"`
+}
+
+func (c *TodoUpdateCmd) Run(ctx *RunContext) error {
+	listID, err := resolveListID(ctx, c.List)
+	if err != nil {
+		return err
+	}
+
+	// Build optional params - only set what was provided
+	var title, due, importance, body *string
+	if c.Title != "" {
+		title = &c.Title
+	}
+	if c.Due != "" {
+		due = &c.Due
+	}
+	if c.Importance != "" {
+		importance = &c.Importance
+	}
+	if c.Body != "" {
+		body = &c.Body
+	}
+
+	if title == nil && due == nil && importance == nil && body == nil {
+		return fmt.Errorf("nothing to update; provide at least one of --title, --due, --importance, --body")
+	}
+
+	if ctx.Flags.DryRun {
+		fmt.Printf("Would update task %s\n", outfmt.Sanitize(c.ID))
+		return nil
+	}
+
+	client, err := ctx.GraphClient()
+	if err != nil {
+		return err
+	}
+
+	task, err := client.UpdateTodoTask(ctx.Ctx, listID, c.ID, title, due, importance, body)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Task updated: %s\n", outfmt.Sanitize(task.Title))
 	return nil
 }
 

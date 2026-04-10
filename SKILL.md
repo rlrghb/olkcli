@@ -54,6 +54,9 @@ Mail
 - Delete: `olk mail delete <ID> --force`
 - Mark read/unread: `olk mail mark <ID> --read` or `olk mail mark <ID> --unread`
 - List folders: `olk mail folders`
+- Create folder: `olk mail folders create -n "Project X"`
+- Rename folder: `olk mail folders rename <FOLDER_ID> -n "New Name"`
+- Delete folder: `olk mail folders delete <FOLDER_ID> --force`
 - List attachments: `olk mail attachments <ID>`
 - Download all attachments: `olk mail attachments <ID> --save [--out DIR]`
 - Download specific attachment: `olk mail attachments <ID> --attachment-id <ATT_ID> [--out DIR]`
@@ -109,6 +112,8 @@ Calendar
 - Create with attendees: `olk calendar create --subject "Sync" --start 2025-06-15T10:00 --end 2025-06-15T10:30 --attendees a@b.com --attendees c@d.com`
 - Create all-day: `olk calendar create --subject "Offsite" --start 2025-06-15 --end 2025-06-16 --all-day`
 - Create with Teams link: `olk calendar create --subject "Call" --start 2025-06-15T14:00 --end 2025-06-15T14:30 --online-meeting`
+- Create recurring: `olk calendar create --subject "Standup" --start 2025-06-15T09:00 --end 2025-06-15T09:15 -r daily`
+- Recurrence options: `daily`, `weekdays` (Mon-Fri), `weekly`, `monthly`, `yearly`
 - Update event: `olk calendar update <ID> [--subject X] [--start Y] [--end Z] [--location L]`
 - Delete event: `olk calendar delete <ID> --force`
 - Respond to invite: `olk calendar respond <ID> accept|decline|tentative`
@@ -135,9 +140,12 @@ Contacts
 Tasks (Microsoft To Do)
 
 - List task lists: `olk todo lists`
+- Create task list: `olk todo lists create -n "Project Tasks"`
+- Delete task list: `olk todo lists delete <LIST_ID> --force`
 - List tasks: `olk todo list [--list LIST_ID] [-n 25] [--status notStarted|inProgress|completed|waitingOnOthers|deferred]`
 - Get task: `olk todo get <TASK_ID> [--list LIST_ID]`
 - Create task: `olk todo create --title "Buy groceries" [--due 2026-04-15] [--importance low|normal|high] [--body "Notes"] [--list LIST_ID]`
+- Update task: `olk todo update <TASK_ID> [--title X] [--due DATE] [--importance low|normal|high] [--body TEXT] [--list LIST_ID]`
 - Complete task: `olk todo complete <TASK_ID> [--list LIST_ID]`
 - Delete task: `olk todo delete <TASK_ID> --force [--list LIST_ID]`
 

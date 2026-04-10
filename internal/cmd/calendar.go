@@ -142,6 +142,7 @@ type CalendarCreateCmd struct {
 	Attendees     []string `help:"Attendee email addresses" short:"a"`
 	AllDay        bool     `help:"All-day event"`
 	OnlineMeeting bool    `help:"Create online meeting"`
+	Recurrence    string   `help:"Recurrence: daily|weekdays|weekly|monthly|yearly" short:"r"`
 }
 
 func (c *CalendarCreateCmd) Run(ctx *RunContext) error {
@@ -168,7 +169,7 @@ func (c *CalendarCreateCmd) Run(ctx *RunContext) error {
 		return nil
 	}
 
-	event, err := client.CreateEvent(ctx.Ctx, c.Subject, start, end, c.Location, c.Attendees, c.AllDay, c.OnlineMeeting)
+	event, err := client.CreateEvent(ctx.Ctx, c.Subject, start, end, c.Location, c.Attendees, c.AllDay, c.OnlineMeeting, c.Recurrence)
 	if err != nil {
 		return err
 	}

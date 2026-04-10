@@ -379,6 +379,66 @@ func (c *Client) ListMailFolders(ctx context.Context) ([]MailFolder, error) {
 	return folders, nil
 }
 
+// CreateMailFolder creates a new mail folder.
+func (c *Client) CreateMailFolder(ctx context.Context, displayName string) (*MailFolder, error) {
+	folder := models.NewMailFolder()
+	folder.SetDisplayName(&displayName)
+
+	created, err := c.inner.Me().MailFolders().Post(ctx, folder, nil)
+	if err != nil {
+		return nil, fmt.Errorf("creating mail folder: %w", err)
+	}
+
+	result := MailFolder{
+		DisplayName: derefStr(created.GetDisplayName()),
+	}
+	if created.GetId() != nil {
+		result.ID = *created.GetId()
+	}
+	if created.GetTotalItemCount() != nil {
+		result.TotalCount = *created.GetTotalItemCount()
+	}
+	if created.GetUnreadItemCount() != nil {
+		result.UnreadCount = *created.GetUnreadItemCount()
+	}
+	return &result, nil
+}
+
+// RenameMailFolder renames a mail folder.
+func (c *Client) RenameMailFolder(ctx context.Context, folderID, displayName string) (*MailFolder, error) {
+	if err := validateID(folderID, "folder ID"); err != nil {
+		return nil, err
+	}
+
+	folder := models.NewMailFolder()
+	folder.SetDisplayName(&displayName)
+
+	updated, err := c.inner.Me().MailFolders().ByMailFolderId(folderID).Patch(ctx, folder, nil)
+	if err != nil {
+		return nil, fmt.Errorf("renaming mail folder: %w", err)
+	}
+
+	result := MailFolder{
+		DisplayName: derefStr(updated.GetDisplayName()),
+	}
+	if updated.GetId() != nil {
+		result.ID = *updated.GetId()
+	}
+	return &result, nil
+}
+
+// DeleteMailFolder deletes a mail folder.
+func (c *Client) DeleteMailFolder(ctx context.Context, folderID string) error {
+	if err := validateID(folderID, "folder ID"); err != nil {
+		return err
+	}
+	err := c.inner.Me().MailFolders().ByMailFolderId(folderID).Delete(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("deleting mail folder: %w", err)
+	}
+	return nil
+}
+
 func (c *Client) SearchMessages(ctx context.Context, query string, top int32) ([]MailMessage, error) {
 	return c.ListMessages(ctx, ListMessagesOptions{
 		Top:    top,

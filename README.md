@@ -13,7 +13,7 @@ Works with both **personal Microsoft accounts** and **enterprise (Azure AD / Ent
 - **Reply, reply-all, forward** messages
 - **Move** messages between folders
 - **Delete** and **mark read/unread**
-- **List folders** with message counts
+- **Manage folders**: list, create, rename, delete mail folders
 - **View and download attachments**
 - **Drafts**: create, list, send, delete draft messages
 - **Flags & categories**: flag for follow-up, set importance, assign categories, manage category definitions
@@ -26,7 +26,7 @@ Works with both **personal Microsoft accounts** and **enterprise (Azure AD / Ent
 - **List events** with configurable date ranges (default: 7 days ahead)
 - **Calendar view** with expanded recurring event occurrences
 - **Recurring events** displayed with human-readable recurrence patterns
-- **Create events** with location, attendees, all-day, and online meeting support
+- **Create events** with location, attendees, all-day, online meeting, and recurrence support
 - **Update and delete** events
 - **Respond** to invitations (accept, decline, tentative)
 - **List calendars** across your account
@@ -38,8 +38,8 @@ Works with both **personal Microsoft accounts** and **enterprise (Azure AD / Ent
 - Fields: name, email, phone, company, job title
 
 ### Tasks (Microsoft To Do)
-- **List task lists** and **tasks** with status filtering
-- **Create, complete, delete** tasks with due dates, importance, and notes
+- **Manage task lists**: list, create, delete task lists
+- **Create, update, complete, delete** tasks with due dates, importance, and notes
 
 ### People / Directory
 - **Search** people in your organization by name — returns name, email, job title, department, company. Uses relevance-ranked People API with automatic directory fallback for enterprise tenants
@@ -252,7 +252,10 @@ olk mail forward <ID> --to X [--comment Y]
 olk mail move <ID> <FOLDER>
 olk mail delete <ID> [--force]
 olk mail mark <ID> --read|--unread
-olk mail folders
+olk mail folders                                     List mail folders
+olk mail folders create -n "Name"                    Create a mail folder
+olk mail folders rename <ID> -n "New Name"           Rename a mail folder
+olk mail folders delete <ID> --force                 Delete a mail folder
 olk mail attachments <ID>                            List attachments
 olk mail attachments <ID> --save [--out DIR]         Download all attachments
 olk mail attachments <ID> --attachment-id X [--out DIR]  Download specific attachment
@@ -280,7 +283,7 @@ olk mail rules delete <ID> --force                   Delete an inbox rule
 olk calendar events [-d 7] [--after DATE] [--before DATE] [--calendar ID] [-n 25]
 olk calendar view [-d 7] [--after DATE] [--before DATE] [--calendar ID] [-n 50]
 olk calendar get <ID>
-olk calendar create --subject X --start Y --end Z [--location L] [--attendees A] [--all-day] [--online-meeting]
+olk calendar create --subject X --start Y --end Z [--location L] [--attendees A] [--all-day] [--online-meeting] [-r daily|weekdays|weekly|monthly|yearly]
 olk calendar update <ID> [--subject X] [--start Y] [--end Z] [--location L]
 olk calendar delete <ID> [--force]
 olk calendar respond <ID> accept|decline|tentative
@@ -310,9 +313,12 @@ olk contacts search <QUERY> [-n 25]
 
 ```
 olk todo lists                                       List task lists
+olk todo lists create -n "Name"                      Create a task list
+olk todo lists delete <ID> --force                   Delete a task list
 olk todo list [--list ID] [-n 25] [--status STATUS]  List tasks
 olk todo get <TASK_ID> [--list ID]                   Get task details
 olk todo create -t "Title" [--due DATE] [--importance low|normal|high] [--body TEXT] [--list ID]
+olk todo update <TASK_ID> [--title X] [--due DATE] [--importance low|normal|high] [--body TEXT] [--list ID]
 olk todo complete <TASK_ID> [--list ID]              Mark task complete
 olk todo delete <TASK_ID> --force [--list ID]        Delete a task
 ```

@@ -60,6 +60,40 @@ func (c *Client) ListTodoLists(ctx context.Context) ([]TodoList, error) {
 	return result, nil
 }
 
+// CreateTodoList creates a new task list.
+func (c *Client) CreateTodoList(ctx context.Context, displayName string) (*TodoList, error) {
+	list := models.NewTodoTaskList()
+	list.SetDisplayName(&displayName)
+
+	created, err := c.inner.Me().Todo().Lists().Post(ctx, list, nil)
+	if err != nil {
+		return nil, fmt.Errorf("creating todo list: %w", err)
+	}
+
+	result := TodoList{
+		DisplayName: derefStr(created.GetDisplayName()),
+	}
+	if created.GetId() != nil {
+		result.ID = *created.GetId()
+	}
+	if created.GetIsOwner() != nil {
+		result.IsOwner = *created.GetIsOwner()
+	}
+	return &result, nil
+}
+
+// DeleteTodoList deletes a task list.
+func (c *Client) DeleteTodoList(ctx context.Context, listID string) error {
+	if err := validateID(listID, "list ID"); err != nil {
+		return err
+	}
+	err := c.inner.Me().Todo().Lists().ByTodoTaskListId(listID).Delete(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("deleting todo list: %w", err)
+	}
+	return nil
+}
+
 // ListTodoTasks returns tasks in a given task list.
 func (c *Client) ListTodoTasks(ctx context.Context, listID string, top int32, status string) ([]TodoTask, error) {
 	if err := validateID(listID, "list ID"); err != nil {
@@ -189,6 +223,71 @@ func (c *Client) CompleteTodoTask(ctx context.Context, listID, taskID string) er
 		return fmt.Errorf("completing todo task: %w", err)
 	}
 	return nil
+}
+
+// UpdateTodoTask updates a task's properties.
+func (c *Client) UpdateTodoTask(ctx context.Context, listID, taskID string, title, dueDate, importance, body *string) (*TodoTask, error) {
+	if err := validateID(listID, "list ID"); err != nil {
+		return nil, err
+	}
+	if err := validateID(taskID, "task ID"); err != nil {
+		return nil, err
+	}
+
+	task := models.NewTodoTask()
+
+	if title != nil {
+		task.SetTitle(title)
+	}
+
+	if dueDate != nil {
+		if *dueDate == "" {
+			// Clear due date
+			task.SetDueDateTime(nil)
+		} else {
+			parsed, err := parseDate(*dueDate)
+			if err != nil {
+				return nil, fmt.Errorf("invalid due date %q: use ISO 8601 format (e.g. 2025-06-15): %w", *dueDate, err)
+			}
+			canonical := parsed.UTC().Format("2006-01-02T15:04:05")
+			dt := models.NewDateTimeTimeZone()
+			dt.SetDateTime(&canonical)
+			tz := "UTC"
+			dt.SetTimeZone(&tz)
+			task.SetDueDateTime(dt)
+		}
+	}
+
+	if importance != nil {
+		var imp models.Importance
+		switch *importance {
+		case "low":
+			imp = models.LOW_IMPORTANCE
+		case "normal":
+			imp = models.NORMAL_IMPORTANCE
+		case "high":
+			imp = models.HIGH_IMPORTANCE
+		default:
+			return nil, fmt.Errorf("invalid importance: %q (must be low, normal, or high)", *importance)
+		}
+		task.SetImportance(&imp)
+	}
+
+	if body != nil {
+		b := models.NewItemBody()
+		b.SetContent(body)
+		ct := models.TEXT_BODYTYPE
+		b.SetContentType(&ct)
+		task.SetBody(b)
+	}
+
+	resp, err := c.inner.Me().Todo().Lists().ByTodoTaskListId(listID).Tasks().ByTodoTaskId(taskID).Patch(ctx, task, nil)
+	if err != nil {
+		return nil, fmt.Errorf("updating todo task: %w", err)
+	}
+
+	result := convertTodoTask(resp)
+	return &result, nil
 }
 
 // DeleteTodoTask deletes a task.

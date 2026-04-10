@@ -106,7 +106,7 @@ func (c *Client) GetEvent(ctx context.Context, eventID string) (*CalendarEvent, 
 	return &e, nil
 }
 
-func (c *Client) CreateEvent(ctx context.Context, subject string, start, end time.Time, location string, attendees []string, isAllDay bool, isOnlineMeeting bool) (*CalendarEvent, error) {
+func (c *Client) CreateEvent(ctx context.Context, subject string, start, end time.Time, location string, attendees []string, isAllDay bool, isOnlineMeeting bool, recurrence string) (*CalendarEvent, error) {
 	event := models.NewEvent()
 	event.SetSubject(&subject)
 
@@ -148,6 +148,14 @@ func (c *Client) CreateEvent(ctx context.Context, subject string, start, end tim
 			atts = append(atts, att)
 		}
 		event.SetAttendees(atts)
+	}
+
+	if recurrence != "" {
+		rec, err := buildRecurrence(recurrence, start)
+		if err != nil {
+			return nil, err
+		}
+		event.SetRecurrence(rec)
 	}
 
 	created, err := c.inner.Me().Events().Post(ctx, event, nil)
@@ -299,6 +307,78 @@ func convertEvent(e models.Eventable) CalendarEvent {
 		ev.Recurrence = formatRecurrence(e.GetRecurrence())
 	}
 	return ev
+}
+
+// buildRecurrence creates a PatternedRecurrence from a simple recurrence string.
+func buildRecurrence(recurrence string, start time.Time) (models.PatternedRecurrenceable, error) {
+	rec := models.NewPatternedRecurrence()
+	pattern := models.NewRecurrencePattern()
+	interval := int32(1)
+	pattern.SetInterval(&interval)
+
+	switch recurrence {
+	case "daily":
+		patType := models.DAILY_RECURRENCEPATTERNTYPE
+		pattern.SetTypeEscaped(&patType)
+	case "weekdays":
+		patType := models.WEEKLY_RECURRENCEPATTERNTYPE
+		pattern.SetTypeEscaped(&patType)
+		pattern.SetDaysOfWeek([]models.DayOfWeek{
+			models.MONDAY_DAYOFWEEK, models.TUESDAY_DAYOFWEEK,
+			models.WEDNESDAY_DAYOFWEEK, models.THURSDAY_DAYOFWEEK,
+			models.FRIDAY_DAYOFWEEK,
+		})
+	case "weekly":
+		patType := models.WEEKLY_RECURRENCEPATTERNTYPE
+		pattern.SetTypeEscaped(&patType)
+		dow := dayOfWeekFromTime(start)
+		pattern.SetDaysOfWeek([]models.DayOfWeek{dow})
+	case "monthly":
+		patType := models.ABSOLUTEMONTHLY_RECURRENCEPATTERNTYPE
+		pattern.SetTypeEscaped(&patType)
+		day := int32(start.Day())
+		pattern.SetDayOfMonth(&day)
+	case "yearly":
+		patType := models.ABSOLUTEYEARLY_RECURRENCEPATTERNTYPE
+		pattern.SetTypeEscaped(&patType)
+		day := int32(start.Day())
+		pattern.SetDayOfMonth(&day)
+		month := int32(start.Month())
+		pattern.SetMonth(&month)
+	default:
+		return nil, fmt.Errorf("invalid recurrence %q: use daily, weekdays, weekly, monthly, or yearly", recurrence)
+	}
+
+	rec.SetPattern(pattern)
+
+	// Set range: no end date (recur forever)
+	recRange := models.NewRecurrenceRange()
+	rangeType := models.NOEND_RECURRENCERANGETYPE
+	recRange.SetTypeEscaped(&rangeType)
+	startDate := serialization.NewDateOnly(start)
+	recRange.SetStartDate(startDate)
+	rec.SetRangeEscaped(recRange)
+
+	return rec, nil
+}
+
+func dayOfWeekFromTime(t time.Time) models.DayOfWeek {
+	switch t.Weekday() {
+	case time.Sunday:
+		return models.SUNDAY_DAYOFWEEK
+	case time.Monday:
+		return models.MONDAY_DAYOFWEEK
+	case time.Tuesday:
+		return models.TUESDAY_DAYOFWEEK
+	case time.Wednesday:
+		return models.WEDNESDAY_DAYOFWEEK
+	case time.Thursday:
+		return models.THURSDAY_DAYOFWEEK
+	case time.Friday:
+		return models.FRIDAY_DAYOFWEEK
+	default:
+		return models.SATURDAY_DAYOFWEEK
+	}
 }
 
 // formatRecurrence converts a recurrence pattern to a human-readable string.
