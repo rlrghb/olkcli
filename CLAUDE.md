@@ -18,7 +18,7 @@ go mod tidy         # After changing dependencies
 ## Architecture
 
 - **CLI framework**: `github.com/alecthomas/kong` — commands are Go structs with `Run(ctx *RunContext) error`
-- **Auth**: Raw OAuth2 device code flow against `login.microsoftonline.com` — no MSAL
+- **Auth**: Raw OAuth2 device code flow against `login.microsoftonline.com` — no MSAL. Scopes defined in `internal/msauth/scopes.go` (includes `MailboxSettings.ReadWrite`, `User.ReadBasic.All` for enterprise directory search)
 - **API**: Official `msgraph-sdk-go` wrapped in `internal/graphapi/` for ergonomic access
 - **Secrets**: OS keyring via `github.com/99designs/keyring` (macOS Keychain, Linux Secret Service, Windows WinCred)
 - **Output**: JSON envelope (`--json`), aligned table (default), TSV (`--plain`)
@@ -66,8 +66,9 @@ The project uses `msgraph-sdk-go` v1.96.0 which has some naming quirks:
 - Contact emails use `models.NewEmailAddress()` not `NewTypedEmailAddress()`
 - Contact phones: `GetBusinessPhones()`, `GetHomePhones()`, `GetMobilePhone()` (no unified `GetPhones()`)
 - Message item request builders: `ItemMessagesMessageItemRequestBuilder*` (note double "Messages")
-- Message rules: `Me().MailFolders().ByMailFolderId("inbox").MessageRules()` for CRUD
-- People API: `Me().People()` with `$search` query parameter
+- Message rules: `Me().MailFolders().ByMailFolderId("inbox").MessageRules()` for CRUD; requires `MailboxSettings.ReadWrite` scope
+- People API: `Me().People()` with `$search` query parameter; falls back to `/users` directory search (requires `ConsistencyLevel: eventual` header) when People API returns empty
+- Message rules: `SetSequence()` must be >= 1 (Graph API rejects 0)
 - FindMeetingTimes: `Me().FindMeetingTimes().Post()` returns `MeetingTimeSuggestionsResultable`
 - Recurrence pattern: `event.GetRecurrence().GetPattern().GetTypeEscaped()` (uses `GetTypeEscaped` not `GetType`)
 - ISODuration: use `serialization.NewDuration()` from `kiota-abstractions-go` for meeting duration
