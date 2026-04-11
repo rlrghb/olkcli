@@ -19,7 +19,7 @@ const maxDownloadSize = 50 << 20
 
 // validateOutDir ensures the output directory is not a symlink and exists.
 func validateOutDir(dir string) error {
-	if err := os.MkdirAll(dir, 0o750); err != nil {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return fmt.Errorf("creating output directory: %w", err)
 	}
 	info, err := os.Lstat(dir)

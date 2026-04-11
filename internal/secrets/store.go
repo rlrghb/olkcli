@@ -92,7 +92,7 @@ func (s *KeyringStore) Set(key, value string) error {
 func (s *KeyringStore) Get(key string) (string, error) {
 	item, err := s.ring.Get(key)
 	if err != nil {
-		return "", fmt.Errorf("getting key %q: %w", key, err)
+		return "", fmt.Errorf("retrieving stored credential: %w", err)
 	}
 	return string(item.Data), nil
 }
