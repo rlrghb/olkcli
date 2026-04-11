@@ -242,11 +242,11 @@ func (c *Client) SendMessage(ctx context.Context, subject, body string, toRecipi
 	if importance != "" {
 		var imp models.Importance
 		switch importance {
-		case ruleImportanceLow:
+		case importanceLow:
 			imp = models.LOW_IMPORTANCE
-		case ruleImportanceNormal:
+		case importanceNormal:
 			imp = models.NORMAL_IMPORTANCE
-		case ruleImportanceHigh:
+		case importanceHigh:
 			imp = models.HIGH_IMPORTANCE
 		default:
 			return fmt.Errorf("invalid importance: %q (must be low, normal, or high)", importance)
@@ -445,7 +445,7 @@ func (c *Client) DeleteMailFolder(ctx context.Context, folderID string) error {
 func (c *Client) SearchMessages(ctx context.Context, query string, top int32) ([]MailMessage, error) {
 	return c.ListMessages(ctx, &ListMessagesOptions{
 		Top:    top,
-		Search: fmt.Sprintf("%q", strings.ReplaceAll(query, `"`, ``)),
+		Search: fmt.Sprintf(`"%s"`, strings.ReplaceAll(query, `"`, ``)), //nolint:gocritic // %q adds Go escapes that break Graph API $search syntax
 	})
 }
 
@@ -562,11 +562,11 @@ func (c *Client) SetImportance(ctx context.Context, messageID, importance string
 
 	var imp models.Importance
 	switch importance {
-	case ruleImportanceLow:
+	case importanceLow:
 		imp = models.LOW_IMPORTANCE
-	case ruleImportanceNormal:
+	case importanceNormal:
 		imp = models.NORMAL_IMPORTANCE
-	case ruleImportanceHigh:
+	case importanceHigh:
 		imp = models.HIGH_IMPORTANCE
 	default:
 		return fmt.Errorf("invalid importance: %q (must be low, normal, or high)", importance)

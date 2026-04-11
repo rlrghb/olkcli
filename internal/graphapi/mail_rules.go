@@ -9,9 +9,9 @@ import (
 )
 
 const (
-	ruleImportanceLow    = "low"
-	ruleImportanceNormal = "normal"
-	ruleImportanceHigh   = "high"
+	importanceLow    = "low"
+	importanceNormal = "normal"
+	importanceHigh   = "high"
 )
 
 // MailRule is a simplified message rule for output
@@ -102,11 +102,11 @@ func (c *Client) CreateMailRule(ctx context.Context, name, from, subjectContains
 	if importance != "" {
 		var imp models.Importance
 		switch importance {
-		case ruleImportanceLow:
+		case importanceLow:
 			imp = models.LOW_IMPORTANCE
-		case ruleImportanceNormal:
+		case importanceNormal:
 			imp = models.NORMAL_IMPORTANCE
-		case ruleImportanceHigh:
+		case importanceHigh:
 			imp = models.HIGH_IMPORTANCE
 		default:
 			return nil, fmt.Errorf("invalid importance: %q", importance)
