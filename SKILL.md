@@ -28,7 +28,8 @@ Use `olk` for Outlook Mail/Calendar/Contacts/Tasks. Works with personal Microsof
 
 Setup (once)
 
-- `olk auth login` — device-code OAuth2 flow (opens browser)
+- `olk auth login` — device-code OAuth2 flow for personal accounts (opens browser)
+- `olk auth login --enterprise` — login with enterprise scopes for work/school accounts (enables OOO, inbox rules, directory search)
 - `olk auth login --client-id ID --tenant-id ID` — enterprise custom app registration
 - `olk auth list` — list authenticated accounts
 - `olk auth status` — check token validity
@@ -80,7 +81,7 @@ Flags & Categories
 - Delete category: `olk mail categories delete <ID> --force`
 - Color presets: `none`, `preset0` (red) through `preset24`
 
-Out-of-Office (enterprise/work accounts only)
+Out-of-Office (enterprise/work accounts only — requires `olk auth login --enterprise`)
 
 - Get auto-reply settings: `olk mail ooo get`
 - Enable auto-reply: `olk mail ooo set --message "I'm out of office"`
@@ -88,7 +89,7 @@ Out-of-Office (enterprise/work accounts only)
 - External message: `olk mail ooo set --message "Internal msg" --external-message "External msg"`
 - Disable auto-reply: `olk mail ooo off`
 
-Inbox Rules (enterprise/work accounts only)
+Inbox Rules (enterprise/work accounts only — requires `olk auth login --enterprise`)
 
 - List rules: `olk mail rules list`
 - Create rule: `olk mail rules create --name "Archive boss" --from boss@co.com --move Archive`
@@ -214,4 +215,4 @@ Notes
 - Destructive commands (`delete`) require `--force` or will prompt for confirmation.
 - Confirm before sending mail or creating/deleting events.
 - If a command fails with an auth error, check `olk auth status` first.
-- Some features are enterprise-only (work/school accounts): out-of-office, inbox rules, find meeting times, and directory search.
+- Some features are enterprise-only (work/school accounts): out-of-office, inbox rules, find meeting times, and directory search. These require `olk auth login --enterprise`.

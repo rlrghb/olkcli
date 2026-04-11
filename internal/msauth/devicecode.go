@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"regexp"
 	"strings"
 	"time"
@@ -123,7 +124,7 @@ func RequestDeviceCode(ctx context.Context, clientID, tenantID string, scopes []
 // PollForToken polls the token endpoint until the user completes authentication,
 // the device code expires, or an unrecoverable error occurs.
 // expiresIn from the device code response caps the maximum polling duration.
-func PollForToken(ctx context.Context, clientID, tenantID, deviceCode string, interval int, expiresIn int) (*TokenResponse, error) {
+func PollForToken(ctx context.Context, clientID, tenantID, deviceCode string, interval int, expiresIn int, verbose bool) (*TokenResponse, error) {
 	if err := validateTenantID(tenantID); err != nil {
 		return nil, err
 	}
@@ -173,6 +174,9 @@ func PollForToken(ctx context.Context, clientID, tenantID, deviceCode string, in
 		if resp.StatusCode != http.StatusOK {
 			var errResp ErrorResponse
 			if jsonErr := json.Unmarshal(body, &errResp); jsonErr == nil {
+				if verbose {
+					fmt.Fprintf(os.Stderr, "[verbose] poll response: status=%d error=%s description=%s\n", resp.StatusCode, sanitizeStr(errResp.Error), sanitizeStr(errResp.ErrorDescription))
+				}
 				switch errResp.Error {
 				case "authorization_pending":
 					// User hasn't completed auth yet; keep polling.
@@ -186,6 +190,10 @@ func PollForToken(ctx context.Context, clientID, tenantID, deviceCode string, in
 				}
 			}
 			return nil, fmt.Errorf("token request failed with status %d", resp.StatusCode)
+		}
+
+		if verbose {
+			fmt.Fprintf(os.Stderr, "[verbose] poll response: status=%d (success)\n", resp.StatusCode)
 		}
 
 		var tokenResp TokenResponse

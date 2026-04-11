@@ -2,7 +2,7 @@
 
 A fast, scriptable CLI for Microsoft Outlook via the Microsoft Graph API. Manage email, calendar, contacts, and tasks from the command line.
 
-Works with both **personal Microsoft accounts** and **enterprise (Azure AD / Entra ID)** accounts. Zero-config setup with device-code authentication — just run `olk auth login` and go.
+Works with both **personal Microsoft accounts** and **enterprise (Azure AD / Entra ID)** accounts. Zero-config setup with device-code authentication — just run `olk auth login` and go. For enterprise accounts, use `olk auth login --enterprise` to enable additional features like out-of-office, inbox rules, and directory search.
 
 ## Key Capabilities
 
@@ -149,10 +149,14 @@ olk mail list --select from,subject
 ### Default (Zero Config)
 
 ```bash
+# Personal accounts (Outlook.com, Hotmail, Live.com)
 olk auth login
+
+# Enterprise accounts (work/school) — enables OOO, inbox rules, directory search
+olk auth login --enterprise
 ```
 
-Uses an embedded public client ID with device-code flow. Works for both personal and enterprise accounts.
+Uses an embedded public client ID with device-code flow. The `--enterprise` flag requests additional scopes (`User.ReadBasic.All`, `MailboxSettings.ReadWrite`) needed for enterprise-only features. Personal accounts should not use `--enterprise` as these scopes are not supported.
 
 ### Custom App Registration
 
@@ -233,7 +237,7 @@ For common workflows, `olk` provides top-level shortcuts:
 ### Auth
 
 ```
-olk auth login [--client-id ID] [--tenant-id ID]    Login via device code
+olk auth login [--enterprise] [--client-id ID] [--tenant-id ID]  Login via device code
 olk auth logout [EMAIL]                              Remove stored credentials
 olk auth clean --force                               Remove ALL accounts and tokens
 olk auth list                                        List authenticated accounts
@@ -403,7 +407,7 @@ Then ask your AI assistant to "check my inbox" or "send an email" and it will us
 
 ## Account Compatibility
 
-Most features work with both personal and enterprise accounts. A few features require an enterprise (work/school) account:
+Most features work with both personal and enterprise accounts. A few features require an enterprise (work/school) account and `olk auth login --enterprise`:
 
 | Feature | Personal | Enterprise |
 |---------|----------|------------|
