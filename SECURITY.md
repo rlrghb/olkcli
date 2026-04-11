@@ -53,4 +53,4 @@ The following are out of scope:
 - **HTTPS only**: All network traffic uses TLS to Microsoft endpoints
 - **PKCE**: Device code flow uses Proof Key for Code Exchange (RFC 7636)
 - **Input validation**: All user inputs are validated before use in API queries
-- **Signed releases**: Release checksums are GPG-signed; SBOM is attached
+- **Release integrity**: Homebrew formula includes SHA256 checksums; `go install` verifies against the Go checksum database
