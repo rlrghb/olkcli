@@ -9,12 +9,12 @@ import (
 )
 
 type CalendarCmd struct {
-	Events    CalendarEventsCmd    `cmd:"" help:"List calendar events"`
-	Get       CalendarGetCmd       `cmd:"" help:"Get event details"`
-	Create    CalendarCreateCmd    `cmd:"" help:"Create a calendar event"`
-	Update    CalendarUpdateCmd    `cmd:"" help:"Update a calendar event"`
-	Delete    CalendarDeleteCmd    `cmd:"" help:"Delete a calendar event"`
-	Respond   CalendarRespondCmd   `cmd:"" help:"Respond to an event invitation"`
+	Events       CalendarEventsCmd       `cmd:"" help:"List calendar events"`
+	Get          CalendarGetCmd          `cmd:"" help:"Get event details"`
+	Create       CalendarCreateCmd       `cmd:"" help:"Create a calendar event"`
+	Update       CalendarUpdateCmd       `cmd:"" help:"Update a calendar event"`
+	Delete       CalendarDeleteCmd       `cmd:"" help:"Delete a calendar event"`
+	Respond      CalendarRespondCmd      `cmd:"" help:"Respond to an event invitation"`
 	Calendars    CalendarCalendarsCmd    `cmd:"" help:"List available calendars"`
 	Availability CalendarAvailabilityCmd `cmd:"" help:"Check availability / free-busy"`
 	View         CalendarViewCmd         `cmd:"" help:"Calendar view with expanded recurring events"`
@@ -78,7 +78,8 @@ func (c *CalendarEventsCmd) Run(ctx *RunContext) error {
 
 	headers := []string{"ID", "SUBJECT", "START", "END", "LOCATION", "STATUS", "RECURRENCE"}
 	var rows [][]string
-	for _, e := range events {
+	for i := range events {
+		e := &events[i]
 		id := outfmt.Truncate(e.ID, 15)
 		subject := outfmt.Truncate(e.Subject, 40)
 		startStr := outfmt.Truncate(e.Start, 16)
@@ -141,7 +142,7 @@ type CalendarCreateCmd struct {
 	Location      string   `help:"Event location" short:"l"`
 	Attendees     []string `help:"Attendee email addresses" short:"a"`
 	AllDay        bool     `help:"All-day event"`
-	OnlineMeeting bool    `help:"Create online meeting"`
+	OnlineMeeting bool     `help:"Create online meeting"`
 	Recurrence    string   `help:"Recurrence: daily|weekdays|weekly|monthly|yearly" short:"r"`
 }
 

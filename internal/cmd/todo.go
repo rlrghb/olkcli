@@ -86,7 +86,7 @@ type TodoListsCreateCmd struct {
 }
 
 func (c *TodoListsCreateCmd) Run(ctx *RunContext) error {
-	if len(c.Name) == 0 {
+	if c.Name == "" {
 		return fmt.Errorf("list name cannot be empty")
 	}
 
@@ -168,7 +168,8 @@ func (c *TodoListCmd) Run(ctx *RunContext) error {
 
 	headers := []string{"ID", "TITLE", "STATUS", "IMPORTANCE", "DUE"}
 	var rows [][]string
-	for _, t := range tasks {
+	for i := range tasks {
+		t := &tasks[i]
 		rows = append(rows, []string{
 			outfmt.Truncate(t.ID, 15),
 			outfmt.Truncate(outfmt.Sanitize(t.Title), 50),

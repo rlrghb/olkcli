@@ -8,6 +8,12 @@ import (
 	"github.com/microsoftgraph/msgraph-sdk-go/models"
 )
 
+const (
+	importanceLow    = "low"
+	importanceNormal = "normal"
+	importanceHigh   = "high"
+)
+
 // MailRule is a simplified message rule for output
 type MailRule struct {
 	ID          string `json:"id"`
@@ -31,7 +37,7 @@ func (c *Client) ListMailRules(ctx context.Context) ([]MailRule, error) {
 	return rules, nil
 }
 
-func (c *Client) CreateMailRule(ctx context.Context, name string, from string, subjectContains string, hasAttachment bool, moveFolder string, markRead bool, deleteMsg bool, forwardTo string, importance string) (*MailRule, error) {
+func (c *Client) CreateMailRule(ctx context.Context, name, from, subjectContains string, hasAttachment bool, moveFolder string, markRead, deleteMsg bool, forwardTo, importance string) (*MailRule, error) {
 	rule := models.NewMessageRule()
 	rule.SetDisplayName(&name)
 	enabled := true
@@ -96,11 +102,11 @@ func (c *Client) CreateMailRule(ctx context.Context, name string, from string, s
 	if importance != "" {
 		var imp models.Importance
 		switch importance {
-		case "low":
+		case importanceLow:
 			imp = models.LOW_IMPORTANCE
-		case "normal":
+		case importanceNormal:
 			imp = models.NORMAL_IMPORTANCE
-		case "high":
+		case importanceHigh:
 			imp = models.HIGH_IMPORTANCE
 		default:
 			return nil, fmt.Errorf("invalid importance: %q", importance)

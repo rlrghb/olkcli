@@ -154,7 +154,7 @@ func (c *Client) GetTodoTask(ctx context.Context, listID, taskID string) (*TodoT
 }
 
 // CreateTodoTask creates a new task in the given list.
-func (c *Client) CreateTodoTask(ctx context.Context, listID, title string, dueDate string, importance string, body string) (*TodoTask, error) {
+func (c *Client) CreateTodoTask(ctx context.Context, listID, title, dueDate, importance, body string) (*TodoTask, error) {
 	if err := validateID(listID, "list ID"); err != nil {
 		return nil, err
 	}
@@ -171,7 +171,7 @@ func (c *Client) CreateTodoTask(ctx context.Context, listID, title string, dueDa
 		canonical := parsed.UTC().Format("2006-01-02T15:04:05")
 		dt := models.NewDateTimeTimeZone()
 		dt.SetDateTime(&canonical)
-		tz := "UTC"
+		tz := graphTimeZoneUTC
 		dt.SetTimeZone(&tz)
 		task.SetDueDateTime(dt)
 	}
@@ -255,7 +255,7 @@ func (c *Client) UpdateTodoTask(ctx context.Context, listID, taskID string, titl
 			canonical := parsed.UTC().Format("2006-01-02T15:04:05")
 			dt := models.NewDateTimeTimeZone()
 			dt.SetDateTime(&canonical)
-			tz := "UTC"
+			tz := graphTimeZoneUTC
 			dt.SetTimeZone(&tz)
 			task.SetDueDateTime(dt)
 		}

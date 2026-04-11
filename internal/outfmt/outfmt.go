@@ -101,7 +101,10 @@ func (p *Printer) Print(headers []string, rows [][]string, jsonData interface{},
 		return p.PrintJSON(jsonData, count, nextLink)
 	case FormatPlain:
 		return p.PrintPlain(headers, rows)
+	case FormatTable:
+		return p.PrintTable(headers, rows)
 	default:
+		// Format is an int; treat unknown values like table output.
 		return p.PrintTable(headers, rows)
 	}
 }

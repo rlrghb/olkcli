@@ -133,7 +133,7 @@ func RequestDeviceCode(ctx context.Context, clientID, tenantID string, scopes []
 // PollForToken polls the token endpoint until the user completes authentication,
 // the device code expires, or an unrecoverable error occurs.
 // expiresIn from the device code response caps the maximum polling duration.
-func PollForToken(ctx context.Context, clientID, tenantID, deviceCode string, interval int, expiresIn int, verbose bool) (*TokenResponse, error) {
+func PollForToken(ctx context.Context, clientID, tenantID, deviceCode string, interval, expiresIn int, verbose bool) (*TokenResponse, error) {
 	if err := validateClientID(clientID); err != nil {
 		return nil, err
 	}

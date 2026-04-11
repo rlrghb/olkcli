@@ -106,14 +106,14 @@ func (c *Client) SetAutoReply(ctx context.Context, status, internalMsg, external
 	if startTime != "" {
 		startDt := models.NewDateTimeTimeZone()
 		startDt.SetDateTime(&startTime)
-		utc := "UTC"
+		utc := graphTimeZoneUTC
 		startDt.SetTimeZone(&utc)
 		autoReply.SetScheduledStartDateTime(startDt)
 	}
 	if endTime != "" {
 		endDt := models.NewDateTimeTimeZone()
 		endDt.SetDateTime(&endTime)
-		utc := "UTC"
+		utc := graphTimeZoneUTC
 		endDt.SetTimeZone(&utc)
 		autoReply.SetScheduledEndDateTime(endDt)
 	}

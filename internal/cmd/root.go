@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/alecthomas/kong"
+
 	"github.com/rlrghb/olkcli/internal/config"
 	"github.com/rlrghb/olkcli/internal/graphapi"
 	"github.com/rlrghb/olkcli/internal/msauth"
@@ -38,7 +39,6 @@ type RunContext struct {
 	Flags  *RootFlags
 	client *graphapi.Client
 	store  secrets.Store
-	auth   *msauth.Authenticator
 	cfg    *config.Config
 }
 
@@ -167,7 +167,7 @@ func Execute() int {
 	)
 
 	ctx_bg := context.Background()
-	timeout := cli.RootFlags.Timeout
+	timeout := cli.Timeout
 	if timeout <= 0 {
 		timeout = 60
 	}

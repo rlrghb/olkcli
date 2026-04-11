@@ -9,7 +9,7 @@ import (
 )
 
 // bestPhone returns the best available phone for table display (mobile > business > home).
-func bestPhone(ct graphapi.Contact) string {
+func bestPhone(ct *graphapi.Contact) string {
 	if ct.MobilePhone != "" {
 		return ct.MobilePhone
 	}
@@ -53,7 +53,8 @@ func (c *ContactsListCmd) Run(ctx *RunContext) error {
 
 	headers := []string{"ID", "NAME", "EMAIL", "PHONE", "COMPANY", "TITLE"}
 	var rows [][]string
-	for _, ct := range contacts {
+	for i := range contacts {
+		ct := &contacts[i]
 		id := outfmt.Truncate(ct.ID, 15)
 		email := ""
 		if len(ct.Emails) > 0 {
@@ -240,7 +241,8 @@ func (c *ContactsSearchCmd) Run(ctx *RunContext) error {
 
 	headers := []string{"ID", "NAME", "EMAIL", "PHONE", "COMPANY"}
 	var rows [][]string
-	for _, ct := range contacts {
+	for i := range contacts {
+		ct := &contacts[i]
 		id := outfmt.Truncate(ct.ID, 15)
 		email := ""
 		if len(ct.Emails) > 0 {

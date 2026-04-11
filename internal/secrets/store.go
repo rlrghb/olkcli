@@ -8,12 +8,13 @@ import (
 	"strings"
 
 	"github.com/99designs/keyring"
+
 	"github.com/rlrghb/olkcli/internal/config"
 )
 
 const (
-	serviceName   = "olk"
-	tokenPrefix   = "olk:token:"
+	serviceName = "olk"
+	tokenPrefix = "olk:token:"
 )
 
 // Store defines the interface for credential storage.
@@ -36,12 +37,12 @@ func NewKeyringStore() (*KeyringStore, error) {
 	// Pre-create keyring fallback directory with restrictive permissions
 	// to prevent other users from reading tokens on multi-user systems.
 	keyringDir := filepath.Join(config.ConfigDir(), "keyring")
-	if err := os.MkdirAll(keyringDir, 0700); err != nil {
+	if err := os.MkdirAll(keyringDir, 0o700); err != nil {
 		return nil, fmt.Errorf("creating keyring directory: %w", err)
 	}
 	// Ensure restrictive permissions even if the directory already existed.
 	if runtime.GOOS != "windows" {
-		if err := os.Chmod(keyringDir, 0700); err != nil {
+		if err := os.Chmod(keyringDir, 0o700); err != nil {
 			return nil, fmt.Errorf("setting keyring directory permissions: %w", err)
 		}
 	}

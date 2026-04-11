@@ -14,12 +14,12 @@ type MailCategorizeCmd struct {
 
 func (c *MailCategorizeCmd) Run(ctx *RunContext) error {
 	// Allow clearing categories with --categories none or --categories ""
-	clear := len(c.Categories) == 1 && (c.Categories[0] == "none" || c.Categories[0] == "")
-	if clear {
+	clearCats := len(c.Categories) == 1 && (c.Categories[0] == "none" || c.Categories[0] == "")
+	if clearCats {
 		c.Categories = []string{}
 	} else {
 		for _, cat := range c.Categories {
-			if len(cat) == 0 {
+			if cat == "" {
 				return fmt.Errorf("category name cannot be empty")
 			}
 			if len(cat) > 255 {
@@ -46,7 +46,7 @@ func (c *MailCategorizeCmd) Run(ctx *RunContext) error {
 		return err
 	}
 
-	if clear {
+	if clearCats {
 		fmt.Println("Categories cleared.")
 	} else {
 		fmt.Println("Categories updated.")

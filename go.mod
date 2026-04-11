@@ -8,6 +8,7 @@ require (
 	github.com/alecthomas/kong v1.15.0
 	github.com/microsoft/kiota-abstractions-go v1.9.3
 	github.com/microsoftgraph/msgraph-sdk-go v1.96.0
+	golang.org/x/text v0.33.0
 )
 
 require (
@@ -36,5 +37,4 @@ require (
 	golang.org/x/net v0.49.0 // indirect
 	golang.org/x/sys v0.40.0 // indirect
 	golang.org/x/term v0.39.0 // indirect
-	golang.org/x/text v0.33.0 // indirect
 )

@@ -9,7 +9,11 @@ import (
 	"github.com/microsoft/kiota-abstractions-go/serialization"
 	"github.com/microsoftgraph/msgraph-sdk-go/models"
 	"github.com/microsoftgraph/msgraph-sdk-go/users"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
+
+var dayNameTitle = cases.Title(language.English)
 
 // CalendarEvent is a simplified calendar event for output
 type CalendarEvent struct {
@@ -106,14 +110,14 @@ func (c *Client) GetEvent(ctx context.Context, eventID string) (*CalendarEvent, 
 	return &e, nil
 }
 
-func (c *Client) CreateEvent(ctx context.Context, subject string, start, end time.Time, location string, attendees []string, isAllDay bool, isOnlineMeeting bool, recurrence string) (*CalendarEvent, error) {
+func (c *Client) CreateEvent(ctx context.Context, subject string, start, end time.Time, location string, attendees []string, isAllDay, isOnlineMeeting bool, recurrence string) (*CalendarEvent, error) {
 	event := models.NewEvent()
 	event.SetSubject(&subject)
 
 	startDt := models.NewDateTimeTimeZone()
 	startStr := start.UTC().Format("2006-01-02T15:04:05")
 	startDt.SetDateTime(&startStr)
-	utc := "UTC"
+	utc := graphTimeZoneUTC
 	startDt.SetTimeZone(&utc)
 	event.SetStart(startDt)
 
@@ -179,7 +183,7 @@ func (c *Client) UpdateEvent(ctx context.Context, eventID string, subject *strin
 		startDt := models.NewDateTimeTimeZone()
 		startStr := start.UTC().Format("2006-01-02T15:04:05")
 		startDt.SetDateTime(&startStr)
-		utc := "UTC"
+		utc := graphTimeZoneUTC
 		startDt.SetTimeZone(&utc)
 		event.SetStart(startDt)
 	}
@@ -187,7 +191,7 @@ func (c *Client) UpdateEvent(ctx context.Context, eventID string, subject *strin
 		endDt := models.NewDateTimeTimeZone()
 		endStr := end.UTC().Format("2006-01-02T15:04:05")
 		endDt.SetDateTime(&endStr)
-		utc := "UTC"
+		utc := graphTimeZoneUTC
 		endDt.SetTimeZone(&utc)
 		event.SetEnd(endDt)
 	}
@@ -216,7 +220,7 @@ func (c *Client) DeleteEvent(ctx context.Context, eventID string) error {
 	return nil
 }
 
-func (c *Client) RespondToEvent(ctx context.Context, eventID string, response string) error {
+func (c *Client) RespondToEvent(ctx context.Context, eventID, response string) error {
 	if err := validateID(eventID, "event ID"); err != nil {
 		return err
 	}
@@ -376,7 +380,10 @@ func dayOfWeekFromTime(t time.Time) models.DayOfWeek {
 		return models.THURSDAY_DAYOFWEEK
 	case time.Friday:
 		return models.FRIDAY_DAYOFWEEK
+	case time.Saturday:
+		return models.SATURDAY_DAYOFWEEK
 	default:
+		// time.Weekday is only Sunday..Saturday; keep default for the compiler.
 		return models.SATURDAY_DAYOFWEEK
 	}
 }
@@ -449,7 +456,7 @@ func formatDaysOfWeek(days []models.DayOfWeek) string {
 	}
 	names := make([]string, 0, len(days))
 	for _, d := range days {
-		names = append(names, strings.Title(d.String())) //nolint:staticcheck
+		names = append(names, dayNameTitle.String(d.String()))
 	}
 	return strings.Join(names, ", ")
 }
@@ -462,10 +469,10 @@ func (c *Client) ListCalendarView(ctx context.Context, startTime, endTime time.T
 
 // MeetingTimeSuggestion represents a suggested meeting time
 type MeetingTimeSuggestion struct {
-	Start                  string                    `json:"start"`
-	End                    string                    `json:"end"`
-	Confidence             float64                   `json:"confidence"`
-	OrganizerAvailability  string                    `json:"organizerAvailability"`
+	Start                  string                     `json:"start"`
+	End                    string                     `json:"end"`
+	Confidence             float64                    `json:"confidence"`
+	OrganizerAvailability  string                     `json:"organizerAvailability"`
 	AttendeeAvailabilities []AttendeeAvailabilityInfo `json:"attendeeAvailabilities,omitempty"`
 }
 
@@ -504,7 +511,7 @@ func (c *Client) FindMeetingTimes(ctx context.Context, attendees []string, start
 	slot := models.NewTimeSlot()
 	startDt := models.NewDateTimeTimeZone()
 	startStr := start.UTC().Format("2006-01-02T15:04:05")
-	utc := "UTC"
+	utc := graphTimeZoneUTC
 	startDt.SetDateTime(&startStr)
 	startDt.SetTimeZone(&utc)
 	slot.SetStart(startDt)

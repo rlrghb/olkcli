@@ -53,7 +53,7 @@ type MailFoldersCreateCmd struct {
 }
 
 func (c *MailFoldersCreateCmd) Run(ctx *RunContext) error {
-	if len(c.Name) == 0 {
+	if c.Name == "" {
 		return fmt.Errorf("folder name cannot be empty")
 	}
 
@@ -83,7 +83,7 @@ type MailFoldersRenameCmd struct {
 }
 
 func (c *MailFoldersRenameCmd) Run(ctx *RunContext) error {
-	if len(c.Name) == 0 {
+	if c.Name == "" {
 		return fmt.Errorf("folder name cannot be empty")
 	}
 
