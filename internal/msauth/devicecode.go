@@ -2,6 +2,9 @@ package msauth
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -12,6 +15,21 @@ import (
 	"strings"
 	"time"
 )
+
+// generatePKCE creates a PKCE code verifier and its S256 challenge.
+// See RFC 7636 §4.1 and §4.2.
+func generatePKCE() (verifier, challenge string, err error) {
+	// 32 random bytes → 43-char base64url verifier (within the 43–128 range)
+	buf := make([]byte, 32)
+	if _, err := rand.Read(buf); err != nil {
+		return "", "", fmt.Errorf("generating PKCE verifier: %w", err)
+	}
+	verifier = base64.RawURLEncoding.EncodeToString(buf)
+
+	h := sha256.Sum256([]byte(verifier))
+	challenge = base64.RawURLEncoding.EncodeToString(h[:])
+	return verifier, challenge, nil
+}
 
 var validTenantID = regexp.MustCompile(`^(?:common|organizations|consumers|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$`)
 var validClientID = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
@@ -41,6 +59,9 @@ type DeviceCodeResponse struct {
 	ExpiresIn       int    `json:"expires_in"`
 	Interval        int    `json:"interval"`
 	Message         string `json:"message"`
+	// CodeVerifier holds the PKCE verifier generated during the device code
+	// request. It must be passed back during token polling.
+	CodeVerifier string `json:"-"`
 }
 
 // TokenResponse holds the OAuth2 token response from the token endpoint.
@@ -78,9 +99,17 @@ func RequestDeviceCode(ctx context.Context, clientID, tenantID string, scopes []
 		return nil, err
 	}
 
+	// Generate PKCE challenge (RFC 7636) for defense-in-depth.
+	codeVerifier, codeChallenge, err := generatePKCE()
+	if err != nil {
+		return nil, err
+	}
+
 	data := url.Values{
-		"client_id": {clientID},
-		"scope":     {strings.Join(scopes, " ")},
+		"client_id":             {clientID},
+		"scope":                 {strings.Join(scopes, " ")},
+		"code_challenge":        {codeChallenge},
+		"code_challenge_method": {"S256"},
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, deviceCodeURL(tenantID), strings.NewReader(data.Encode()))
@@ -127,13 +156,17 @@ func RequestDeviceCode(ctx context.Context, clientID, tenantID string, scopes []
 		dcResp.ExpiresIn = 900
 	}
 
+	// Carry the PKCE verifier so PollForToken can present it.
+	dcResp.CodeVerifier = codeVerifier
+
 	return &dcResp, nil
 }
 
 // PollForToken polls the token endpoint until the user completes authentication,
 // the device code expires, or an unrecoverable error occurs.
 // expiresIn from the device code response caps the maximum polling duration.
-func PollForToken(ctx context.Context, clientID, tenantID, deviceCode string, interval, expiresIn int, verbose bool) (*TokenResponse, error) {
+// codeVerifier is the PKCE verifier from the device code request (RFC 7636).
+func PollForToken(ctx context.Context, clientID, tenantID, deviceCode string, interval, expiresIn int, codeVerifier string, verbose bool) (*TokenResponse, error) {
 	if err := validateClientID(clientID); err != nil {
 		return nil, err
 	}
@@ -156,6 +189,9 @@ func PollForToken(ctx context.Context, clientID, tenantID, deviceCode string, in
 		"client_id":   {clientID},
 		"grant_type":  {"urn:ietf:params:oauth:grant-type:device_code"},
 		"device_code": {deviceCode},
+	}
+	if codeVerifier != "" {
+		data.Set("code_verifier", codeVerifier)
 	}
 
 	for {

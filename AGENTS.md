@@ -55,3 +55,7 @@
 - Never commit OAuth tokens or client secrets.
 - Prefer OS keychain backends; the file fallback is for headless environments only.
 - Config dir (`~/.config/olk/`) uses 0700 permissions; token files use 0600.
+- Device code flow uses PKCE (RFC 7636) — `code_challenge` sent with device code request, `code_verifier` sent during token polling.
+- Token refresh is serialized per-email via `sync.Map` of mutexes in `internal/msauth/auth.go` to prevent race conditions.
+- KQL search queries are sanitized by stripping special characters (`"`, `:`, `(`, `)`, `&`, `|`, `!`, `*`, `\`) in `internal/graphapi/mail.go`.
+- Releases are GPG-signed with SBOM (SPDX) via goreleaser. See `SECURITY.md` for vulnerability disclosure policy.

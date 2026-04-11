@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 
@@ -17,6 +18,18 @@ import (
 	"github.com/rlrghb/olkcli/internal/config"
 	"github.com/rlrghb/olkcli/internal/secrets"
 )
+
+// refreshMu guards per-email token refresh to prevent concurrent refreshes
+// from racing on the same keyring entry.
+var (
+	refreshMuMap sync.Map // map[string]*sync.Mutex
+)
+
+// emailMutex returns a per-email mutex for serializing token refresh operations.
+func emailMutex(email string) *sync.Mutex {
+	val, _ := refreshMuMap.LoadOrStore(email, &sync.Mutex{})
+	return val.(*sync.Mutex)
+}
 
 // safeExpiresIn bounds-checks an expires_in value (seconds) to prevent
 // time.Duration overflow. Returns a sane default (3600) for out-of-range values.
@@ -90,8 +103,8 @@ func (a *Authenticator) LoginDeviceCode(ctx context.Context, scopes []string, ve
 	// Step 2: Display the user code and verification URL.
 	fmt.Fprintf(os.Stderr, "\nTo sign in, open a browser to:\n  %s\n\nEnter the code: %s\n\nWaiting for authentication...\n", sanitizeStr(dcResp.VerificationURI), sanitizeStr(dcResp.UserCode))
 
-	// Step 3: Poll for the token.
-	tokenResp, err := PollForToken(ctx, a.ClientID, a.TenantID, dcResp.DeviceCode, dcResp.Interval, dcResp.ExpiresIn, verbose)
+	// Step 3: Poll for the token (includes PKCE verifier).
+	tokenResp, err := PollForToken(ctx, a.ClientID, a.TenantID, dcResp.DeviceCode, dcResp.Interval, dcResp.ExpiresIn, dcResp.CodeVerifier, verbose)
 	if err != nil {
 		return nil, fmt.Errorf("polling for token: %w", err)
 	}
@@ -136,6 +149,12 @@ func (a *Authenticator) LoginDeviceCode(ctx context.Context, scopes []string, ve
 // It loads the stored token, refreshes it if expired, and returns a
 // StaticTokenCredential suitable for use with the Azure/Microsoft Graph SDKs.
 func (a *Authenticator) GetCredential(ctx context.Context, email string) (azcore.TokenCredential, error) {
+	// Serialize token refresh per email to prevent concurrent refreshes from
+	// racing on the same keyring entry.
+	mu := emailMutex(email)
+	mu.Lock()
+	defer mu.Unlock()
+
 	// Step 1: Load token from keyring.
 	tokenData, err := LoadToken(a.Store, email)
 	if err != nil {

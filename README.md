@@ -427,13 +427,16 @@ Most features work with both personal and enterprise accounts. A few features re
 | Find meeting times | No | Yes |
 | Directory search (fallback) | No | Yes |
 
-## Privacy & Data Handling
+## Privacy & Security
 
 - **No telemetry**: `olk` collects no analytics, usage data, or crash reports
 - **No third-party services**: All communication is directly between your machine and Microsoft Graph API
 - **Token storage**: OAuth refresh tokens are stored in your OS credential manager (macOS Keychain, Linux Secret Service, Windows Credential Manager) — never in plain-text files
+- **PKCE**: Device code flow uses Proof Key for Code Exchange (RFC 7636) for defense-in-depth
 - **Data stays local**: Email bodies, attachments, and contacts are streamed to stdout and never cached to disk
+- **Signed releases**: Release checksums are GPG-signed with an SBOM (SPDX) attached
 - **Clean removal**: Run `olk auth clean --force` to remove all stored accounts and tokens
+- **Vulnerability reporting**: See [SECURITY.md](SECURITY.md) for our disclosure policy
 
 ## Architecture
 

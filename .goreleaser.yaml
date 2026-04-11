@@ -31,6 +31,25 @@ checksum:
   extra_files:
     - glob: ./prebuilt-archives/*
 
+signs:
+  - artifacts: checksum
+    args:
+      - "--batch"
+      - "--local-user"
+      - "{{ .Env.GPG_FINGERPRINT }}"
+      - "--output"
+      - "${signature}"
+      - "--detach-sig"
+      - "${artifact}"
+
+sboms:
+  - artifacts: archive
+    cmd: syft
+    args:
+      - "${artifact}"
+      - "--output"
+      - "spdx-json=${document}"
+
 release:
   extra_files:
     - glob: ./prebuilt-archives/*

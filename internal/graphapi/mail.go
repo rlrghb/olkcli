@@ -442,10 +442,36 @@ func (c *Client) DeleteMailFolder(ctx context.Context, folderID string) error {
 	return nil
 }
 
+// sanitizeKQL strips characters that have special meaning in Microsoft Graph
+// KQL $search expressions. The query is wrapped in double quotes by the caller,
+// so we must remove literal double quotes and also strip KQL operators/syntax
+// characters to prevent query injection. This is the user's own mailbox, so
+// the impact is low, but defense-in-depth is worthwhile.
+func sanitizeKQL(query string) string {
+	// Remove characters with special KQL semantics:
+	//   "  — would break out of the quoted string
+	//   :  — property restriction operator (e.g., from:, subject:)
+	//   (  — grouping
+	//   )  — grouping
+	//   &  — AND operator
+	//   |  — OR operator
+	//   !  — NOT operator
+	//   *  — wildcard
+	//   \  — escape character
+	return strings.Map(func(r rune) rune {
+		switch r {
+		case '"', ':', '(', ')', '&', '|', '!', '*', '\\':
+			return -1 // drop
+		default:
+			return r
+		}
+	}, query)
+}
+
 func (c *Client) SearchMessages(ctx context.Context, query string, top int32) ([]MailMessage, error) {
 	return c.ListMessages(ctx, &ListMessagesOptions{
 		Top:    top,
-		Search: fmt.Sprintf(`"%s"`, strings.ReplaceAll(query, `"`, ``)), //nolint:gocritic // %q adds Go escapes that break Graph API $search syntax
+		Search: fmt.Sprintf(`"%s"`, sanitizeKQL(query)),
 	})
 }
 
