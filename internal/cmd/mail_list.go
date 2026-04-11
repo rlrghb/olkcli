@@ -51,7 +51,7 @@ func (c *MailListCmd) Run(ctx *RunContext) error {
 		Filter:   filter,
 	}
 
-	messages, err := client.ListMessages(ctx.Ctx, opts)
+	messages, err := client.ListMessages(ctx.Ctx, &opts)
 	if err != nil {
 		return err
 	}
@@ -63,7 +63,8 @@ func (c *MailListCmd) Run(ctx *RunContext) error {
 
 	headers := []string{"ID", "FROM", "SUBJECT", "DATE", "READ", "ATTACH"}
 	var rows [][]string
-	for _, m := range messages {
+	for i := range messages {
+		m := &messages[i]
 		read := " "
 		if m.IsRead {
 			read = "Y"

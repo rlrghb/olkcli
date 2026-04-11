@@ -25,7 +25,8 @@ func (c *MailSearchCmd) Run(ctx *RunContext) error {
 
 	headers := []string{"ID", "FROM", "SUBJECT", "DATE"}
 	var rows [][]string
-	for _, m := range messages {
+	for i := range messages {
+		m := &messages[i]
 		id := outfmt.Truncate(m.ID, 15)
 		date := outfmt.Truncate(m.ReceivedAt, 16)
 		subject := outfmt.Truncate(m.Subject, 60)

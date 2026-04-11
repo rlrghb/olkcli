@@ -19,7 +19,7 @@ const maxDownloadSize = 50 << 20
 
 // validateOutDir ensures the output directory is not a symlink and exists.
 func validateOutDir(dir string) error {
-	if err := os.MkdirAll(dir, 0750); err != nil {
+	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return fmt.Errorf("creating output directory: %w", err)
 	}
 	info, err := os.Lstat(dir)
@@ -39,7 +39,7 @@ func validateOutDir(dir string) error {
 // Appends a numeric suffix (e.g., "file(1).pdf") to avoid collisions.
 func safeWriteFile(path string, content []byte) (string, error) {
 	// Try the original path first with O_EXCL to prevent overwrite.
-	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
 	if err == nil {
 		_, writeErr := f.Write(content)
 		closeErr := f.Close()
@@ -57,7 +57,7 @@ func safeWriteFile(path string, content []byte) (string, error) {
 	base := strings.TrimSuffix(path, ext)
 	for i := 1; i < 1000; i++ {
 		candidate := fmt.Sprintf("%s(%d)%s", base, i, ext)
-		f, err = os.OpenFile(candidate, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+		f, err = os.OpenFile(candidate, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
 		if err == nil {
 			_, writeErr := f.Write(content)
 			closeErr := f.Close()

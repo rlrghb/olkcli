@@ -58,7 +58,8 @@ func (c *CalendarViewCmd) Run(ctx *RunContext) error {
 
 	headers := []string{"ID", "SUBJECT", "START", "END", "LOCATION", "STATUS", "RECURRENCE"}
 	var rows [][]string
-	for _, e := range events {
+	for i := range events {
+		e := &events[i]
 		id := outfmt.Truncate(e.ID, 15)
 		subject := outfmt.Truncate(e.Subject, 40)
 		startStr := outfmt.Truncate(e.Start, 16)

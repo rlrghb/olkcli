@@ -9,6 +9,9 @@ import (
 	"github.com/microsoftgraph/msgraph-sdk-go/models/odataerrors"
 )
 
+// graphTimeZoneUTC is the time zone string Microsoft Graph expects on dateTimeTimeZone values.
+const graphTimeZoneUTC = "UTC"
+
 // safeIDPattern matches typical Microsoft Graph IDs (alphanumeric, hyphens, underscores, equals, plus, slash for base64).
 var safeIDPattern = regexp.MustCompile(`^[a-zA-Z0-9_=+/-]+$`)
 

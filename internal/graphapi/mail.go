@@ -12,12 +12,12 @@ import (
 
 // allowedOrderBy is the set of valid $orderby field values.
 var allowedOrderBy = map[string]bool{
-	"receivedDateTime desc": true,
-	"receivedDateTime asc":  true,
-	"receivedDateTime":      true,
-	"subject desc":          true,
-	"subject asc":           true,
-	"subject":               true,
+	"receivedDateTime desc":          true,
+	"receivedDateTime asc":           true,
+	"receivedDateTime":               true,
+	"subject desc":                   true,
+	"subject asc":                    true,
+	"subject":                        true,
 	"from/emailAddress/address desc": true,
 	"from/emailAddress/address asc":  true,
 	"from/emailAddress/address":      true,
@@ -70,7 +70,10 @@ type ListMessagesOptions struct {
 	Select   []string
 }
 
-func (c *Client) ListMessages(ctx context.Context, opts ListMessagesOptions) ([]MailMessage, error) {
+func (c *Client) ListMessages(ctx context.Context, opts *ListMessagesOptions) ([]MailMessage, error) {
+	if opts == nil {
+		opts = &ListMessagesOptions{}
+	}
 	opts.Top = clampTop(opts.Top)
 
 	if opts.OrderBy == "" {
@@ -181,7 +184,7 @@ func (c *Client) GetMessage(ctx context.Context, messageID string) (*MailMessage
 	return &m, nil
 }
 
-func (c *Client) SendMessage(ctx context.Context, subject string, body string, toRecipients []string, ccRecipients []string, bccRecipients []string, isHTML bool, attachments []AttachmentInput, importance string, readReceipt bool) error {
+func (c *Client) SendMessage(ctx context.Context, subject, body string, toRecipients, ccRecipients, bccRecipients []string, isHTML bool, attachments []AttachmentInput, importance string, readReceipt bool) error {
 	msg := models.NewMessage()
 	msg.SetSubject(&subject)
 
@@ -239,11 +242,11 @@ func (c *Client) SendMessage(ctx context.Context, subject string, body string, t
 	if importance != "" {
 		var imp models.Importance
 		switch importance {
-		case "low":
+		case ruleImportanceLow:
 			imp = models.LOW_IMPORTANCE
-		case "normal":
+		case ruleImportanceNormal:
 			imp = models.NORMAL_IMPORTANCE
-		case "high":
+		case ruleImportanceHigh:
 			imp = models.HIGH_IMPORTANCE
 		default:
 			return fmt.Errorf("invalid importance: %q (must be low, normal, or high)", importance)
@@ -262,7 +265,7 @@ func (c *Client) SendMessage(ctx context.Context, subject string, body string, t
 	return nil
 }
 
-func (c *Client) ReplyMessage(ctx context.Context, messageID string, comment string, replyAll bool) error {
+func (c *Client) ReplyMessage(ctx context.Context, messageID, comment string, replyAll bool) error {
 	if err := validateID(messageID, "message ID"); err != nil {
 		return err
 	}
@@ -285,7 +288,7 @@ func (c *Client) ReplyMessage(ctx context.Context, messageID string, comment str
 	return nil
 }
 
-func (c *Client) ForwardMessage(ctx context.Context, messageID string, comment string, toRecipients []string) error {
+func (c *Client) ForwardMessage(ctx context.Context, messageID, comment string, toRecipients []string) error {
 	if err := validateID(messageID, "message ID"); err != nil {
 		return err
 	}
@@ -304,7 +307,7 @@ func (c *Client) ForwardMessage(ctx context.Context, messageID string, comment s
 	return nil
 }
 
-func (c *Client) MoveMessage(ctx context.Context, messageID string, folderID string) error {
+func (c *Client) MoveMessage(ctx context.Context, messageID, folderID string) error {
 	if err := validateID(messageID, "message ID"); err != nil {
 		return err
 	}
@@ -440,9 +443,9 @@ func (c *Client) DeleteMailFolder(ctx context.Context, folderID string) error {
 }
 
 func (c *Client) SearchMessages(ctx context.Context, query string, top int32) ([]MailMessage, error) {
-	return c.ListMessages(ctx, ListMessagesOptions{
+	return c.ListMessages(ctx, &ListMessagesOptions{
 		Top:    top,
-		Search: fmt.Sprintf(`"%s"`, strings.ReplaceAll(query, `"`, ``)),
+		Search: fmt.Sprintf("%q", strings.ReplaceAll(query, `"`, ``)),
 	})
 }
 
@@ -522,7 +525,7 @@ func (c *Client) GetAttachments(ctx context.Context, messageID string) ([]Attach
 }
 
 // FlagMessage sets the follow-up flag status on a message
-func (c *Client) FlagMessage(ctx context.Context, messageID string, flagStatus string) error {
+func (c *Client) FlagMessage(ctx context.Context, messageID, flagStatus string) error {
 	if err := validateID(messageID, "message ID"); err != nil {
 		return err
 	}
@@ -552,18 +555,18 @@ func (c *Client) FlagMessage(ctx context.Context, messageID string, flagStatus s
 }
 
 // SetImportance sets the importance level on a message
-func (c *Client) SetImportance(ctx context.Context, messageID string, importance string) error {
+func (c *Client) SetImportance(ctx context.Context, messageID, importance string) error {
 	if err := validateID(messageID, "message ID"); err != nil {
 		return err
 	}
 
 	var imp models.Importance
 	switch importance {
-	case "low":
+	case ruleImportanceLow:
 		imp = models.LOW_IMPORTANCE
-	case "normal":
+	case ruleImportanceNormal:
 		imp = models.NORMAL_IMPORTANCE
-	case "high":
+	case ruleImportanceHigh:
 		imp = models.HIGH_IMPORTANCE
 	default:
 		return fmt.Errorf("invalid importance: %q (must be low, normal, or high)", importance)

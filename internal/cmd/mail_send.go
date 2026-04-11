@@ -13,13 +13,13 @@ import (
 )
 
 type MailSendCmd struct {
-	To         []string `help:"Recipient email addresses" required:"" short:"t"`
-	Subject    string   `help:"Email subject" required:"" short:"s"`
-	Body       string   `help:"Email body" short:"b"`
-	CC         []string `help:"CC recipients"`
-	BCC        []string `help:"BCC recipients"`
-	HTML       bool     `help:"Send body as HTML"`
-	Attach     []string `help:"File paths to attach" type:"path"`
+	To          []string `help:"Recipient email addresses" required:"" short:"t"`
+	Subject     string   `help:"Email subject" required:"" short:"s"`
+	Body        string   `help:"Email body" short:"b"`
+	CC          []string `help:"CC recipients"`
+	BCC         []string `help:"BCC recipients"`
+	HTML        bool     `help:"Send body as HTML"`
+	Attach      []string `help:"File paths to attach" type:"path"`
 	Importance  string   `help:"Message importance: low|normal|high" enum:",low,normal,high" default:""`
 	ReadReceipt bool     `help:"Request a read receipt"`
 }

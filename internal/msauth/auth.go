@@ -13,6 +13,7 @@ import (
 	"unicode"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+
 	"github.com/rlrghb/olkcli/internal/config"
 	"github.com/rlrghb/olkcli/internal/secrets"
 )
@@ -67,9 +68,9 @@ func NewAuthenticator(store secrets.Store, clientID, tenantID string) *Authentic
 
 // graphMeResponse represents the relevant fields from the Microsoft Graph /me endpoint.
 type graphMeResponse struct {
-	Mail                string `json:"mail"`
-	UserPrincipalName   string `json:"userPrincipalName"`
-	DisplayName         string `json:"displayName"`
+	Mail              string `json:"mail"`
+	UserPrincipalName string `json:"userPrincipalName"`
+	DisplayName       string `json:"displayName"`
 }
 
 // LoginDeviceCode performs the device code flow, retrieves the user profile,
@@ -216,7 +217,7 @@ func (a *Authenticator) ListAccounts() ([]AccountInfo, error) {
 // fetchUserProfile retrieves the email and display name from the Microsoft
 // Graph /me endpoint.
 func fetchUserProfile(ctx context.Context, accessToken string) (email, displayName string, err error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://graph.microsoft.com/v1.0/me", nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://graph.microsoft.com/v1.0/me", http.NoBody)
 	if err != nil {
 		return "", "", fmt.Errorf("creating profile request: %w", err)
 	}
@@ -264,7 +265,7 @@ func saveAccountInfo(info *AccountInfo) error {
 	}
 
 	path := accountFilePath(info.Email)
-	if err := atomicWriteFile(path, data, 0600); err != nil {
+	if err := atomicWriteFile(path, data, 0o600); err != nil {
 		return fmt.Errorf("writing account file: %w", err)
 	}
 

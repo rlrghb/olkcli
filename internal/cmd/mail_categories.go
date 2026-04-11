@@ -52,7 +52,7 @@ type MailCategoriesCreateCmd struct {
 }
 
 func (c *MailCategoriesCreateCmd) Run(ctx *RunContext) error {
-	if len(c.Name) == 0 {
+	if c.Name == "" {
 		return fmt.Errorf("category name cannot be empty")
 	}
 	if len(c.Name) > 255 {

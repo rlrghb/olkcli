@@ -9,7 +9,7 @@ import (
 )
 
 // buildMailFilter builds an OData filter string from common mail filter options
-func buildMailFilter(unread bool, from string, after string, before string) (string, error) {
+func buildMailFilter(unread bool, from, after, before string) (string, error) {
 	var filters []string
 
 	if unread {

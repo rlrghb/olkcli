@@ -49,9 +49,9 @@ func Load() (*Config, error) {
 
 	// Warn if config file is readable by others (Unix only).
 	if runtime.GOOS != "windows" {
-		if perm := info.Mode().Perm(); perm&0077 != 0 {
+		if perm := info.Mode().Perm(); perm&0o077 != 0 {
 			fmt.Fprintf(os.Stderr, "warning: config file %s has permissions %o, expected 0600; fixing\n", path, perm)
-			if chmodErr := os.Chmod(path, 0600); chmodErr != nil {
+			if chmodErr := os.Chmod(path, 0o600); chmodErr != nil {
 				fmt.Fprintf(os.Stderr, "warning: could not fix permissions: %v\n", chmodErr)
 			}
 		}
@@ -84,7 +84,7 @@ func (c *Config) Save() error {
 	if err != nil {
 		return err
 	}
-	return atomicWriteFile(ConfigFilePath(), data, 0600)
+	return atomicWriteFile(ConfigFilePath(), data, 0o600)
 }
 
 // atomicWriteFile writes data to a temp file then renames it to the target path,

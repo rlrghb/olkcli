@@ -38,14 +38,14 @@ func (c *Client) GetSchedule(ctx context.Context, emails []string, start, end ti
 	startDt := models.NewDateTimeTimeZone()
 	startStr := start.UTC().Format("2006-01-02T15:04:05")
 	startDt.SetDateTime(&startStr)
-	utc := "UTC"
-	startDt.SetTimeZone(&utc)
+	tz := graphTimeZoneUTC
+	startDt.SetTimeZone(&tz)
 	body.SetStartTime(startDt)
 
 	endDt := models.NewDateTimeTimeZone()
 	endStr := end.UTC().Format("2006-01-02T15:04:05")
 	endDt.SetDateTime(&endStr)
-	endDt.SetTimeZone(&utc)
+	endDt.SetTimeZone(&tz)
 	body.SetEndTime(endDt)
 
 	interval := int32(30)

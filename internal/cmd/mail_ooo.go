@@ -7,6 +7,8 @@ import (
 	"github.com/rlrghb/olkcli/internal/outfmt"
 )
 
+const oooStatusScheduled = "scheduled"
+
 // MailOOOCmd is the parent command for out-of-office / auto-reply settings
 type MailOOOCmd struct {
 	Get MailOOOGetCmd `cmd:"" help:"Get auto-reply settings"`
@@ -75,7 +77,7 @@ func (c *MailOOOSetCmd) Run(ctx *RunContext) error {
 	var startStr, endStr string
 
 	if c.Start != "" || c.End != "" {
-		status = "scheduled"
+		status = oooStatusScheduled
 		var startTime, endTime time.Time
 		if c.Start != "" {
 			t, err := parseOOOTime(c.Start)
@@ -100,7 +102,7 @@ func (c *MailOOOSetCmd) Run(ctx *RunContext) error {
 
 	if ctx.Flags.DryRun {
 		fmt.Printf("Would set auto-reply:\n  Status: %s\n  Message: %s\n", status, outfmt.Sanitize(c.Message))
-		if status == "scheduled" {
+		if status == oooStatusScheduled {
 			fmt.Printf("  Start: %s\n  End: %s\n", startStr, endStr)
 		}
 		return nil
@@ -111,7 +113,7 @@ func (c *MailOOOSetCmd) Run(ctx *RunContext) error {
 		return err
 	}
 
-	if status == "scheduled" {
+	if status == oooStatusScheduled {
 		fmt.Println("Auto-reply enabled (scheduled).")
 	} else {
 		fmt.Println("Auto-reply enabled.")

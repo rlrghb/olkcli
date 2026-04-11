@@ -2,16 +2,16 @@ package msauth
 
 // Microsoft Graph API scopes
 const (
-	ScopeMail          = "Mail.ReadWrite"
-	ScopeMailSend      = "Mail.Send"
-	ScopeCalendar      = "Calendars.ReadWrite"
-	ScopeContacts      = "Contacts.ReadWrite"
-	ScopeTasks         = "Tasks.ReadWrite"
-	ScopePeople           = "People.Read"
-	ScopeUser             = "User.Read"
-	ScopeUserReadAll      = "User.ReadBasic.All"
-	ScopeMailboxSettings  = "MailboxSettings.ReadWrite"
-	ScopeOfflineAccess    = "offline_access"
+	ScopeMail            = "Mail.ReadWrite"
+	ScopeMailSend        = "Mail.Send"
+	ScopeCalendar        = "Calendars.ReadWrite"
+	ScopeContacts        = "Contacts.ReadWrite"
+	ScopeTasks           = "Tasks.ReadWrite"
+	ScopePeople          = "People.Read"
+	ScopeUser            = "User.Read"
+	ScopeUserReadAll     = "User.ReadBasic.All"
+	ScopeMailboxSettings = "MailboxSettings.ReadWrite"
+	ScopeOfflineAccess   = "offline_access"
 )
 
 func DefaultScopes() []string {

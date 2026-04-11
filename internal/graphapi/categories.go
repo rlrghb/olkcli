@@ -27,7 +27,7 @@ func (c *Client) ListCategories(ctx context.Context) ([]Category, error) {
 	return categories, nil
 }
 
-func (c *Client) CreateCategory(ctx context.Context, name string, color string) (*Category, error) {
+func (c *Client) CreateCategory(ctx context.Context, name, color string) (*Category, error) {
 	cat := models.NewOutlookCategory()
 	cat.SetDisplayName(&name)
 
