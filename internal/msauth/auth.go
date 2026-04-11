@@ -65,18 +65,23 @@ type graphMeResponse struct {
 
 // LoginDeviceCode performs the device code flow, retrieves the user profile,
 // and persists the tokens and account information.
-func (a *Authenticator) LoginDeviceCode(ctx context.Context, scopes []string) (*AccountInfo, error) {
+func (a *Authenticator) LoginDeviceCode(ctx context.Context, scopes []string, verbose bool) (*AccountInfo, error) {
 	// Step 1: Request a device code.
 	dcResp, err := RequestDeviceCode(ctx, a.ClientID, a.TenantID, scopes)
 	if err != nil {
 		return nil, fmt.Errorf("requesting device code: %w", err)
 	}
 
+	if verbose {
+		fmt.Fprintf(os.Stderr, "[verbose] device code response: expires_in=%d interval=%d verification_uri=%s\n", dcResp.ExpiresIn, dcResp.Interval, sanitizeStr(dcResp.VerificationURI))
+		fmt.Fprintf(os.Stderr, "[verbose] client_id=%s tenant=%s scopes=%s\n", a.ClientID, a.TenantID, strings.Join(scopes, " "))
+	}
+
 	// Step 2: Display the user code and verification URL.
 	fmt.Fprintf(os.Stderr, "\nTo sign in, open a browser to:\n  %s\n\nEnter the code: %s\n\nWaiting for authentication...\n", sanitizeStr(dcResp.VerificationURI), sanitizeStr(dcResp.UserCode))
 
 	// Step 3: Poll for the token.
-	tokenResp, err := PollForToken(ctx, a.ClientID, a.TenantID, dcResp.DeviceCode, dcResp.Interval, dcResp.ExpiresIn)
+	tokenResp, err := PollForToken(ctx, a.ClientID, a.TenantID, dcResp.DeviceCode, dcResp.Interval, dcResp.ExpiresIn, verbose)
 	if err != nil {
 		return nil, fmt.Errorf("polling for token: %w", err)
 	}

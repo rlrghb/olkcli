@@ -21,9 +21,10 @@ type AuthCmd struct {
 }
 
 type AuthLoginCmd struct {
-	ClientID string `help:"OAuth2 client ID" env:"OLK_CLIENT_ID"`
-	TenantID string `help:"Azure AD tenant ID" env:"OLK_TENANT_ID" default:"common"`
-	ReadOnly bool   `help:"Request read-only permissions"`
+	ClientID   string `help:"OAuth2 client ID" env:"OLK_CLIENT_ID"`
+	TenantID   string `help:"Azure AD tenant ID" env:"OLK_TENANT_ID" default:"common"`
+	ReadOnly   bool   `help:"Request read-only permissions"`
+	Enterprise bool   `help:"Request enterprise scopes (work/school accounts)" env:"OLK_ENTERPRISE"`
 }
 
 func (c *AuthLoginCmd) Run(ctx *RunContext) error {
@@ -37,16 +38,27 @@ func (c *AuthLoginCmd) Run(ctx *RunContext) error {
 		return err
 	}
 
+	// Personal accounts cannot consent to enterprise-only scopes
+	// (User.ReadBasic.All, MailboxSettings.ReadWrite) — requesting them
+	// causes the device code flow to fail with a misleading "code expired" error.
+	// Use --enterprise for work/school accounts that need these scopes.
 	scopes := msauth.DefaultScopes()
+	if c.Enterprise {
+		scopes = msauth.EnterpriseScopes()
+	}
 	if c.ReadOnly {
-		scopes = msauth.ReadOnlyScopes()
+		if c.Enterprise {
+			scopes = msauth.EnterpriseReadOnlyScopes()
+		} else {
+			scopes = msauth.ReadOnlyScopes()
+		}
 	}
 	// Use a dedicated context for login — the global --timeout (default 60s)
 	// is too short for device-code flow which needs minutes for the user to
 	// open a browser and enter the code.
 	loginCtx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
 	defer cancel()
-	info, err := auth.LoginDeviceCode(loginCtx, scopes)
+	info, err := auth.LoginDeviceCode(loginCtx, scopes, ctx.Flags.Verbose)
 	if err != nil {
 		return err
 	}

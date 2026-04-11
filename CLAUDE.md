@@ -18,7 +18,7 @@ go mod tidy         # After changing dependencies
 ## Architecture
 
 - **CLI framework**: `github.com/alecthomas/kong` — commands are Go structs with `Run(ctx *RunContext) error`
-- **Auth**: Raw OAuth2 device code flow against `login.microsoftonline.com` — no MSAL. Scopes defined in `internal/msauth/scopes.go` (includes `MailboxSettings.ReadWrite`, `User.ReadBasic.All` for enterprise directory search)
+- **Auth**: Raw OAuth2 device code flow against `login.microsoftonline.com` — no MSAL. Scopes defined in `internal/msauth/scopes.go`. Enterprise-only scopes (`MailboxSettings.ReadWrite`, `User.ReadBasic.All`) are only requested with `--enterprise` flag — personal accounts cannot consent to them
 - **API**: Official `msgraph-sdk-go` wrapped in `internal/graphapi/` for ergonomic access
 - **Secrets**: OS keyring via `github.com/99designs/keyring` (macOS Keychain, Linux Secret Service, Windows WinCred)
 - **Output**: JSON envelope (`--json`), aligned table (default), TSV (`--plain`)

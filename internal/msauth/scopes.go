@@ -24,9 +24,15 @@ func DefaultScopes() []string {
 		ScopeContacts,
 		ScopeTasks,
 		ScopePeople,
-		ScopeUserReadAll,
-		ScopeMailboxSettings,
 	}
+}
+
+// EnterpriseScopes returns all scopes including enterprise-only ones.
+// Personal Microsoft accounts cannot consent to User.ReadBasic.All
+// or MailboxSettings.ReadWrite — requesting them causes device code
+// flow to fail with a misleading "code expired" error.
+func EnterpriseScopes() []string {
+	return append(DefaultScopes(), ScopeUserReadAll, ScopeMailboxSettings)
 }
 
 func ReadOnlyScopes() []string {
@@ -38,7 +44,10 @@ func ReadOnlyScopes() []string {
 		"Contacts.Read",
 		"Tasks.Read",
 		"People.Read",
-		"User.ReadBasic.All",
-		"MailboxSettings.Read",
 	}
+}
+
+// EnterpriseReadOnlyScopes returns read-only scopes including enterprise-only ones.
+func EnterpriseReadOnlyScopes() []string {
+	return append(ReadOnlyScopes(), "User.ReadBasic.All", "MailboxSettings.Read")
 }
