@@ -17,6 +17,15 @@ import (
 	"github.com/rlrghb/olkcli/internal/secrets"
 )
 
+// safeExpiresIn bounds-checks an expires_in value (seconds) to prevent
+// time.Duration overflow. Returns a sane default (3600) for out-of-range values.
+func safeExpiresIn(expiresIn int) int {
+	if expiresIn <= 0 || expiresIn > 86400 {
+		return 3600
+	}
+	return expiresIn
+}
+
 // sanitizeStr strips control characters from a string to prevent terminal injection.
 func sanitizeStr(s string) string {
 	return strings.Map(func(r rune) rune {
@@ -96,7 +105,7 @@ func (a *Authenticator) LoginDeviceCode(ctx context.Context, scopes []string, ve
 	}
 
 	// Step 5: Store refresh token in keyring.
-	expiresAt := time.Now().Add(time.Duration(tokenResp.ExpiresIn) * time.Second)
+	expiresAt := time.Now().Add(time.Duration(safeExpiresIn(tokenResp.ExpiresIn)) * time.Second)
 	tokenData := &TokenData{
 		AccessToken:  tokenResp.AccessToken,
 		RefreshToken: tokenResp.RefreshToken,
@@ -140,7 +149,7 @@ func (a *Authenticator) GetCredential(ctx context.Context, email string) (azcore
 		}
 
 		tokenData.AccessToken = tokenResp.AccessToken
-		tokenData.ExpiresAt = time.Now().Add(time.Duration(tokenResp.ExpiresIn) * time.Second)
+		tokenData.ExpiresAt = time.Now().Add(time.Duration(safeExpiresIn(tokenResp.ExpiresIn)) * time.Second)
 		if tokenResp.RefreshToken != "" {
 			tokenData.RefreshToken = tokenResp.RefreshToken
 		}
@@ -219,7 +228,7 @@ func fetchUserProfile(ctx context.Context, accessToken string) (email, displayNa
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20)) // 1 MB limit
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 100<<10)) // 100 KB limit for OAuth responses
 	if err != nil {
 		return "", "", fmt.Errorf("reading profile response: %w", err)
 	}

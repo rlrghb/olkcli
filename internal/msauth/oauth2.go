@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -22,7 +23,8 @@ type TokenData struct {
 }
 
 // RefreshAccessToken exchanges a refresh token for a new access token.
-func RefreshAccessToken(ctx context.Context, clientID, tenantID, refreshToken string) (*TokenResponse, error) {
+func RefreshAccessToken(ctx context.Context, clientID, tenantID, refreshToken string, verbose ...bool) (*TokenResponse, error) {
+	isVerbose := len(verbose) > 0 && verbose[0]
 	if err := validateClientID(clientID); err != nil {
 		return nil, err
 	}
@@ -48,7 +50,7 @@ func RefreshAccessToken(ctx context.Context, clientID, tenantID, refreshToken st
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20)) // 1 MB limit
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 100<<10)) // 100 KB limit for OAuth responses
 	if err != nil {
 		return nil, fmt.Errorf("reading refresh response: %w", err)
 	}
@@ -56,14 +58,24 @@ func RefreshAccessToken(ctx context.Context, clientID, tenantID, refreshToken st
 	if resp.StatusCode != http.StatusOK {
 		var errResp ErrorResponse
 		if jsonErr := json.Unmarshal(body, &errResp); jsonErr == nil && errResp.Error != "" {
+			if isVerbose {
+				fmt.Fprintf(os.Stderr, "[verbose] refresh failed: status=%d error=%s description=%s\n", resp.StatusCode, sanitizeStr(errResp.Error), sanitizeStr(errResp.ErrorDescription))
+			}
 			return nil, fmt.Errorf("refresh token failed: %s: %s", sanitizeStr(errResp.Error), sanitizeStr(errResp.ErrorDescription))
 		}
 		return nil, fmt.Errorf("refresh token failed with status %d", resp.StatusCode)
 	}
 
+	if isVerbose {
+		fmt.Fprintf(os.Stderr, "[verbose] token refresh successful\n")
+	}
+
 	var tokenResp TokenResponse
 	if err := json.Unmarshal(body, &tokenResp); err != nil {
 		return nil, fmt.Errorf("decoding refresh response: %w", err)
+	}
+	if tokenResp.AccessToken == "" {
+		return nil, fmt.Errorf("refresh response contained empty access token")
 	}
 
 	return &tokenResp, nil
@@ -96,6 +108,9 @@ func LoadToken(store secrets.Store, email string) (*TokenData, error) {
 	var data TokenData
 	if err := json.Unmarshal([]byte(raw), &data); err != nil {
 		return nil, fmt.Errorf("unmarshaling token data: %w", err)
+	}
+	if data.RefreshToken == "" {
+		return nil, fmt.Errorf("stored token data contains empty refresh token")
 	}
 	return &data, nil
 }

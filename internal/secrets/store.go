@@ -39,6 +39,12 @@ func NewKeyringStore() (*KeyringStore, error) {
 	if err := os.MkdirAll(keyringDir, 0700); err != nil {
 		return nil, fmt.Errorf("creating keyring directory: %w", err)
 	}
+	// Ensure restrictive permissions even if the directory already existed.
+	if runtime.GOOS != "windows" {
+		if err := os.Chmod(keyringDir, 0700); err != nil {
+			return nil, fmt.Errorf("setting keyring directory permissions: %w", err)
+		}
+	}
 
 	cfg := keyring.Config{
 		ServiceName: serviceName,

@@ -95,7 +95,7 @@ func RequestDeviceCode(ctx context.Context, clientID, tenantID string, scopes []
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20)) // 1 MB limit
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 100<<10)) // 100 KB limit for OAuth responses
 	if err != nil {
 		return nil, fmt.Errorf("reading device code response: %w", err)
 	}
@@ -113,9 +113,18 @@ func RequestDeviceCode(ctx context.Context, clientID, tenantID string, scopes []
 		return nil, fmt.Errorf("decoding device code response: %w", err)
 	}
 
-	// Default interval to 5 seconds if not provided.
-	if dcResp.Interval == 0 {
+	if dcResp.DeviceCode == "" {
+		return nil, fmt.Errorf("device code response contained empty device_code")
+	}
+
+	// Bounds-check interval: default to 5, cap at 120.
+	if dcResp.Interval <= 0 || dcResp.Interval > 120 {
 		dcResp.Interval = 5
+	}
+
+	// Bounds-check ExpiresIn to prevent time.Duration overflow (cap at 1 hour).
+	if dcResp.ExpiresIn <= 0 || dcResp.ExpiresIn > 3600 {
+		dcResp.ExpiresIn = 900
 	}
 
 	return &dcResp, nil
@@ -125,11 +134,14 @@ func RequestDeviceCode(ctx context.Context, clientID, tenantID string, scopes []
 // the device code expires, or an unrecoverable error occurs.
 // expiresIn from the device code response caps the maximum polling duration.
 func PollForToken(ctx context.Context, clientID, tenantID, deviceCode string, interval int, expiresIn int, verbose bool) (*TokenResponse, error) {
+	if err := validateClientID(clientID); err != nil {
+		return nil, err
+	}
 	if err := validateTenantID(tenantID); err != nil {
 		return nil, err
 	}
 
-	if interval <= 0 {
+	if interval <= 0 || interval > 120 {
 		interval = 5
 	}
 
@@ -164,7 +176,7 @@ func PollForToken(ctx context.Context, clientID, tenantID, deviceCode string, in
 			return nil, fmt.Errorf("polling for token: %w", err)
 		}
 
-		body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20)) // 1 MB limit
+		body, err := io.ReadAll(io.LimitReader(resp.Body, 100<<10)) // 100 KB limit for OAuth responses
 		resp.Body.Close()
 		if err != nil {
 			return nil, fmt.Errorf("reading token response: %w", err)
@@ -184,6 +196,9 @@ func PollForToken(ctx context.Context, clientID, tenantID, deviceCode string, in
 				case "slow_down":
 					// Server asks us to slow down; increase interval.
 					interval += 5
+					if interval > 120 {
+						interval = 120
+					}
 					continue
 				default:
 					return nil, fmt.Errorf("token request failed: %s: %s", sanitizeStr(errResp.Error), sanitizeStr(errResp.ErrorDescription))
@@ -199,6 +214,9 @@ func PollForToken(ctx context.Context, clientID, tenantID, deviceCode string, in
 		var tokenResp TokenResponse
 		if err := json.Unmarshal(body, &tokenResp); err != nil {
 			return nil, fmt.Errorf("decoding token response: %w", err)
+		}
+		if tokenResp.AccessToken == "" {
+			return nil, fmt.Errorf("token response contained empty access token")
 		}
 
 		return &tokenResp, nil

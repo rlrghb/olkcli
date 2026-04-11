@@ -2,8 +2,10 @@ package config
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
 )
 
@@ -32,11 +34,31 @@ func Load() (*Config, error) {
 	}
 
 	path := ConfigFilePath()
-	data, err := os.ReadFile(path)
+	info, err := os.Lstat(path)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return cfg, nil
 		}
+		return nil, err
+	}
+
+	// Reject symlinks to prevent redirection attacks.
+	if info.Mode()&os.ModeSymlink != 0 {
+		return nil, fmt.Errorf("config file %s is a symlink, refusing to load", path)
+	}
+
+	// Warn if config file is readable by others (Unix only).
+	if runtime.GOOS != "windows" {
+		if perm := info.Mode().Perm(); perm&0077 != 0 {
+			fmt.Fprintf(os.Stderr, "warning: config file %s has permissions %o, expected 0600; fixing\n", path, perm)
+			if chmodErr := os.Chmod(path, 0600); chmodErr != nil {
+				fmt.Fprintf(os.Stderr, "warning: could not fix permissions: %v\n", chmodErr)
+			}
+		}
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
 		return nil, err
 	}
 

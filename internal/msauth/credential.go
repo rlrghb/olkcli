@@ -33,3 +33,12 @@ func (c *StaticTokenCredential) GetToken(_ context.Context, _ policy.TokenReques
 		ExpiresOn: c.expiresOn,
 	}, nil
 }
+
+// Clear overwrites the access token to reduce exposure in memory.
+// Note: Go strings are immutable, so this replaces the reference but the
+// original bytes may persist until garbage collected. This is a best-effort
+// mitigation — use short-lived credentials where possible.
+func (c *StaticTokenCredential) Clear() {
+	c.accessToken = ""
+	c.expiresOn = time.Time{}
+}

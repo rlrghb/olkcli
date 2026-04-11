@@ -9,8 +9,9 @@ import (
 	"github.com/microsoftgraph/msgraph-sdk-go/users"
 )
 
-// safePeopleQuery matches only alphanumeric, spaces, @, dots, hyphens, underscores.
-var safePeopleQuery = regexp.MustCompile(`^[a-zA-Z0-9 @._-]+$`)
+// safePeopleQuery matches alphanumeric, Unicode letters, spaces, @, dots, hyphens, underscores.
+// SECURITY: this whitelist prevents KQL injection in people/directory search queries.
+var safePeopleQuery = regexp.MustCompile(`^[\p{L}\p{N} @._-]+$`)
 
 // Person is a simplified person for output
 type Person struct {

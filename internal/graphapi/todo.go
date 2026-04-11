@@ -105,6 +105,9 @@ func (c *Client) ListTodoTasks(ctx context.Context, listID string, top int32, st
 		Top: &top,
 	}
 	if status != "" {
+		// SECURITY: whitelist validation is mandatory here — the status value
+		// is interpolated into an OData $filter string. Without this check,
+		// arbitrary OData injection would be possible.
 		validStatuses := map[string]bool{
 			"notStarted": true, "inProgress": true, "completed": true,
 			"waitingOnOthers": true, "deferred": true,

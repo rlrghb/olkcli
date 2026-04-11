@@ -17,6 +17,62 @@ type MailAttachmentsCmd struct {
 // maxDownloadSize is the maximum size for a single attachment download (50 MB).
 const maxDownloadSize = 50 << 20
 
+// validateOutDir ensures the output directory is not a symlink and exists.
+func validateOutDir(dir string) error {
+	if err := os.MkdirAll(dir, 0750); err != nil {
+		return fmt.Errorf("creating output directory: %w", err)
+	}
+	info, err := os.Lstat(dir)
+	if err != nil {
+		return fmt.Errorf("checking output directory: %w", err)
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("output directory %s is a symlink, refusing to write", dir)
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("output path %s is not a directory", dir)
+	}
+	return nil
+}
+
+// safeWriteFile writes content to path, refusing to overwrite existing files.
+// Appends a numeric suffix (e.g., "file(1).pdf") to avoid collisions.
+func safeWriteFile(path string, content []byte) (string, error) {
+	// Try the original path first with O_EXCL to prevent overwrite.
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+	if err == nil {
+		_, writeErr := f.Write(content)
+		closeErr := f.Close()
+		if writeErr != nil {
+			return path, writeErr
+		}
+		return path, closeErr
+	}
+	if !os.IsExist(err) {
+		return "", err
+	}
+
+	// File exists — find an available name with a numeric suffix.
+	ext := filepath.Ext(path)
+	base := strings.TrimSuffix(path, ext)
+	for i := 1; i < 1000; i++ {
+		candidate := fmt.Sprintf("%s(%d)%s", base, i, ext)
+		f, err = os.OpenFile(candidate, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+		if err == nil {
+			_, writeErr := f.Write(content)
+			closeErr := f.Close()
+			if writeErr != nil {
+				return candidate, writeErr
+			}
+			return candidate, closeErr
+		}
+		if !os.IsExist(err) {
+			return "", err
+		}
+	}
+	return "", fmt.Errorf("could not find available filename for %s after 1000 attempts", filepath.Base(path))
+}
+
 // sanitizeFilename removes path separators and leading dots to prevent path traversal.
 func sanitizeFilename(name string) string {
 	// Strip any directory components
@@ -45,18 +101,22 @@ func (c *MailAttachmentsCmd) Run(ctx *RunContext) error {
 		if err != nil {
 			return err
 		}
+		if len(att.Content) > maxDownloadSize {
+			return fmt.Errorf("attachment %q content is %d bytes, exceeds 50MB download limit", att.Name, len(att.Content))
+		}
 
 		outDir := c.Out
-		if err := os.MkdirAll(outDir, 0750); err != nil {
-			return fmt.Errorf("creating output directory: %w", err)
+		if err := validateOutDir(outDir); err != nil {
+			return err
 		}
 
 		filename := sanitizeFilename(att.Name)
 		outPath := filepath.Join(outDir, filename)
-		if err := os.WriteFile(outPath, att.Content, 0600); err != nil {
+		saved, err := safeWriteFile(outPath, att.Content)
+		if err != nil {
 			return fmt.Errorf("writing file: %w", err)
 		}
-		fmt.Printf("Saved: %s\n", outPath)
+		fmt.Printf("Saved: %s\n", saved)
 		return nil
 	}
 
@@ -73,8 +133,8 @@ func (c *MailAttachmentsCmd) Run(ctx *RunContext) error {
 	// Download all attachments if --save is set
 	if c.Save {
 		outDir := c.Out
-		if err := os.MkdirAll(outDir, 0750); err != nil {
-			return fmt.Errorf("creating output directory: %w", err)
+		if err := validateOutDir(outDir); err != nil {
+			return err
 		}
 
 		for _, a := range attachments {
@@ -85,13 +145,17 @@ func (c *MailAttachmentsCmd) Run(ctx *RunContext) error {
 			if err != nil {
 				return fmt.Errorf("downloading %q: %w", a.Name, err)
 			}
+			if len(att.Content) > maxDownloadSize {
+				return fmt.Errorf("attachment %q content is %d bytes, exceeds 50MB download limit", a.Name, len(att.Content))
+			}
 
 			filename := sanitizeFilename(att.Name)
 			outPath := filepath.Join(outDir, filename)
-			if err := os.WriteFile(outPath, att.Content, 0600); err != nil {
+			saved, err := safeWriteFile(outPath, att.Content)
+			if err != nil {
 				return fmt.Errorf("writing file %q: %w", filename, err)
 			}
-			fmt.Printf("Saved: %s\n", outPath)
+			fmt.Printf("Saved: %s\n", saved)
 		}
 		return nil
 	}

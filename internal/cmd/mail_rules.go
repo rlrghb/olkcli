@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/rlrghb/olkcli/internal/graphapi"
 	"github.com/rlrghb/olkcli/internal/outfmt"
 )
 
@@ -90,6 +91,9 @@ func (c *MailRulesCreateCmd) Run(ctx *RunContext) error {
 		actions = append(actions, "delete")
 	}
 	if c.ForwardTo != "" {
+		if err := graphapi.ValidateEmail(c.ForwardTo); err != nil {
+			return fmt.Errorf("invalid --forward-to address: %w", err)
+		}
 		actions = append(actions, fmt.Sprintf("forward:%s", c.ForwardTo))
 	}
 	if c.SetImportance != "" {
