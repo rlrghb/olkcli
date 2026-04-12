@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 	"text/tabwriter"
+	"time"
 	"unicode"
 )
 
@@ -23,6 +24,7 @@ type Envelope struct {
 	Results  interface{} `json:"results"`
 	Count    int         `json:"count"`
 	NextLink string      `json:"nextLink,omitempty"`
+	Timezone string      `json:"timezone,omitempty"`
 }
 
 // Printer handles output formatting
@@ -31,10 +33,11 @@ type Printer struct {
 	Writer      io.Writer
 	Select      string // comma-separated field names
 	ResultsOnly bool
+	Timezone    string // IANA timezone name for JSON envelope metadata
 }
 
 // NewPrinter creates a printer from flags
-func NewPrinter(jsonFlag, plainFlag, resultsOnly bool, selectFields string) *Printer {
+func NewPrinter(jsonFlag, plainFlag, resultsOnly bool, selectFields, timezone string) *Printer {
 	f := FormatTable
 	if jsonFlag {
 		f = FormatJSON
@@ -46,6 +49,7 @@ func NewPrinter(jsonFlag, plainFlag, resultsOnly bool, selectFields string) *Pri
 		Writer:      os.Stdout,
 		Select:      selectFields,
 		ResultsOnly: resultsOnly,
+		Timezone:    timezone,
 	}
 }
 
@@ -60,6 +64,7 @@ func (p *Printer) PrintJSON(results interface{}, count int, nextLink string) err
 		Results:  results,
 		Count:    count,
 		NextLink: nextLink,
+		Timezone: p.Timezone,
 	})
 }
 
@@ -191,4 +196,38 @@ func SanitizeMultiline(s string) string {
 		}
 		return r
 	}, s)
+}
+
+// ConvertTime parses a UTC time string and converts it to the given location.
+// For date-only inputs, returns "2006-01-02". For datetime inputs, returns
+// "2006-01-02 15:04". Returns the original string unchanged if loc is nil or
+// parsing fails.
+func ConvertTime(utcStr string, loc *time.Location) string {
+	if loc == nil || utcStr == "" {
+		return utcStr
+	}
+
+	formats := []struct {
+		layout   string
+		dateOnly bool
+	}{
+		{time.RFC3339, false},
+		{"2006-01-02T15:04:05.0000000", false},
+		{"2006-01-02T15:04:05", false},
+		{"2006-01-02T15:04", false},
+		{"2006-01-02", true},
+	}
+
+	for _, f := range formats {
+		t, err := time.Parse(f.layout, utcStr)
+		if err != nil {
+			continue
+		}
+		if f.dateOnly {
+			return t.In(loc).Format("2006-01-02")
+		}
+		return t.In(loc).Format("2006-01-02 15:04")
+	}
+
+	return utcStr
 }

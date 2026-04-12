@@ -28,10 +28,11 @@ func (c *MailGetCmd) Run(ctx *RunContext) error {
 		return printer.PrintJSON(msg, 1, "")
 	}
 
+	loc, _ := ctx.Timezone()
 	fmt.Printf("From:    %s\n", outfmt.Sanitize(msg.From))
 	fmt.Printf("To:      %s\n", outfmt.Sanitize(strings.Join(msg.To, ", ")))
 	fmt.Printf("Subject: %s\n", outfmt.Sanitize(msg.Subject))
-	fmt.Printf("Date:    %s\n", outfmt.Sanitize(msg.ReceivedAt))
+	fmt.Printf("Date:    %s\n", outfmt.Sanitize(outfmt.ConvertTime(msg.ReceivedAt, loc)))
 	fmt.Printf("Read:    %v\n", msg.IsRead)
 	fmt.Println(strings.Repeat("-", 60))
 

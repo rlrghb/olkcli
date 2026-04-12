@@ -13,6 +13,7 @@ import (
 type Config struct {
 	DefaultAccount string            `json:"default_account,omitempty"`
 	Clients        map[string]Client `json:"clients,omitempty"`
+	Timezone       string            `json:"timezone,omitempty"`
 	mu             sync.RWMutex
 }
 
@@ -154,6 +155,20 @@ func (c *Config) GetClient(email string) Client {
 		ClientID: DefaultClientID,
 		TenantID: DefaultTenantID,
 	}
+}
+
+// SetTimezone sets the display timezone
+func (c *Config) SetTimezone(tz string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.Timezone = tz
+}
+
+// GetTimezone returns the configured display timezone
+func (c *Config) GetTimezone() string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.Timezone
 }
 
 // RemoveAccount removes an account from config

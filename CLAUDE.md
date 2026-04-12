@@ -22,6 +22,7 @@ go mod tidy         # After changing dependencies
 - **API**: Official `msgraph-sdk-go` wrapped in `internal/graphapi/` for ergonomic access
 - **Secrets**: OS keyring via `github.com/99designs/keyring` (macOS Keychain, Linux Secret Service, Windows WinCred)
 - **Output**: JSON envelope (`--json`), aligned table (default), TSV (`--plain`)
+- **Timezone**: Display-layer conversion via `outfmt.ConvertTime()`. Resolved once per command via `RunContext.Timezone()` (flag > env > config > Local). JSON output keeps raw UTC; envelope includes `timezone` field. IANA db embedded via `import _ "time/tzdata"`
 
 ## Key Patterns
 
@@ -55,6 +56,11 @@ go mod tidy         # After changing dependencies
 
 ### Adding a new flag to all commands
 Add it to `RootFlags` in `internal/cmd/root.go` with `env:"OLK_*"` tag.
+
+### Adding timezone conversion to a new command
+1. Get the location: `loc, _ := ctx.Timezone()`
+2. Wrap time fields: `outfmt.ConvertTime(field, loc)`
+3. Only convert for table/plain output — JSON keeps raw UTC strings
 
 ### Changing Graph API calls
 Edit files in `internal/graphapi/` — these wrap the verbose SDK calls into simple methods returning plain structs.

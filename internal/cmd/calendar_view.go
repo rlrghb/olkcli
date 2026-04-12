@@ -56,14 +56,15 @@ func (c *CalendarViewCmd) Run(ctx *RunContext) error {
 		return printer.PrintJSON(events, len(events), "")
 	}
 
+	loc, _ := ctx.Timezone()
 	headers := []string{"ID", "SUBJECT", "START", "END", "LOCATION", "STATUS", "RECURRENCE"}
 	var rows [][]string
 	for i := range events {
 		e := &events[i]
 		id := outfmt.Truncate(e.ID, 15)
 		subject := outfmt.Truncate(e.Subject, 40)
-		startStr := outfmt.Truncate(e.Start, 16)
-		endStr := outfmt.Truncate(e.End, 16)
+		startStr := outfmt.Truncate(outfmt.ConvertTime(e.Start, loc), 16)
+		endStr := outfmt.Truncate(outfmt.ConvertTime(e.End, loc), 16)
 		rows = append(rows, []string{id, subject, startStr, endStr, outfmt.Sanitize(e.Location), e.Status, e.Recurrence})
 	}
 

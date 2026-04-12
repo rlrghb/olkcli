@@ -8,7 +8,7 @@
 - `internal/graphapi/`: Microsoft Graph API wrapper — mail, calendar, contacts, todo (tasks, checklist items, attachments, linked resources), availability, mailbox settings, mail rules, people.
 - `internal/config/`: Configuration and XDG paths (`~/.config/olk/`).
 - `internal/secrets/`: OS keyring integration via `99designs/keyring`.
-- `internal/outfmt/`: Output formatting — JSON envelope, aligned tables, TSV.
+- `internal/outfmt/`: Output formatting — JSON envelope, aligned tables, TSV, timezone conversion via `ConvertTime()`.
 - `internal/errfmt/`: Graph API error mapping to actionable user messages.
 - `SKILL.md`: [Agent Skills](https://agentskills.io) standard file — teaches AI assistants (Claude Code, OpenClaw, etc.) how to use `olk` commands.
 - `bin/`: build outputs (gitignored).
