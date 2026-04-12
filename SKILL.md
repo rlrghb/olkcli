@@ -145,10 +145,31 @@ Tasks (Microsoft To Do)
 - Delete task list: `olk todo lists delete <LIST_ID> --force`
 - List tasks: `olk todo list [--list LIST_ID] [-n 25] [--status notStarted|inProgress|completed|waitingOnOthers|deferred]`
 - Get task: `olk todo get <TASK_ID> [--list LIST_ID]`
-- Create task: `olk todo create --title "Buy groceries" [--due 2026-04-15] [--importance low|normal|high] [--body "Notes"] [--list LIST_ID]`
-- Update task: `olk todo update <TASK_ID> [--title X] [--due DATE] [--importance low|normal|high] [--body TEXT] [--list LIST_ID]`
+- Create task: `olk todo create --title "Buy groceries" [--due 2026-04-15] [--start 2026-04-10] [--importance low|normal|high] [--body "Notes"] [--reminder 2026-04-14T09:00] [--recurrence daily|weekdays|weekly|monthly|yearly] [-c "Work" -c "Urgent"] [--list LIST_ID]`
+- Update task: `olk todo update <TASK_ID> [--title X] [--due DATE] [--start DATE] [--importance low|normal|high] [--body TEXT] [--reminder DATETIME] [--recurrence PATTERN] [-c CATEGORY] [--list LIST_ID]`
 - Complete task: `olk todo complete <TASK_ID> [--list LIST_ID]`
 - Delete task: `olk todo delete <TASK_ID> --force [--list LIST_ID]`
+
+Checklist Items
+
+- List checklist items: `olk todo checklist list <TASK_ID> [--list LIST_ID]`
+- Create checklist item: `olk todo checklist create <TASK_ID> -n "Step 1" [--list LIST_ID]`
+- Toggle checked/unchecked: `olk todo checklist toggle <TASK_ID> <ITEM_ID> [--list LIST_ID]`
+- Update checklist item: `olk todo checklist update <TASK_ID> <ITEM_ID> -n "New name" [--list LIST_ID]`
+- Delete checklist item: `olk todo checklist delete <TASK_ID> <ITEM_ID> --force [--list LIST_ID]`
+
+Task Attachments
+
+- List attachments: `olk todo attach list <TASK_ID> [--list LIST_ID]`
+- Upload attachment: `olk todo attach upload <TASK_ID> <FILE> [--list LIST_ID]`
+- Download attachment: `olk todo attach download <TASK_ID> <ATTACHMENT_ID> [--out DIR] [--list LIST_ID]`
+- Delete attachment: `olk todo attach delete <TASK_ID> <ATTACHMENT_ID> --force [--list LIST_ID]`
+
+Linked Resources
+
+- List linked resources: `olk todo links list <TASK_ID> [--list LIST_ID]`
+- Create linked resource: `olk todo links create <TASK_ID> -n "Resource name" [--url URL] [--app-name APP] [--external-id ID] [--list LIST_ID]`
+- Delete linked resource: `olk todo links delete <TASK_ID> <RESOURCE_ID> --force [--list LIST_ID]`
 
 If `--list` is omitted, the default (first) task list is used automatically.
 

@@ -27,14 +27,45 @@ type TodoList struct {
 
 // TodoTask is a simplified task for output
 type TodoTask struct {
+	ID             string   `json:"id"`
+	Title          string   `json:"title"`
+	Status         string   `json:"status"`
+	Importance     string   `json:"importance"`
+	DueDate        string   `json:"dueDateTime,omitempty"`
+	CreatedAt      string   `json:"createdDateTime"`
+	CompletedAt    string   `json:"completedDateTime,omitempty"`
+	Body           string   `json:"body,omitempty"`
+	StartDate      string   `json:"startDateTime,omitempty"`
+	IsReminderOn   bool     `json:"isReminderOn"`
+	ReminderDate   string   `json:"reminderDateTime,omitempty"`
+	Recurrence     string   `json:"recurrence,omitempty"`
+	Categories     []string `json:"categories,omitempty"`
+	HasAttachments bool     `json:"hasAttachments"`
+}
+
+// TodoChecklistItem is a simplified checklist item for output
+type TodoChecklistItem struct {
 	ID          string `json:"id"`
-	Title       string `json:"title"`
-	Status      string `json:"status"`
-	Importance  string `json:"importance"`
-	DueDate     string `json:"dueDateTime,omitempty"`
-	CreatedAt   string `json:"createdDateTime"`
-	CompletedAt string `json:"completedDateTime,omitempty"`
-	Body        string `json:"body,omitempty"`
+	DisplayName string `json:"displayName"`
+	IsChecked   bool   `json:"isChecked"`
+	CreatedAt   string `json:"createdDateTime,omitempty"`
+}
+
+// TodoAttachment is a simplified attachment for output
+type TodoAttachment struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	ContentType string `json:"contentType"`
+	Size        int32  `json:"size"`
+}
+
+// TodoLinkedResource is a simplified linked resource for output
+type TodoLinkedResource struct {
+	ID              string `json:"id"`
+	DisplayName     string `json:"displayName"`
+	ApplicationName string `json:"applicationName"`
+	ExternalID      string `json:"externalId"`
+	WebURL          string `json:"webUrl"`
 }
 
 // ListTodoLists returns all task lists for the current user.
@@ -154,7 +185,7 @@ func (c *Client) GetTodoTask(ctx context.Context, listID, taskID string) (*TodoT
 }
 
 // CreateTodoTask creates a new task in the given list.
-func (c *Client) CreateTodoTask(ctx context.Context, listID, title, dueDate, importance, body string) (*TodoTask, error) {
+func (c *Client) CreateTodoTask(ctx context.Context, listID, title, dueDate, importance, body, startDate, reminderDate, recurrence string, categories []string) (*TodoTask, error) {
 	if err := validateID(listID, "list ID"); err != nil {
 		return nil, err
 	}
@@ -199,6 +230,55 @@ func (c *Client) CreateTodoTask(ctx context.Context, listID, title, dueDate, imp
 		task.SetBody(b)
 	}
 
+	if startDate != "" {
+		parsed, err := parseDate(startDate)
+		if err != nil {
+			return nil, fmt.Errorf("invalid start date %q: use ISO 8601 format (e.g. 2025-06-15 or 2025-06-15T09:00:00Z): %w", startDate, err)
+		}
+		canonical := parsed.UTC().Format("2006-01-02T15:04:05")
+		dt := models.NewDateTimeTimeZone()
+		dt.SetDateTime(&canonical)
+		tz := graphTimeZoneUTC
+		dt.SetTimeZone(&tz)
+		task.SetStartDateTime(dt)
+	}
+
+	if reminderDate != "" {
+		parsed, err := parseDate(reminderDate)
+		if err != nil {
+			return nil, fmt.Errorf("invalid reminder date %q: use ISO 8601 format (e.g. 2025-06-15 or 2025-06-15T09:00:00Z): %w", reminderDate, err)
+		}
+		canonical := parsed.UTC().Format("2006-01-02T15:04:05")
+		dt := models.NewDateTimeTimeZone()
+		dt.SetDateTime(&canonical)
+		tz := graphTimeZoneUTC
+		dt.SetTimeZone(&tz)
+		task.SetReminderDateTime(dt)
+		isOn := true
+		task.SetIsReminderOn(&isOn)
+	}
+
+	if recurrence != "" {
+		var start time.Time
+		switch {
+		case startDate != "":
+			start, _ = parseDate(startDate)
+		case dueDate != "":
+			start, _ = parseDate(dueDate)
+		default:
+			start = time.Now()
+		}
+		rec, err := buildRecurrence(recurrence, start)
+		if err != nil {
+			return nil, err
+		}
+		task.SetRecurrence(rec)
+	}
+
+	if len(categories) > 0 {
+		task.SetCategories(categories)
+	}
+
 	resp, err := c.inner.Me().Todo().Lists().ByTodoTaskListId(listID).Tasks().Post(ctx, task, nil)
 	if err != nil {
 		return nil, fmt.Errorf("creating todo task: %w", err)
@@ -229,7 +309,7 @@ func (c *Client) CompleteTodoTask(ctx context.Context, listID, taskID string) er
 }
 
 // UpdateTodoTask updates a task's properties.
-func (c *Client) UpdateTodoTask(ctx context.Context, listID, taskID string, title, dueDate, importance, body *string) (*TodoTask, error) {
+func (c *Client) UpdateTodoTask(ctx context.Context, listID, taskID string, title, dueDate, importance, body, startDate, reminderDate, recurrence *string, categories *[]string) (*TodoTask, error) {
 	if err := validateID(listID, "list ID"); err != nil {
 		return nil, err
 	}
@@ -284,6 +364,69 @@ func (c *Client) UpdateTodoTask(ctx context.Context, listID, taskID string, titl
 		task.SetBody(b)
 	}
 
+	if startDate != nil {
+		if *startDate == "" {
+			task.SetStartDateTime(nil)
+		} else {
+			parsed, err := parseDate(*startDate)
+			if err != nil {
+				return nil, fmt.Errorf("invalid start date %q: use ISO 8601 format (e.g. 2025-06-15): %w", *startDate, err)
+			}
+			canonical := parsed.UTC().Format("2006-01-02T15:04:05")
+			dt := models.NewDateTimeTimeZone()
+			dt.SetDateTime(&canonical)
+			tz := graphTimeZoneUTC
+			dt.SetTimeZone(&tz)
+			task.SetStartDateTime(dt)
+		}
+	}
+
+	if reminderDate != nil {
+		if *reminderDate == "" {
+			task.SetReminderDateTime(nil)
+			isOff := false
+			task.SetIsReminderOn(&isOff)
+		} else {
+			parsed, err := parseDate(*reminderDate)
+			if err != nil {
+				return nil, fmt.Errorf("invalid reminder date %q: use ISO 8601 format (e.g. 2025-06-15): %w", *reminderDate, err)
+			}
+			canonical := parsed.UTC().Format("2006-01-02T15:04:05")
+			dt := models.NewDateTimeTimeZone()
+			dt.SetDateTime(&canonical)
+			tz := graphTimeZoneUTC
+			dt.SetTimeZone(&tz)
+			task.SetReminderDateTime(dt)
+			isOn := true
+			task.SetIsReminderOn(&isOn)
+		}
+	}
+
+	if recurrence != nil {
+		if *recurrence == "" {
+			task.SetRecurrence(nil)
+		} else {
+			var start time.Time
+			switch {
+			case startDate != nil && *startDate != "":
+				start, _ = parseDate(*startDate)
+			case dueDate != nil && *dueDate != "":
+				start, _ = parseDate(*dueDate)
+			default:
+				start = time.Now()
+			}
+			rec, err := buildRecurrence(*recurrence, start)
+			if err != nil {
+				return nil, err
+			}
+			task.SetRecurrence(rec)
+		}
+	}
+
+	if categories != nil {
+		task.SetCategories(*categories)
+	}
+
 	resp, err := c.inner.Me().Todo().Lists().ByTodoTaskListId(listID).Tasks().ByTodoTaskId(taskID).Patch(ctx, task, nil)
 	if err != nil {
 		return nil, fmt.Errorf("updating todo task: %w", err)
@@ -335,5 +478,375 @@ func convertTodoTask(t models.TodoTaskable) TodoTask {
 	if t.GetBody() != nil && t.GetBody().GetContent() != nil {
 		task.Body = *t.GetBody().GetContent()
 	}
+	if t.GetStartDateTime() != nil && t.GetStartDateTime().GetDateTime() != nil {
+		task.StartDate = *t.GetStartDateTime().GetDateTime()
+	}
+	if t.GetIsReminderOn() != nil {
+		task.IsReminderOn = *t.GetIsReminderOn()
+	}
+	if t.GetReminderDateTime() != nil && t.GetReminderDateTime().GetDateTime() != nil {
+		task.ReminderDate = *t.GetReminderDateTime().GetDateTime()
+	}
+	if t.GetRecurrence() != nil {
+		task.Recurrence = formatRecurrence(t.GetRecurrence())
+	}
+	if t.GetCategories() != nil {
+		task.Categories = t.GetCategories()
+	}
+	if t.GetHasAttachments() != nil {
+		task.HasAttachments = *t.GetHasAttachments()
+	}
 	return task
+}
+
+// --- Checklist Item methods ---
+
+// ListChecklistItems returns all checklist items for a task.
+func (c *Client) ListChecklistItems(ctx context.Context, listID, taskID string) ([]TodoChecklistItem, error) {
+	if err := validateID(listID, "list ID"); err != nil {
+		return nil, err
+	}
+	if err := validateID(taskID, "task ID"); err != nil {
+		return nil, err
+	}
+
+	resp, err := c.inner.Me().Todo().Lists().ByTodoTaskListId(listID).Tasks().ByTodoTaskId(taskID).ChecklistItems().Get(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("listing checklist items: %w", err)
+	}
+
+	var result []TodoChecklistItem
+	for _, item := range resp.GetValue() {
+		result = append(result, convertChecklistItem(item))
+	}
+	return result, nil
+}
+
+// CreateChecklistItem creates a new checklist item on a task.
+func (c *Client) CreateChecklistItem(ctx context.Context, listID, taskID, displayName string) (*TodoChecklistItem, error) {
+	if err := validateID(listID, "list ID"); err != nil {
+		return nil, err
+	}
+	if err := validateID(taskID, "task ID"); err != nil {
+		return nil, err
+	}
+
+	item := models.NewChecklistItem()
+	item.SetDisplayName(&displayName)
+
+	created, err := c.inner.Me().Todo().Lists().ByTodoTaskListId(listID).Tasks().ByTodoTaskId(taskID).ChecklistItems().Post(ctx, item, nil)
+	if err != nil {
+		return nil, fmt.Errorf("creating checklist item: %w", err)
+	}
+
+	result := convertChecklistItem(created)
+	return &result, nil
+}
+
+// UpdateChecklistItem updates a checklist item's properties.
+func (c *Client) UpdateChecklistItem(ctx context.Context, listID, taskID, itemID string, displayName *string, isChecked *bool) (*TodoChecklistItem, error) {
+	if err := validateID(listID, "list ID"); err != nil {
+		return nil, err
+	}
+	if err := validateID(taskID, "task ID"); err != nil {
+		return nil, err
+	}
+	if err := validateID(itemID, "checklist item ID"); err != nil {
+		return nil, err
+	}
+
+	item := models.NewChecklistItem()
+	if displayName != nil {
+		item.SetDisplayName(displayName)
+	}
+	if isChecked != nil {
+		item.SetIsChecked(isChecked)
+	}
+
+	updated, err := c.inner.Me().Todo().Lists().ByTodoTaskListId(listID).Tasks().ByTodoTaskId(taskID).ChecklistItems().ByChecklistItemId(itemID).Patch(ctx, item, nil)
+	if err != nil {
+		return nil, fmt.Errorf("updating checklist item: %w", err)
+	}
+
+	result := convertChecklistItem(updated)
+	return &result, nil
+}
+
+// DeleteChecklistItem deletes a checklist item.
+func (c *Client) DeleteChecklistItem(ctx context.Context, listID, taskID, itemID string) error {
+	if err := validateID(listID, "list ID"); err != nil {
+		return err
+	}
+	if err := validateID(taskID, "task ID"); err != nil {
+		return err
+	}
+	if err := validateID(itemID, "checklist item ID"); err != nil {
+		return err
+	}
+
+	err := c.inner.Me().Todo().Lists().ByTodoTaskListId(listID).Tasks().ByTodoTaskId(taskID).ChecklistItems().ByChecklistItemId(itemID).Delete(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("deleting checklist item: %w", err)
+	}
+	return nil
+}
+
+// ToggleChecklistItem toggles the IsChecked state of a checklist item.
+func (c *Client) ToggleChecklistItem(ctx context.Context, listID, taskID, itemID string) (*TodoChecklistItem, error) {
+	if err := validateID(listID, "list ID"); err != nil {
+		return nil, err
+	}
+	if err := validateID(taskID, "task ID"); err != nil {
+		return nil, err
+	}
+	if err := validateID(itemID, "checklist item ID"); err != nil {
+		return nil, err
+	}
+
+	// Get current state
+	current, err := c.inner.Me().Todo().Lists().ByTodoTaskListId(listID).Tasks().ByTodoTaskId(taskID).ChecklistItems().ByChecklistItemId(itemID).Get(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("getting checklist item: %w", err)
+	}
+
+	// Flip the IsChecked value
+	newChecked := current.GetIsChecked() == nil || !*current.GetIsChecked()
+
+	patch := models.NewChecklistItem()
+	patch.SetIsChecked(&newChecked)
+
+	updated, err := c.inner.Me().Todo().Lists().ByTodoTaskListId(listID).Tasks().ByTodoTaskId(taskID).ChecklistItems().ByChecklistItemId(itemID).Patch(ctx, patch, nil)
+	if err != nil {
+		return nil, fmt.Errorf("toggling checklist item: %w", err)
+	}
+
+	result := convertChecklistItem(updated)
+	return &result, nil
+}
+
+func convertChecklistItem(item models.ChecklistItemable) TodoChecklistItem {
+	ci := TodoChecklistItem{}
+	if item.GetId() != nil {
+		ci.ID = *item.GetId()
+	}
+	if item.GetDisplayName() != nil {
+		ci.DisplayName = *item.GetDisplayName()
+	}
+	if item.GetIsChecked() != nil {
+		ci.IsChecked = *item.GetIsChecked()
+	}
+	if item.GetCreatedDateTime() != nil {
+		ci.CreatedAt = item.GetCreatedDateTime().Format("2006-01-02T15:04:05Z")
+	}
+	return ci
+}
+
+// --- Attachment methods ---
+
+// ListTodoAttachments returns all attachments for a task.
+func (c *Client) ListTodoAttachments(ctx context.Context, listID, taskID string) ([]TodoAttachment, error) {
+	if err := validateID(listID, "list ID"); err != nil {
+		return nil, err
+	}
+	if err := validateID(taskID, "task ID"); err != nil {
+		return nil, err
+	}
+
+	resp, err := c.inner.Me().Todo().Lists().ByTodoTaskListId(listID).Tasks().ByTodoTaskId(taskID).Attachments().Get(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("listing todo attachments: %w", err)
+	}
+
+	var result []TodoAttachment
+	for _, a := range resp.GetValue() {
+		att := TodoAttachment{}
+		if a.GetId() != nil {
+			att.ID = *a.GetId()
+		}
+		if a.GetName() != nil {
+			att.Name = *a.GetName()
+		}
+		if a.GetContentType() != nil {
+			att.ContentType = *a.GetContentType()
+		}
+		if a.GetSize() != nil {
+			att.Size = *a.GetSize()
+		}
+		result = append(result, att)
+	}
+	return result, nil
+}
+
+// UploadTodoAttachment uploads a file attachment to a task.
+func (c *Client) UploadTodoAttachment(ctx context.Context, listID, taskID, name, contentType string, content []byte) (*TodoAttachment, error) {
+	if err := validateID(listID, "list ID"); err != nil {
+		return nil, err
+	}
+	if err := validateID(taskID, "task ID"); err != nil {
+		return nil, err
+	}
+
+	att := models.NewTaskFileAttachment()
+	odataType := "#microsoft.graph.taskFileAttachment"
+	att.SetOdataType(&odataType)
+	att.SetName(&name)
+	att.SetContentType(&contentType)
+	att.SetContentBytes(content)
+
+	created, err := c.inner.Me().Todo().Lists().ByTodoTaskListId(listID).Tasks().ByTodoTaskId(taskID).Attachments().Post(ctx, att, nil)
+	if err != nil {
+		return nil, fmt.Errorf("uploading todo attachment: %w", err)
+	}
+
+	result := TodoAttachment{}
+	if created.GetId() != nil {
+		result.ID = *created.GetId()
+	}
+	if created.GetName() != nil {
+		result.Name = *created.GetName()
+	}
+	if created.GetContentType() != nil {
+		result.ContentType = *created.GetContentType()
+	}
+	if created.GetSize() != nil {
+		result.Size = *created.GetSize()
+	}
+	return &result, nil
+}
+
+// DownloadTodoAttachment downloads a task attachment's content.
+func (c *Client) DownloadTodoAttachment(ctx context.Context, listID, taskID, attachmentID string) (name, contentType string, content []byte, err error) {
+	if e := validateID(listID, "list ID"); e != nil {
+		return "", "", nil, e
+	}
+	if e := validateID(taskID, "task ID"); e != nil {
+		return "", "", nil, e
+	}
+	if e := validateID(attachmentID, "attachment ID"); e != nil {
+		return "", "", nil, e
+	}
+
+	att, err := c.inner.Me().Todo().Lists().ByTodoTaskListId(listID).Tasks().ByTodoTaskId(taskID).Attachments().ByAttachmentBaseId(attachmentID).Get(ctx, nil)
+	if err != nil {
+		return "", "", nil, fmt.Errorf("downloading todo attachment: %w", err)
+	}
+
+	if att.GetName() != nil {
+		name = *att.GetName()
+	}
+	if att.GetContentType() != nil {
+		contentType = *att.GetContentType()
+	}
+
+	// Type-assert to TaskFileAttachmentable to access ContentBytes
+	if fileAtt, ok := att.(models.TaskFileAttachmentable); ok {
+		content = fileAtt.GetContentBytes()
+	}
+
+	return name, contentType, content, nil
+}
+
+// DeleteTodoAttachment deletes a task attachment.
+func (c *Client) DeleteTodoAttachment(ctx context.Context, listID, taskID, attachmentID string) error {
+	if err := validateID(listID, "list ID"); err != nil {
+		return err
+	}
+	if err := validateID(taskID, "task ID"); err != nil {
+		return err
+	}
+	if err := validateID(attachmentID, "attachment ID"); err != nil {
+		return err
+	}
+
+	err := c.inner.Me().Todo().Lists().ByTodoTaskListId(listID).Tasks().ByTodoTaskId(taskID).Attachments().ByAttachmentBaseId(attachmentID).Delete(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("deleting todo attachment: %w", err)
+	}
+	return nil
+}
+
+// --- Linked Resource methods ---
+
+// ListLinkedResources returns all linked resources for a task.
+func (c *Client) ListLinkedResources(ctx context.Context, listID, taskID string) ([]TodoLinkedResource, error) {
+	if err := validateID(listID, "list ID"); err != nil {
+		return nil, err
+	}
+	if err := validateID(taskID, "task ID"); err != nil {
+		return nil, err
+	}
+
+	resp, err := c.inner.Me().Todo().Lists().ByTodoTaskListId(listID).Tasks().ByTodoTaskId(taskID).LinkedResources().Get(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("listing linked resources: %w", err)
+	}
+
+	var result []TodoLinkedResource
+	for _, r := range resp.GetValue() {
+		result = append(result, convertLinkedResource(r))
+	}
+	return result, nil
+}
+
+// CreateLinkedResource creates a new linked resource on a task.
+func (c *Client) CreateLinkedResource(ctx context.Context, listID, taskID, displayName, appName, externalID, webURL string) (*TodoLinkedResource, error) {
+	if err := validateID(listID, "list ID"); err != nil {
+		return nil, err
+	}
+	if err := validateID(taskID, "task ID"); err != nil {
+		return nil, err
+	}
+
+	lr := models.NewLinkedResource()
+	lr.SetDisplayName(&displayName)
+	lr.SetApplicationName(&appName)
+	lr.SetExternalId(&externalID)
+	lr.SetWebUrl(&webURL)
+
+	created, err := c.inner.Me().Todo().Lists().ByTodoTaskListId(listID).Tasks().ByTodoTaskId(taskID).LinkedResources().Post(ctx, lr, nil)
+	if err != nil {
+		return nil, fmt.Errorf("creating linked resource: %w", err)
+	}
+
+	result := convertLinkedResource(created)
+	return &result, nil
+}
+
+// DeleteLinkedResource deletes a linked resource from a task.
+func (c *Client) DeleteLinkedResource(ctx context.Context, listID, taskID, resourceID string) error {
+	if err := validateID(listID, "list ID"); err != nil {
+		return err
+	}
+	if err := validateID(taskID, "task ID"); err != nil {
+		return err
+	}
+	if err := validateID(resourceID, "linked resource ID"); err != nil {
+		return err
+	}
+
+	err := c.inner.Me().Todo().Lists().ByTodoTaskListId(listID).Tasks().ByTodoTaskId(taskID).LinkedResources().ByLinkedResourceId(resourceID).Delete(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("deleting linked resource: %w", err)
+	}
+	return nil
+}
+
+func convertLinkedResource(r models.LinkedResourceable) TodoLinkedResource {
+	lr := TodoLinkedResource{}
+	if r.GetId() != nil {
+		lr.ID = *r.GetId()
+	}
+	if r.GetDisplayName() != nil {
+		lr.DisplayName = *r.GetDisplayName()
+	}
+	if r.GetApplicationName() != nil {
+		lr.ApplicationName = *r.GetApplicationName()
+	}
+	if r.GetExternalId() != nil {
+		lr.ExternalID = *r.GetExternalId()
+	}
+	if r.GetWebUrl() != nil {
+		lr.WebURL = *r.GetWebUrl()
+	}
+	return lr
 }

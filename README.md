@@ -39,7 +39,10 @@ Works with both **personal Microsoft accounts** and **enterprise (Azure AD / Ent
 
 ### Tasks (Microsoft To Do)
 - **Manage task lists**: list, create, delete task lists
-- **Create, update, complete, delete** tasks with due dates, importance, and notes
+- **Create, update, complete, delete** tasks with due dates, importance, notes, start dates, reminders, recurrence, and categories
+- **Checklists**: list, create, toggle, update, and delete checklist items within tasks
+- **Attachments**: list, upload, download, and delete task file attachments
+- **Linked resources**: list, create, and delete linked resources on tasks
 
 ### People / Directory
 - **Search** people by name — returns name, email, job title, department, company. Personal accounts search known contacts; enterprise accounts also search the organization directory
@@ -321,10 +324,22 @@ olk todo lists create -n "Name"                      Create a task list
 olk todo lists delete <ID> --force                   Delete a task list
 olk todo list [--list ID] [-n 25] [--status STATUS]  List tasks
 olk todo get <TASK_ID> [--list ID]                   Get task details
-olk todo create -t "Title" [--due DATE] [--importance low|normal|high] [--body TEXT] [--list ID]
-olk todo update <TASK_ID> [--title X] [--due DATE] [--importance low|normal|high] [--body TEXT] [--list ID]
+olk todo create -t "Title" [--due DATE] [--importance low|normal|high] [--body TEXT] [--list ID] [--start DATE] [--reminder DATETIME] [--recurrence daily|weekdays|weekly|monthly|yearly] [--categories CAT]
+olk todo update <TASK_ID> [--title X] [--due DATE] [--importance low|normal|high] [--body TEXT] [--list ID] [--start DATE] [--reminder DATETIME] [--recurrence daily|weekdays|weekly|monthly|yearly] [--categories CAT]
 olk todo complete <TASK_ID> [--list ID]              Mark task complete
 olk todo delete <TASK_ID> --force [--list ID]        Delete a task
+olk todo checklist list <TASK_ID> [--list ID]        List checklist items
+olk todo checklist create <TASK_ID> -n "Name" [--list ID]  Create a checklist item
+olk todo checklist toggle <TASK_ID> <ITEM_ID> [--list ID]  Toggle checked/unchecked
+olk todo checklist update <TASK_ID> <ITEM_ID> -n "Name" [--list ID]  Update checklist item
+olk todo checklist delete <TASK_ID> <ITEM_ID> --force [--list ID]    Delete checklist item
+olk todo attach list <TASK_ID> [--list ID]           List task attachments
+olk todo attach upload <TASK_ID> <FILE> [--list ID]  Upload a file attachment
+olk todo attach download <TASK_ID> <ATTACHMENT_ID> [--list ID] [--out DIR]  Download an attachment
+olk todo attach delete <TASK_ID> <ATTACHMENT_ID> --force [--list ID]        Delete an attachment
+olk todo links list <TASK_ID> [--list ID]            List linked resources
+olk todo links create <TASK_ID> -n "Name" --url "URL" [--list ID]   Create a linked resource
+olk todo links delete <TASK_ID> <RESOURCE_ID> --force [--list ID]   Delete a linked resource
 ```
 
 ### User Profile

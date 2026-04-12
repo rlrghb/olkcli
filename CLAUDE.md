@@ -72,3 +72,6 @@ The project uses `msgraph-sdk-go` v1.96.0 which has some naming quirks:
 - FindMeetingTimes: `Me().FindMeetingTimes().Post()` returns `MeetingTimeSuggestionsResultable`
 - Recurrence pattern: `event.GetRecurrence().GetPattern().GetTypeEscaped()` (uses `GetTypeEscaped` not `GetType`)
 - ISODuration: use `serialization.NewDuration()` from `kiota-abstractions-go` for meeting duration
+- Todo checklist items: `Me().Todo().Lists().ByTodoTaskListId(listID).Tasks().ByTodoTaskId(taskID).ChecklistItems()`
+- Todo attachments: `TaskFileAttachment` type for upload; `ByAttachmentBaseId()` for get/delete
+- Todo linked resources: `Me().Todo().Lists().ByTodoTaskListId(listID).Tasks().ByTodoTaskId(taskID).LinkedResources()`

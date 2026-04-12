@@ -471,7 +471,7 @@ func sanitizeKQL(query string) string {
 func (c *Client) SearchMessages(ctx context.Context, query string, top int32) ([]MailMessage, error) {
 	return c.ListMessages(ctx, &ListMessagesOptions{
 		Top:    top,
-		Search: fmt.Sprintf(`"%s"`, sanitizeKQL(query)),
+		Search: `"` + sanitizeKQL(query) + `"`,
 	})
 }
 
