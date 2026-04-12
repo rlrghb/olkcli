@@ -57,6 +57,7 @@ func (c *CalendarFindTimesCmd) Run(ctx *RunContext) error {
 		return printer.PrintJSON(suggestions, len(suggestions), "")
 	}
 
+	loc, _ := ctx.Timezone()
 	headers := []string{"START", "END", "CONFIDENCE", "ATTENDEE AVAILABILITY"}
 	var rows [][]string
 	for _, s := range suggestions {
@@ -65,8 +66,8 @@ func (c *CalendarFindTimesCmd) Run(ctx *RunContext) error {
 			avails = append(avails, fmt.Sprintf("%s:%s", a.Email, a.Availability))
 		}
 		rows = append(rows, []string{
-			outfmt.Truncate(s.Start, 16),
-			outfmt.Truncate(s.End, 16),
+			outfmt.Truncate(outfmt.ConvertTime(s.Start, loc), 16),
+			outfmt.Truncate(outfmt.ConvertTime(s.End, loc), 16),
 			fmt.Sprintf("%.0f%%", s.Confidence*100),
 			strings.Join(avails, ", "),
 		})

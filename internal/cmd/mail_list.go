@@ -61,6 +61,7 @@ func (c *MailListCmd) Run(ctx *RunContext) error {
 		return printer.PrintJSON(messages, len(messages), "")
 	}
 
+	loc, _ := ctx.Timezone()
 	headers := []string{"ID", "FROM", "SUBJECT", "DATE", "READ", "ATTACH"}
 	var rows [][]string
 	for i := range messages {
@@ -74,7 +75,7 @@ func (c *MailListCmd) Run(ctx *RunContext) error {
 			attach = "Y"
 		}
 		subject := outfmt.Truncate(m.Subject, 60)
-		date := outfmt.Truncate(m.ReceivedAt, 16)
+		date := outfmt.Truncate(outfmt.ConvertTime(m.ReceivedAt, loc), 16)
 		id := outfmt.Truncate(m.ID, 15)
 		rows = append(rows, []string{id, m.From, subject, date, read, attach})
 	}

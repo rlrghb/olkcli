@@ -76,14 +76,15 @@ func (c *CalendarEventsCmd) Run(ctx *RunContext) error {
 		return printer.PrintJSON(events, len(events), "")
 	}
 
+	loc, _ := ctx.Timezone()
 	headers := []string{"ID", "SUBJECT", "START", "END", "LOCATION", "STATUS", "RECURRENCE"}
 	var rows [][]string
 	for i := range events {
 		e := &events[i]
 		id := outfmt.Truncate(e.ID, 15)
 		subject := outfmt.Truncate(e.Subject, 40)
-		startStr := outfmt.Truncate(e.Start, 16)
-		endStr := outfmt.Truncate(e.End, 16)
+		startStr := outfmt.Truncate(outfmt.ConvertTime(e.Start, loc), 16)
+		endStr := outfmt.Truncate(outfmt.ConvertTime(e.End, loc), 16)
 		rows = append(rows, []string{id, subject, startStr, endStr, e.Location, e.Status, e.Recurrence})
 	}
 
@@ -110,9 +111,10 @@ func (c *CalendarGetCmd) Run(ctx *RunContext) error {
 		return printer.PrintJSON(event, 1, "")
 	}
 
+	loc, _ := ctx.Timezone()
 	fmt.Printf("Subject:   %s\n", outfmt.Sanitize(event.Subject))
-	fmt.Printf("Start:     %s\n", outfmt.Sanitize(event.Start))
-	fmt.Printf("End:       %s\n", outfmt.Sanitize(event.End))
+	fmt.Printf("Start:     %s\n", outfmt.Sanitize(outfmt.ConvertTime(event.Start, loc)))
+	fmt.Printf("End:       %s\n", outfmt.Sanitize(outfmt.ConvertTime(event.End, loc)))
 	fmt.Printf("Location:  %s\n", outfmt.Sanitize(event.Location))
 	fmt.Printf("Organizer: %s\n", outfmt.Sanitize(event.Organizer))
 	fmt.Printf("Status:    %s\n", outfmt.Sanitize(event.Status))

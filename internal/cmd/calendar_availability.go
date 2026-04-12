@@ -62,6 +62,7 @@ func (c *CalendarAvailabilityCmd) Run(ctx *RunContext) error {
 		return printer.PrintJSON(schedules, len(schedules), "")
 	}
 
+	loc, _ := ctx.Timezone()
 	headers := []string{"EMAIL", "STATUS", "START", "END", "SUBJECT"}
 	var rows [][]string
 	for _, sched := range schedules {
@@ -73,8 +74,8 @@ func (c *CalendarAvailabilityCmd) Run(ctx *RunContext) error {
 			rows = append(rows, []string{
 				sched.Email,
 				item.Status,
-				outfmt.Truncate(item.Start, 16),
-				outfmt.Truncate(item.End, 16),
+				outfmt.Truncate(outfmt.ConvertTime(item.Start, loc), 16),
+				outfmt.Truncate(outfmt.ConvertTime(item.End, loc), 16),
 				outfmt.Truncate(item.Subject, 40),
 			})
 		}

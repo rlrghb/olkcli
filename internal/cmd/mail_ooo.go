@@ -35,6 +35,7 @@ func (c *MailOOOGetCmd) Run(ctx *RunContext) error {
 		return printer.PrintJSON(settings, 1, "")
 	}
 
+	loc, _ := ctx.Timezone()
 	fmt.Printf("Status:            %s\n", outfmt.Sanitize(settings.Status))
 	fmt.Printf("External Audience: %s\n", outfmt.Sanitize(settings.ExternalAudience))
 	if settings.InternalMessage != "" {
@@ -44,10 +45,10 @@ func (c *MailOOOGetCmd) Run(ctx *RunContext) error {
 		fmt.Printf("External Message:  %s\n", outfmt.Sanitize(settings.ExternalMessage))
 	}
 	if settings.StartTime != "" {
-		fmt.Printf("Start:             %s\n", outfmt.Sanitize(settings.StartTime))
+		fmt.Printf("Start:             %s\n", outfmt.Sanitize(outfmt.ConvertTime(settings.StartTime, loc)))
 	}
 	if settings.EndTime != "" {
-		fmt.Printf("End:               %s\n", outfmt.Sanitize(settings.EndTime))
+		fmt.Printf("End:               %s\n", outfmt.Sanitize(outfmt.ConvertTime(settings.EndTime, loc)))
 	}
 
 	return nil

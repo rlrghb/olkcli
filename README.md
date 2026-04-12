@@ -234,6 +234,7 @@ For common workflows, `olk` provides top-level shortcuts:
 | `--color auto\|never\|always` | `OLK_COLOR` | Color mode |
 | `--select FIELDS` | `OLK_SELECT` | Field projection |
 | `--results-only` | `OLK_RESULTS_ONLY` | Unwrap JSON envelope |
+| `--tz TIMEZONE` | `OLK_TIMEZONE` | IANA time zone for display (e.g. `America/New_York`) |
 
 ## Commands Reference
 
@@ -342,6 +343,13 @@ olk todo links create <TASK_ID> -n "Name" --url "URL" [--list ID]   Create a lin
 olk todo links delete <TASK_ID> <RESOURCE_ID> --force [--list ID]   Delete a linked resource
 ```
 
+### Configuration
+
+```
+olk config set timezone America/New_York             Set display timezone
+olk config get timezone                              Get current timezone setting
+```
+
 ### User Profile
 
 ```
@@ -360,6 +368,23 @@ Config is stored at `~/.config/olk/`:
 ```
 
 Override the config directory with `OLK_CONFIG_DIR`.
+
+### Timezone
+
+By default, times are displayed in your system's local timezone. You can override this:
+
+```bash
+# Per-command
+olk calendar events --tz America/New_York
+
+# Via environment variable
+export OLK_TIMEZONE=Europe/London
+
+# Persistent (saved to config)
+olk config set timezone America/Chicago
+```
+
+Precedence: `--tz` flag > `OLK_TIMEZONE` env var > config file > system local timezone. JSON output always contains raw UTC strings; the `timezone` field in the envelope indicates the display timezone.
 
 ## Scripting Examples
 

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"time"
+	_ "time/tzdata"
 
 	"github.com/alecthomas/kong"
 
@@ -32,6 +33,7 @@ type RootFlags struct {
 	Select      string `help:"Comma-separated fields to output" env:"OLK_SELECT"`
 	ResultsOnly bool   `help:"Output only the results array (no envelope)" env:"OLK_RESULTS_ONLY"`
 	Timeout     int    `help:"Request timeout in seconds" default:"60" env:"OLK_TIMEOUT"`
+	TimeZone    string `help:"IANA time zone for display (e.g. America/New_York, Local, UTC)" name:"tz" env:"OLK_TIMEZONE"`
 }
 
 type RunContext struct {
@@ -126,9 +128,28 @@ func (r *RunContext) GraphClient() (*graphapi.Client, error) {
 	return client, nil
 }
 
+// Timezone returns the resolved time.Location for display.
+// Precedence: --tz flag > OLK_TIMEZONE env > config file > Local.
+func (r *RunContext) Timezone() (*time.Location, error) {
+	tz := r.Flags.TimeZone
+	if tz == "" {
+		if cfg, err := r.Config(); err == nil {
+			tz = cfg.GetTimezone()
+		}
+	}
+	if tz == "" {
+		tz = "Local"
+	}
+	return time.LoadLocation(tz)
+}
+
 // Printer returns an output printer based on flags
 func (r *RunContext) Printer() *outfmt.Printer {
-	return outfmt.NewPrinter(r.Flags.JSON, r.Flags.Plain, r.Flags.ResultsOnly, r.Flags.Select)
+	tzName := "Local"
+	if loc, err := r.Timezone(); err == nil {
+		tzName = loc.String()
+	}
+	return outfmt.NewPrinter(r.Flags.JSON, r.Flags.Plain, r.Flags.ResultsOnly, r.Flags.Select, tzName)
 }
 
 type CLI struct {
@@ -140,6 +161,7 @@ type CLI struct {
 	Contacts ContactsCmd `cmd:"" help:"Contacts commands"`
 	Todo     TodoCmd     `cmd:"" help:"Microsoft To Do tasks"`
 	People   PeopleCmd   `cmd:"" help:"People directory search"`
+	Config   ConfigCmd   `cmd:"" help:"Configuration management"`
 	Version  VersionCmd  `cmd:"" help:"Show version information"`
 	Whoami   WhoamiCmd   `cmd:"" help:"Show current user profile"`
 

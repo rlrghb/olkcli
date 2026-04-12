@@ -23,12 +23,13 @@ func (c *MailSearchCmd) Run(ctx *RunContext) error {
 		return printer.PrintJSON(messages, len(messages), "")
 	}
 
+	loc, _ := ctx.Timezone()
 	headers := []string{"ID", "FROM", "SUBJECT", "DATE"}
 	var rows [][]string
 	for i := range messages {
 		m := &messages[i]
 		id := outfmt.Truncate(m.ID, 15)
-		date := outfmt.Truncate(m.ReceivedAt, 16)
+		date := outfmt.Truncate(outfmt.ConvertTime(m.ReceivedAt, loc), 16)
 		subject := outfmt.Truncate(m.Subject, 60)
 		rows = append(rows, []string{id, m.From, subject, date})
 	}

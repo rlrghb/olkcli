@@ -169,6 +169,7 @@ func (c *TodoListCmd) Run(ctx *RunContext) error {
 		return printer.PrintJSON(tasks, len(tasks), "")
 	}
 
+	loc, _ := ctx.Timezone()
 	headers := []string{"ID", "TITLE", "STATUS", "IMPORTANCE", "DUE"}
 	var rows [][]string
 	for i := range tasks {
@@ -178,7 +179,7 @@ func (c *TodoListCmd) Run(ctx *RunContext) error {
 			outfmt.Truncate(outfmt.Sanitize(t.Title), 50),
 			outfmt.Sanitize(t.Status),
 			outfmt.Sanitize(t.Importance),
-			outfmt.Truncate(outfmt.Sanitize(t.DueDate), 16),
+			outfmt.Truncate(outfmt.Sanitize(outfmt.ConvertTime(t.DueDate, loc)), 16),
 		})
 	}
 
@@ -212,19 +213,20 @@ func (c *TodoGetCmd) Run(ctx *RunContext) error {
 		return printer.PrintJSON(task, 1, "")
 	}
 
+	loc, _ := ctx.Timezone()
 	fmt.Printf("ID:          %s\n", outfmt.Sanitize(task.ID))
 	fmt.Printf("Title:       %s\n", outfmt.Sanitize(task.Title))
 	fmt.Printf("Status:      %s\n", outfmt.Sanitize(task.Status))
 	fmt.Printf("Importance:  %s\n", outfmt.Sanitize(task.Importance))
-	fmt.Printf("Created:     %s\n", outfmt.Sanitize(task.CreatedAt))
+	fmt.Printf("Created:     %s\n", outfmt.Sanitize(outfmt.ConvertTime(task.CreatedAt, loc)))
 	if task.DueDate != "" {
-		fmt.Printf("Due:         %s\n", outfmt.Sanitize(task.DueDate))
+		fmt.Printf("Due:         %s\n", outfmt.Sanitize(outfmt.ConvertTime(task.DueDate, loc)))
 	}
 	if task.StartDate != "" {
-		fmt.Printf("Start:       %s\n", outfmt.Sanitize(task.StartDate))
+		fmt.Printf("Start:       %s\n", outfmt.Sanitize(outfmt.ConvertTime(task.StartDate, loc)))
 	}
 	if task.IsReminderOn {
-		fmt.Printf("Reminder:    %s\n", outfmt.Sanitize(task.ReminderDate))
+		fmt.Printf("Reminder:    %s\n", outfmt.Sanitize(outfmt.ConvertTime(task.ReminderDate, loc)))
 	}
 	if task.Recurrence != "" {
 		fmt.Printf("Recurrence:  %s\n", outfmt.Sanitize(task.Recurrence))
@@ -233,7 +235,7 @@ func (c *TodoGetCmd) Run(ctx *RunContext) error {
 		fmt.Printf("Categories:  %s\n", outfmt.Sanitize(strings.Join(task.Categories, ", ")))
 	}
 	if task.CompletedAt != "" {
-		fmt.Printf("Completed:   %s\n", outfmt.Sanitize(task.CompletedAt))
+		fmt.Printf("Completed:   %s\n", outfmt.Sanitize(outfmt.ConvertTime(task.CompletedAt, loc)))
 	}
 	if task.HasAttachments {
 		fmt.Printf("Attachments: Yes\n")

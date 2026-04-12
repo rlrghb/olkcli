@@ -39,13 +39,14 @@ func (c *MailDraftsListCmd) Run(ctx *RunContext) error {
 		return printer.PrintJSON(drafts, len(drafts), "")
 	}
 
+	loc, _ := ctx.Timezone()
 	headers := []string{"ID", "SUBJECT", "TO", "CREATED"}
 	var rows [][]string
 	for _, d := range drafts {
 		id := outfmt.Truncate(d.ID, 15)
 		subject := outfmt.Truncate(d.Subject, 60)
 		to := outfmt.Truncate(strings.Join(d.To, ", "), 40)
-		created := outfmt.Truncate(d.Created, 16)
+		created := outfmt.Truncate(outfmt.ConvertTime(d.Created, loc), 16)
 		rows = append(rows, []string{id, subject, to, created})
 	}
 

@@ -173,6 +173,13 @@ Linked Resources
 
 If `--list` is omitted, the default (first) task list is used automatically.
 
+Configuration
+
+- Set timezone: `olk config set timezone America/New_York`
+- Get timezone: `olk config get timezone`
+- Timezone precedence: `--tz` flag > `OLK_TIMEZONE` env > config file > system local
+- JSON output keeps raw UTC times; envelope includes `"timezone"` field
+
 User Profile
 
 - `olk whoami` — display current user's name, email, job title, department, office, phone
@@ -206,6 +213,7 @@ Global Flags
 - `-v, --verbose` — verbose output (env: `OLK_VERBOSE`)
 - `--color auto|never|always` — color mode (env: `OLK_COLOR`)
 - `--timeout SECONDS` — request timeout, default 60 (env: `OLK_TIMEOUT`)
+- `--tz TIMEZONE` — IANA time zone for display, e.g. `America/New_York`, `UTC`, `Local` (env: `OLK_TIMEZONE`)
 
 Scripting Examples
 
@@ -226,6 +234,7 @@ Scripting Examples
 
 Notes
 
+- Set `OLK_TIMEZONE=America/New_York` to display times in your timezone.
 - Set `OLK_ACCOUNT=you@example.com` to avoid repeating `--account`.
 - Set `OLK_TODO_LIST=<list-id>` to avoid repeating `--list` for todo commands.
 - For scripting, prefer `--json --results-only` plus `jq`.
