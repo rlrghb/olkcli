@@ -442,36 +442,37 @@ func (c *Client) DeleteMailFolder(ctx context.Context, folderID string) error {
 	return nil
 }
 
-// sanitizeKQL strips characters that have special meaning in Microsoft Graph
-// KQL $search expressions. The query is wrapped in double quotes by the caller,
-// so we must remove literal double quotes and also strip KQL operators/syntax
-// characters to prevent query injection. This is the user's own mailbox, so
-// the impact is low, but defense-in-depth is worthwhile.
-func sanitizeKQL(query string) string {
-	// Remove characters with special KQL semantics:
-	//   "  — would break out of the quoted string
-	//   :  — property restriction operator (e.g., from:, subject:)
-	//   (  — grouping
-	//   )  — grouping
-	//   &  — AND operator
-	//   |  — OR operator
-	//   !  — NOT operator
-	//   *  — wildcard
-	//   \  — escape character
-	return strings.Map(func(r rune) rune {
-		switch r {
-		case '"', ':', '(', ')', '&', '|', '!', '*', '\\':
-			return -1 // drop
-		default:
-			return r
+// isKQLQuery returns true when query contains KQL syntax — either punctuation
+// operators (:, (, ), &, |, !, *) or keyword operators (AND, OR, NOT).
+func isKQLQuery(query string) bool {
+	if strings.ContainsAny(query, ":()&|!*") {
+		return true
+	}
+	for _, word := range strings.Fields(query) {
+		switch word {
+		case "AND", "OR", "NOT":
+			return true
 		}
-	}, query)
+	}
+	return false
 }
 
 func (c *Client) SearchMessages(ctx context.Context, query string, top int32) ([]MailMessage, error) {
+	var search string
+	if isKQLQuery(query) {
+		// KQL query — pass through as-is so property restrictions, boolean
+		// operators, and quoted phrases (e.g. subject:"quarterly report")
+		// all work. This is the user's own mailbox, so the impact of any
+		// query manipulation is limited to their own search results.
+		search = query
+	} else {
+		// Plain keyword search — wrap in quotes for phrase matching.
+		// Strip any literal double quotes to prevent breaking the wrapper.
+		search = `"` + strings.ReplaceAll(query, `"`, "") + `"`
+	}
 	return c.ListMessages(ctx, &ListMessagesOptions{
 		Top:    top,
-		Search: `"` + sanitizeKQL(query) + `"`,
+		Search: search,
 	})
 }
 

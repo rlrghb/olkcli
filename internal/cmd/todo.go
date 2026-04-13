@@ -21,6 +21,9 @@ type TodoCmd struct {
 	Links     TodoLinksCmd     `cmd:"" help:"Linked resource operations"`
 }
 
+// clearSentinel is the value users pass to clear optional fields (e.g. --due none).
+const clearSentinel = "none"
+
 // resolveListID returns the provided listID, or auto-detects the default task list.
 func resolveListID(ctx *RunContext, listID string) (string, error) {
 	if listID != "" {
@@ -343,10 +346,10 @@ type TodoUpdateCmd struct {
 	ID         string   `arg:"" help:"Task ID"`
 	List       string   `help:"Task list ID" env:"OLK_TODO_LIST"`
 	Title      string   `help:"New title" short:"t"`
-	Due        string   `help:"New due date (ISO 8601, empty string to clear)" short:"d"`
-	Start      string   `help:"New start date (ISO 8601, empty string to clear)" short:"s"`
-	Reminder   string   `help:"New reminder date/time (ISO 8601, empty string to clear)"`
-	Recurrence string   `help:"New recurrence pattern (empty string to clear)" enum:"daily,weekdays,weekly,monthly,yearly," default:""`
+	Due        string   `help:"New due date (ISO 8601, or 'none' to clear)" short:"d"`
+	Start      string   `help:"New start date (ISO 8601, or 'none' to clear)" short:"s"`
+	Reminder   string   `help:"New reminder date/time (ISO 8601, or 'none' to clear)"`
+	Recurrence string   `help:"New recurrence pattern, or 'none' to clear" enum:"daily,weekdays,weekly,monthly,yearly,none," default:""`
 	Importance string   `help:"New importance level" enum:"low,normal,high," default:""`
 	Body       string   `help:"New body text" short:"b"`
 	Categories []string `help:"New categories (use -c none to clear)" short:"c"`
@@ -365,7 +368,12 @@ func (c *TodoUpdateCmd) Run(ctx *RunContext) error {
 		title = &c.Title
 	}
 	if c.Due != "" {
-		due = &c.Due
+		if c.Due == clearSentinel {
+			empty := ""
+			due = &empty
+		} else {
+			due = &c.Due
+		}
 	}
 	if c.Importance != "" {
 		importance = &c.Importance
@@ -374,16 +382,31 @@ func (c *TodoUpdateCmd) Run(ctx *RunContext) error {
 		body = &c.Body
 	}
 	if c.Start != "" {
-		start = &c.Start
+		if c.Start == clearSentinel {
+			empty := ""
+			start = &empty
+		} else {
+			start = &c.Start
+		}
 	}
 	if c.Reminder != "" {
-		reminder = &c.Reminder
+		if c.Reminder == clearSentinel {
+			empty := ""
+			reminder = &empty
+		} else {
+			reminder = &c.Reminder
+		}
 	}
 	if c.Recurrence != "" {
-		recurrence = &c.Recurrence
+		if c.Recurrence == clearSentinel {
+			empty := ""
+			recurrence = &empty
+		} else {
+			recurrence = &c.Recurrence
+		}
 	}
 	if len(c.Categories) > 0 {
-		if len(c.Categories) == 1 && c.Categories[0] == "none" {
+		if len(c.Categories) == 1 && c.Categories[0] == clearSentinel {
 			empty := []string{}
 			categories = &empty
 		} else {
