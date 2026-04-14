@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/microsoftgraph/msgraph-sdk-go/models/odataerrors"
 )
@@ -29,8 +30,11 @@ func validateID(id, label string) error {
 	return nil
 }
 
-// ValidateEmail checks basic email format.
+// ValidateEmail checks basic email format and length.
 func ValidateEmail(email string) error {
+	if len(email) > 254 {
+		return fmt.Errorf("email address too long: %d characters (max 254)", len(email))
+	}
 	if !safeEmailPattern.MatchString(email) {
 		return fmt.Errorf("invalid email address: %q", email)
 	}
@@ -44,6 +48,32 @@ var safePhonePattern = regexp.MustCompile(`^[0-9 ()+.\-]{1,30}$`)
 func ValidatePhone(phone string) error {
 	if !safePhonePattern.MatchString(phone) {
 		return fmt.Errorf("invalid phone number: %q", phone)
+	}
+	return nil
+}
+
+// ValidateBirthday parses an ISO date string (YYYY-MM-DD) and returns the parsed time.
+func ValidateBirthday(s string) (time.Time, error) {
+	t, err := time.Parse("2006-01-02", s)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("invalid birthday %q: use YYYY-MM-DD format", s)
+	}
+	if t.Year() < 1900 || t.After(time.Now()) {
+		return time.Time{}, fmt.Errorf("invalid birthday %q: must be between 1900 and today", s)
+	}
+	return t, nil
+}
+
+// maxContactFieldLen is the maximum length for general contact string fields.
+const maxContactFieldLen = 255
+
+// maxContactNotesLen is the maximum length for the PersonalNotes field.
+const maxContactNotesLen = 32000
+
+// ValidateContactFieldLen checks that a contact string field is within length limits.
+func ValidateContactFieldLen(value, label string, limit int) error {
+	if len(value) > limit {
+		return fmt.Errorf("%s too long: %d characters (max %d)", label, len(value), limit)
 	}
 	return nil
 }

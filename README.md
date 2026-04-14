@@ -34,8 +34,8 @@ Works with both **personal Microsoft accounts** and **enterprise (Azure AD / Ent
 - **Find meeting times** — suggest available slots for multiple attendees *(enterprise only)*
 
 ### Contacts
-- **List, search, create, update, delete** contacts
-- Fields: name, email, phone, company, job title
+- **List, search, create, update, delete** contacts with sorting and pagination
+- Fields: name, multiple emails, phone, company, job title, department, manager, birthday, notes, addresses, categories, and more
 
 ### Tasks (Microsoft To Do)
 - **Manage task lists**: list, create, delete task lists
@@ -309,10 +309,10 @@ olk people search <QUERY> [-n 25]
 ### Contacts
 
 ```
-olk contacts list [-n 25] [--folder ID]
+olk contacts list [-n 25] [--skip N] [--sort displayName|givenName|surname]
 olk contacts get <ID>
-olk contacts create --first-name X --last-name Y [--email Z] [-p MOBILE] [--business-phone P] [--home-phone P] [--company C] [--title T]
-olk contacts update <ID> [--first-name X] [--last-name Y] [--email Z] [-p MOBILE] [--business-phone P] [--home-phone P] [--company C] [--title T]
+olk contacts create --first-name X --last-name Y [-e EMAIL]... [-p MOBILE] [--business-phone P] [--home-phone P] [--company C] [--title T] [--department D] [--manager M] [--birthday YYYY-MM-DD] [--notes N] [--middle-name M] [--nickname N] [-g CATEGORY]... [--street S] [--city C] [--state S] [--postal-code P] [--country C] [--address-type business|home|other]
+olk contacts update <ID> [--first-name X] [--last-name Y] [-e EMAIL]... [-p MOBILE] [--business-phone P] [--home-phone P] [--company C] [--title T] [--department D] [--manager M] [--birthday YYYY-MM-DD] [--notes N] [--middle-name M] [--nickname N] [-g CATEGORY]... [--street S] [--city C] [--state S] [--postal-code P] [--country C] [--address-type business|home|other]
 olk contacts delete <ID> [--force]
 olk contacts search <QUERY> [-n 25]
 ```
