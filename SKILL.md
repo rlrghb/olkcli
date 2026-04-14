@@ -131,10 +131,10 @@ People / Directory
 
 Contacts
 
-- List: `olk contacts list [-n 25]`
+- List: `olk contacts list [-n 25] [--skip N] [--sort displayName|givenName|surname]`
 - Get: `olk contacts get <ID>`
-- Create: `olk contacts create --first-name John --last-name Doe [--email j@d.com] [-p 555-1234] [--business-phone P] [--home-phone P] [--company Acme] [--title Engineer]`
-- Update: `olk contacts update <ID> [--first-name X] [--last-name Y] [--email Z] [-p MOBILE] [--business-phone P] [--home-phone P] [--company C] [--title T]`
+- Create: `olk contacts create --first-name John --last-name Doe [-e j@d.com] [-e backup@d.com] [-p 555-1234] [--business-phone P] [--home-phone P] [--company Acme] [--title Engineer] [--department D] [--manager M] [--birthday YYYY-MM-DD] [--notes N] [--middle-name M] [--nickname N] [-g CATEGORY] [--street S] [--city C] [--state S] [--postal-code P] [--country C] [--address-type business|home|other]`
+- Update: `olk contacts update <ID> [--first-name X] [--last-name Y] [-e EMAIL]... [-p MOBILE] [--business-phone P] [--home-phone P] [--company C] [--title T] [--department D] [--manager M] [--birthday YYYY-MM-DD] [--notes N] [--middle-name M] [--nickname N] [-g CATEGORY]... [--street S] [--city C] [--state S] [--postal-code P] [--country C] [--address-type business|home|other]`
 - Delete: `olk contacts delete <ID> --force`
 - Search: `olk contacts search "John" [-n 25]`
 

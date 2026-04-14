@@ -69,8 +69,10 @@ Edit files in `internal/graphapi/` — these wrap the verbose SDK calls into sim
 
 The project uses `msgraph-sdk-go` v1.96.0 which has some naming quirks:
 - Attendee type uses `SetTypeEscaped()` not `SetType()` (Go keyword collision)
-- Contact emails use `models.NewEmailAddress()` not `NewTypedEmailAddress()`
+- Contact emails use `models.NewEmailAddress()` not `NewTypedEmailAddress()` — supports multiple emails as `[]EmailAddressable`
 - Contact phones: `GetBusinessPhones()`, `GetHomePhones()`, `GetMobilePhone()` (no unified `GetPhones()`)
+- Contact addresses: `GetBusinessAddress()`, `GetHomeAddress()`, `GetOtherAddress()` return `PhysicalAddressable`; use `models.NewPhysicalAddress()` to create
+- Contact birthday: `GetBirthday()` / `SetBirthday()` takes `*time.Time`
 - Message item request builders: `ItemMessagesMessageItemRequestBuilder*` (note double "Messages")
 - Message rules: `Me().MailFolders().ByMailFolderId("inbox").MessageRules()` for CRUD; requires `MailboxSettings.ReadWrite` scope
 - People API: `Me().People()` with `$search` query parameter; falls back to `/users` directory search (requires `ConsistencyLevel: eventual` header) when People API returns empty
