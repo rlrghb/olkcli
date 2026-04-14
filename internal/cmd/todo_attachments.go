@@ -137,10 +137,7 @@ func (c *TodoAttachDownloadCmd) Run(ctx *RunContext) error {
 	if err != nil {
 		return err
 	}
-
-	if len(content) > maxDownloadSize {
-		return fmt.Errorf("attachment is %d bytes, exceeds 50MB download limit", len(content))
-	}
+	// Size is validated in the API layer (graphapi/todo.go).
 
 	if err := validateOutDir(c.Out); err != nil {
 		return err
