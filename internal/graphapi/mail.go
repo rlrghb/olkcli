@@ -442,34 +442,12 @@ func (c *Client) DeleteMailFolder(ctx context.Context, folderID string) error {
 	return nil
 }
 
-// isKQLQuery returns true when query contains KQL syntax — either punctuation
-// operators (:, (, ), &, |, !, *) or keyword operators (AND, OR, NOT).
-func isKQLQuery(query string) bool {
-	if strings.ContainsAny(query, ":()&|!*") {
-		return true
-	}
-	for _, word := range strings.Fields(query) {
-		switch word {
-		case "AND", "OR", "NOT":
-			return true
-		}
-	}
-	return false
-}
-
 func (c *Client) SearchMessages(ctx context.Context, query string, top int32) ([]MailMessage, error) {
-	var search string
-	if isKQLQuery(query) {
-		// KQL query — pass through as-is so property restrictions, boolean
-		// operators, and quoted phrases (e.g. subject:"quarterly report")
-		// all work. This is the user's own mailbox, so the impact of any
-		// query manipulation is limited to their own search results.
-		search = query
-	} else {
-		// Plain keyword search — wrap in quotes for phrase matching.
-		// Strip any literal double quotes to prevent breaking the wrapper.
-		search = `"` + strings.ReplaceAll(query, `"`, "") + `"`
-	}
+	// The $search parameter value must be wrapped in double quotes per
+	// Graph API requirements. KQL property restrictions (from:, subject:, etc.)
+	// and boolean operators (AND, OR, NOT) work inside the quoted string.
+	// Strip literal double quotes from user input to prevent breaking the wrapper.
+	search := `"` + strings.ReplaceAll(query, `"`, "") + `"`
 	return c.ListMessages(ctx, &ListMessagesOptions{
 		Top:    top,
 		Search: search,

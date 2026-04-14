@@ -57,5 +57,5 @@
 - Config dir (`~/.config/olk/`) uses 0700 permissions; token files use 0600.
 - Device code flow uses PKCE (RFC 7636) — `code_challenge` sent with device code request, `code_verifier` sent during token polling.
 - Token refresh is serialized per-email via `sync.Map` of mutexes in `internal/msauth/auth.go` to prevent race conditions.
-- KQL search queries support property restrictions (`from:`, `subject:`, etc.) and boolean operators. Only literal double-quote characters are stripped to prevent syntax injection. Plain keyword queries are auto-wrapped in double quotes; queries containing KQL operators are passed through as-is. See `internal/graphapi/mail.go`.
+- KQL search queries are always wrapped in double quotes (Graph `$search` parameter requirement). Property restrictions (`from:`, `subject:`, etc.) and boolean operators work inside the quotes. Literal double-quote characters are stripped from user input to prevent breaking the wrapper. See `internal/graphapi/mail.go`.
 - See `SECURITY.md` for vulnerability disclosure policy.
