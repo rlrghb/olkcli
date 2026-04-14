@@ -10,6 +10,7 @@ import (
 	"github.com/rlrghb/olkcli/internal/config"
 	"github.com/rlrghb/olkcli/internal/msauth"
 	"github.com/rlrghb/olkcli/internal/outfmt"
+	"github.com/rlrghb/olkcli/internal/secrets"
 )
 
 type AuthCmd struct {
@@ -155,22 +156,42 @@ func (c *AuthCleanCmd) Run(ctx *RunContext) error {
 		clientCfg := cfg.GetClient(acct.Email)
 		a, err := ctx.Authenticator(clientCfg.ClientID, clientCfg.TenantID)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "warning: skipping %s: %v\n", outfmt.Sanitize(acct.Email), err)
+			fmt.Fprintf(os.Stderr, "warning: skipping %s: %s\n", outfmt.Sanitize(acct.Email), outfmt.Sanitize(err.Error()))
 			continue
 		}
 		if err := a.Logout(acct.Email); err != nil {
-			fmt.Fprintf(os.Stderr, "warning: could not remove %s: %v\n", outfmt.Sanitize(acct.Email), err)
+			fmt.Fprintf(os.Stderr, "warning: could not remove %s: %s\n", outfmt.Sanitize(acct.Email), outfmt.Sanitize(err.Error()))
 			continue
 		}
 		cfg.RemoveAccount(acct.Email)
 		removed++
 	}
 
+	// Clean up orphaned keyring tokens that no longer have account files.
+	// This catches tokens left behind if an account file was deleted manually
+	// or if a previous logout partially failed.
+	orphaned := 0
+	if keys, err := auth.Store.Keys(); err == nil {
+		for _, key := range keys {
+			if secrets.IsTokenKey(key) {
+				if err := auth.Store.Delete(key); err != nil {
+					fmt.Fprintf(os.Stderr, "warning: could not remove orphaned token %s: %s\n", outfmt.Sanitize(key), outfmt.Sanitize(err.Error()))
+				} else {
+					orphaned++
+				}
+			}
+		}
+	}
+
 	if err := cfg.Save(); err != nil {
 		return fmt.Errorf("saving config: %w", err)
 	}
 
-	fmt.Printf("Removed %d account(s) and their tokens.\n", removed)
+	msg := fmt.Sprintf("Removed %d account(s) and their tokens.", removed)
+	if orphaned > 0 {
+		msg += fmt.Sprintf(" Cleaned up %d orphaned token(s).", orphaned)
+	}
+	fmt.Println(msg)
 	return nil
 }
 

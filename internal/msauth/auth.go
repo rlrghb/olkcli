@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -212,21 +213,37 @@ func (a *Authenticator) ListAccounts() ([]AccountInfo, error) {
 		return nil, fmt.Errorf("reading accounts directory: %w", err)
 	}
 
+	// Harden directory permissions on every read — fixes drift from
+	// umask changes or manual edits.
+	if runtime.GOOS != "windows" {
+		_ = os.Chmod(acctDir, 0o700)
+	}
+
 	var accounts []AccountInfo
 	for _, entry := range entries {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
 			continue
 		}
 
-		data, err := os.ReadFile(filepath.Join(acctDir, entry.Name()))
+		filePath := filepath.Join(acctDir, entry.Name())
+
+		// Harden file permissions if too open.
+		if runtime.GOOS != "windows" {
+			if info, err := entry.Info(); err == nil && info.Mode().Perm()&0o077 != 0 {
+				fmt.Fprintf(os.Stderr, "warning: fixing permissions on %q (was %o)\n", entry.Name(), info.Mode().Perm())
+				_ = os.Chmod(filePath, 0o600)
+			}
+		}
+
+		data, err := os.ReadFile(filePath)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "warning: skipping account file %s: %v\n", entry.Name(), err)
+			fmt.Fprintf(os.Stderr, "warning: skipping account file %q: %v\n", entry.Name(), err)
 			continue
 		}
 
 		var info AccountInfo
 		if err := json.Unmarshal(data, &info); err != nil {
-			fmt.Fprintf(os.Stderr, "warning: skipping account file %s: invalid JSON: %v\n", entry.Name(), err)
+			fmt.Fprintf(os.Stderr, "warning: skipping account file %q: invalid JSON: %v\n", entry.Name(), err)
 			continue
 		}
 		accounts = append(accounts, info)

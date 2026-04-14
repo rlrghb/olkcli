@@ -743,6 +743,10 @@ func (c *Client) DownloadTodoAttachment(ctx context.Context, listID, taskID, att
 		content = fileAtt.GetContentBytes()
 	}
 
+	if len(content) > maxAttachmentBytes {
+		return "", "", nil, fmt.Errorf("attachment %q is %d bytes, exceeds %d byte limit", name, len(content), maxAttachmentBytes)
+	}
+
 	return name, contentType, content, nil
 }
 

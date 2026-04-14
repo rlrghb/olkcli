@@ -26,6 +26,10 @@ var allowedOrderBy = map[string]bool{
 // safeEmailPattern validates basic email format.
 var safeEmailPattern = regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$`)
 
+// maxAttachmentBytes is the hard limit for attachment downloads (50 MB).
+// Applied in the API layer so oversized content is rejected before reaching callers.
+const maxAttachmentBytes = 50 << 20
+
 // allowedSelectFields is the set of valid $select field names for messages.
 var allowedSelectFields = map[string]bool{
 	"id": true, "subject": true, "from": true, "toRecipients": true,
@@ -498,6 +502,10 @@ func (c *Client) DownloadAttachment(ctx context.Context, messageID, attachmentID
 		att.Content = fileAtt.GetContentBytes()
 	} else {
 		return nil, fmt.Errorf("attachment %q is not a file attachment", att.Name)
+	}
+
+	if len(att.Content) > maxAttachmentBytes {
+		return nil, fmt.Errorf("attachment %q is %d bytes, exceeds %d byte limit", att.Name, len(att.Content), maxAttachmentBytes)
 	}
 
 	return att, nil

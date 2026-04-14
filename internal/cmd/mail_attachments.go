@@ -101,9 +101,7 @@ func (c *MailAttachmentsCmd) Run(ctx *RunContext) error {
 		if err != nil {
 			return err
 		}
-		if len(att.Content) > maxDownloadSize {
-			return fmt.Errorf("attachment %q content is %d bytes, exceeds 50MB download limit", att.Name, len(att.Content))
-		}
+		// Size is validated in the API layer (graphapi/mail.go).
 
 		outDir := c.Out
 		if err := validateOutDir(outDir); err != nil {
@@ -144,9 +142,6 @@ func (c *MailAttachmentsCmd) Run(ctx *RunContext) error {
 			att, err := client.DownloadAttachment(ctx.Ctx, c.ID, a.ID)
 			if err != nil {
 				return fmt.Errorf("downloading %q: %w", a.Name, err)
-			}
-			if len(att.Content) > maxDownloadSize {
-				return fmt.Errorf("attachment %q content is %d bytes, exceeds 50MB download limit", a.Name, len(att.Content))
 			}
 
 			filename := sanitizeFilename(att.Name)

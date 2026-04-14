@@ -116,3 +116,8 @@ func (s *KeyringStore) Keys() ([]string, error) {
 func TokenKey(email string) string {
 	return tokenPrefix + strings.ToLower(email)
 }
+
+// IsTokenKey reports whether a keyring key is an olk token entry.
+func IsTokenKey(key string) bool {
+	return strings.HasPrefix(key, tokenPrefix)
+}

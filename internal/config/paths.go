@@ -33,6 +33,11 @@ func EnsureConfigDir() error {
 		if err := os.MkdirAll(dir, 0o700); err != nil {
 			return err
 		}
+		// Enforce restrictive permissions even if directory already existed
+		// with weaker permissions (e.g. created by another tool or umask).
+		if err := os.Chmod(dir, 0o700); err != nil {
+			return err
+		}
 	}
 	return nil
 }
