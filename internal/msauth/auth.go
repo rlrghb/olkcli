@@ -220,11 +220,13 @@ func (a *Authenticator) ListAccounts() ([]AccountInfo, error) {
 
 		data, err := os.ReadFile(filepath.Join(acctDir, entry.Name()))
 		if err != nil {
+			fmt.Fprintf(os.Stderr, "warning: skipping account file %s: %v\n", entry.Name(), err)
 			continue
 		}
 
 		var info AccountInfo
 		if err := json.Unmarshal(data, &info); err != nil {
+			fmt.Fprintf(os.Stderr, "warning: skipping account file %s: invalid JSON: %v\n", entry.Name(), err)
 			continue
 		}
 		accounts = append(accounts, info)

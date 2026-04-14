@@ -14,7 +14,7 @@ type MailCategorizeCmd struct {
 
 func (c *MailCategorizeCmd) Run(ctx *RunContext) error {
 	// Allow clearing categories with --categories none or --categories ""
-	clearCats := len(c.Categories) == 1 && (c.Categories[0] == "none" || c.Categories[0] == "")
+	clearCats := len(c.Categories) == 1 && (c.Categories[0] == clearSentinel || c.Categories[0] == "")
 	if clearCats {
 		c.Categories = []string{}
 	} else {

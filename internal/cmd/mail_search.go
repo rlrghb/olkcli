@@ -3,7 +3,7 @@ package cmd
 import "github.com/rlrghb/olkcli/internal/outfmt"
 
 type MailSearchCmd struct {
-	Query string `arg:"" help:"Search query (KQL syntax)"`
+	Query string `arg:"" help:"Search query — supports KQL operators (from:, subject:, hasAttachment:, etc.)"`
 	Top   int32  `help:"Number of results" default:"25" short:"n"`
 }
 

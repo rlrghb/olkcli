@@ -9,6 +9,7 @@ type SendCmd struct {
 	BCC         []string `help:"BCC recipients"`
 	HTML        bool     `help:"Send body as HTML"`
 	Attach      []string `help:"File paths to attach" type:"path"`
+	Importance  string   `help:"Message importance: low|normal|high" enum:",low,normal,high" default:""`
 	ReadReceipt bool     `help:"Request a read receipt"`
 }
 
@@ -21,6 +22,7 @@ func (c *SendCmd) Run(ctx *RunContext) error {
 		BCC:         c.BCC,
 		HTML:        c.HTML,
 		Attach:      c.Attach,
+		Importance:  c.Importance,
 		ReadReceipt: c.ReadReceipt,
 	}
 	return inner.Run(ctx)

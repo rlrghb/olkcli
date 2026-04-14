@@ -194,6 +194,7 @@ func Execute() int {
 		timeout = 60
 	}
 	if timeout > 600 {
+		fmt.Fprintf(os.Stderr, "warning: --timeout %d exceeds maximum, clamping to 600s\n", timeout)
 		timeout = 600
 	}
 	var cancel context.CancelFunc
