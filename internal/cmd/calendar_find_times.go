@@ -68,7 +68,7 @@ func (c *CalendarFindTimesCmd) Run(ctx *RunContext) error {
 		rows = append(rows, []string{
 			outfmt.Truncate(outfmt.ConvertTime(s.Start, loc), 16),
 			outfmt.Truncate(outfmt.ConvertTime(s.End, loc), 16),
-			fmt.Sprintf("%.0f%%", s.Confidence*100),
+			fmt.Sprintf("%.0f%%", s.Confidence),
 			strings.Join(avails, ", "),
 		})
 	}

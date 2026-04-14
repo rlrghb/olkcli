@@ -126,10 +126,14 @@ func graphErrorMessage(err error) string {
 }
 
 // enterpriseError wraps a Graph API error with a hint that the feature
-// may require a work/school account, if the error is access-denied.
+// may require a work/school account, if the error indicates access issues.
 func enterpriseError(action string, err error) error {
 	msg := graphErrorMessage(err)
-	if strings.Contains(strings.ToLower(msg), "access") && strings.Contains(strings.ToLower(msg), "denied") {
+	lower := strings.ToLower(msg)
+	needsEnterprise := (strings.Contains(lower, "access") && strings.Contains(lower, "denied")) ||
+		lower == "unknownerror" ||
+		strings.Contains(lower, "mailboxnotenabledforrestapi")
+	if needsEnterprise {
 		return fmt.Errorf("%s: %s\n  Note: this feature requires a work/school (Microsoft 365) account and is not available for personal Microsoft accounts (Outlook.com, Hotmail, Live.com)", action, msg)
 	}
 	return fmt.Errorf("%s: %s", action, msg)
