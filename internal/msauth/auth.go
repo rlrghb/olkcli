@@ -27,8 +27,9 @@ var (
 )
 
 // emailMutex returns a per-email mutex for serializing token refresh operations.
+// Email is lowercased to match the canonical key used in TokenKey().
 func emailMutex(email string) *sync.Mutex {
-	val, _ := refreshMuMap.LoadOrStore(email, &sync.Mutex{})
+	val, _ := refreshMuMap.LoadOrStore(strings.ToLower(email), &sync.Mutex{})
 	return val.(*sync.Mutex)
 }
 

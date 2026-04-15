@@ -13,8 +13,8 @@ import (
 // graphTimeZoneUTC is the time zone string Microsoft Graph expects on dateTimeTimeZone values.
 const graphTimeZoneUTC = "UTC"
 
-// safeIDPattern matches typical Microsoft Graph IDs (alphanumeric, hyphens, underscores, equals, plus, slash for base64).
-var safeIDPattern = regexp.MustCompile(`^[a-zA-Z0-9_=+/-]+$`)
+// safeIDPattern matches typical Microsoft Graph IDs (alphanumeric, hyphens, underscores, equals, plus, slash for base64, exclamation for OneDrive).
+var safeIDPattern = regexp.MustCompile(`^[a-zA-Z0-9_=+/!-]+$`)
 
 // validateID checks that an ID parameter contains only safe characters.
 func validateID(id, label string) error {
@@ -135,6 +135,21 @@ func enterpriseError(action string, err error) error {
 		strings.Contains(lower, "mailboxnotenabledforrestapi")
 	if needsEnterprise {
 		return fmt.Errorf("%s: %s\n  Note: this feature requires a work/school (Microsoft 365) account and is not available for personal Microsoft accounts (Outlook.com, Hotmail, Live.com)", action, msg)
+	}
+	return fmt.Errorf("%s: %s", action, msg)
+}
+
+// scopeUpgradeError wraps a Graph API error with a hint to re-login
+// when the error indicates missing permissions (e.g. token lacks a newly added scope).
+func scopeUpgradeError(action string, err error) error {
+	msg := graphErrorMessage(err)
+	lower := strings.ToLower(msg)
+	needsReauth := strings.Contains(lower, "accessdenied") ||
+		strings.Contains(lower, "insufficient") ||
+		(strings.Contains(lower, "access") && strings.Contains(lower, "denied")) ||
+		strings.Contains(lower, "authorization_requestdenied")
+	if needsReauth {
+		return fmt.Errorf("%s: %s\n  Hint: you may need to re-login to grant new permissions: olk auth login", action, msg)
 	}
 	return fmt.Errorf("%s: %s", action, msg)
 }

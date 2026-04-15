@@ -4,7 +4,7 @@ This file provides context for Claude Code when working on the olk project.
 
 ## What is this project?
 
-`olk` is a CLI tool for Microsoft Outlook via the Microsoft Graph API. It provides terminal access to email, calendar, contacts, and tasks for both personal Microsoft accounts and enterprise Azure AD/Entra ID accounts.
+`olk` is a CLI tool for Microsoft Outlook and OneDrive via the Microsoft Graph API. It provides terminal access to email, calendar, contacts, tasks, and OneDrive files for both personal Microsoft accounts and enterprise Azure AD/Entra ID accounts.
 
 ## Quick Reference
 
@@ -54,6 +54,11 @@ go mod tidy         # After changing dependencies
 2. Add the struct to `TodoCmd` in `internal/cmd/todo.go`
 3. If needed, add the API method to `internal/graphapi/todo.go`
 
+### Adding a new drive subcommand
+1. Create `internal/cmd/drive_<name>.go` with the command struct and `Run` method
+2. Add the struct to `DriveCmd` in `internal/cmd/drive.go`
+3. If needed, add the API method to `internal/graphapi/drive.go`
+
 ### Adding a new flag to all commands
 Add it to `RootFlags` in `internal/cmd/root.go` with `env:"OLK_*"` tag.
 
@@ -83,3 +88,7 @@ The project uses `msgraph-sdk-go` v1.96.0 which has some naming quirks:
 - Todo checklist items: `Me().Todo().Lists().ByTodoTaskListId(listID).Tasks().ByTodoTaskId(taskID).ChecklistItems()`
 - Todo attachments: `TaskFileAttachment` type for upload; `ByAttachmentBaseId()` for get/delete
 - Todo linked resources: `Me().Todo().Lists().ByTodoTaskListId(listID).Tasks().ByTodoTaskId(taskID).LinkedResources()`
+- Drive: `Me().Drive()` for default drive, `Me().Drives()` for all drives, `Drives().ByDriveId(id)` for specific drive
+- DriveItems: `Drives().ByDriveId(id).Items().ByDriveItemId(itemID)` for item operations; `.Children()` for folder contents; `.Content()` for file download/upload
+- Drive path-based access requires raw URL builders: `drives.NewItemItemsDriveItemItemRequestBuilder(rawURL, c.inner.GetAdapter())` with URL pattern `/drives/{id}/root:/{path}:`
+- Drive sharing: `CreateLink().Post()` body uses `SetTypeEscaped()` not `SetType()` (same Go keyword collision as Attendee)

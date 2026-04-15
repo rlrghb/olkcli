@@ -1,6 +1,6 @@
 # olk — Microsoft Outlook in Your Terminal
 
-A fast, scriptable CLI for Microsoft Outlook via the Microsoft Graph API. Manage email, calendar, contacts, and tasks from the command line.
+A fast, scriptable CLI for Microsoft Outlook and OneDrive via the Microsoft Graph API. Manage email, calendar, contacts, tasks, and OneDrive files from the command line.
 
 Works with both **personal Microsoft accounts** and **enterprise (Azure AD / Entra ID)** accounts. Zero-config setup with device-code authentication — just run `olk auth login` and go. For enterprise accounts, use `olk auth login --enterprise` to enable additional features like out-of-office, inbox rules, and directory search.
 
@@ -43,6 +43,15 @@ Works with both **personal Microsoft accounts** and **enterprise (Azure AD / Ent
 - **Checklists**: list, create, toggle, update, and delete checklist items within tasks
 - **Attachments**: list, upload, download, and delete task file attachments
 - **Linked resources**: list, create, and delete linked resources on tasks
+
+### OneDrive
+- **Browse** files and folders with `drive ls [path]`
+- **Search** files by name or content
+- **Download** and **upload** files (simple and resumable for large files)
+- **Create folders**, **copy**, **move**, and **delete** items
+- **Share** files with view or edit links
+- **Version history** for files
+- **Drive info** including quota usage
 
 ### People / Directory
 - **Search** people by name — returns name, email, job title, department, company. Personal accounts search known contacts; enterprise accounts also search the organization directory
@@ -161,6 +170,8 @@ olk auth login --enterprise
 
 Uses an embedded public client ID with device-code flow. The `--enterprise` flag requests additional scopes (`User.ReadBasic.All`, `MailboxSettings.ReadWrite`) needed for enterprise-only features. Personal accounts should not use `--enterprise` as these scopes are not supported.
 
+> **Note:** If you upgrade to a version that adds new features (e.g. OneDrive support), you may need to re-run `olk auth login` to grant the new permissions. If you see "access denied" errors, re-login to refresh your token scopes.
+
 ### Custom App Registration
 
 If your organization blocks the default client ID, or your admin requires apps to be registered under your tenant, you'll need to create your own app registration:
@@ -168,7 +179,7 @@ If your organization blocks the default client ID, or your admin requires apps t
 1. Go to [Azure Portal > App registrations](https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade) and click **New registration**
 2. Set **Supported account types** to match your needs (single tenant or multi-tenant)
 3. Under **Authentication > Advanced settings**, set **Allow public client flows** to **Yes** (required for device-code flow)
-4. Under **API permissions**, add **Microsoft Graph** delegated permissions: `Mail.ReadWrite`, `Mail.Send`, `Calendars.ReadWrite`, `Contacts.ReadWrite`, `Tasks.ReadWrite`, `People.Read`, `User.Read`, `User.ReadBasic.All`, `MailboxSettings.ReadWrite`, `offline_access`
+4. Under **API permissions**, add **Microsoft Graph** delegated permissions: `Mail.ReadWrite`, `Mail.Send`, `Calendars.ReadWrite`, `Contacts.ReadWrite`, `Tasks.ReadWrite`, `Files.ReadWrite`, `People.Read`, `User.Read`, `User.ReadBasic.All`, `MailboxSettings.ReadWrite`, `offline_access` (use `Files.Read` instead of `Files.ReadWrite` for read-only access)
 5. Copy the **Application (client) ID** and **Directory (tenant) ID** from the app's Overview page
 
 Then use them:
@@ -465,6 +476,7 @@ Most features work with both personal and enterprise accounts. A few features re
 | Focused Inbox | Yes | Yes |
 | Availability / free-busy | Yes | Yes |
 | Find meeting times | No | Yes |
+| OneDrive (browse, upload, download, share) | Yes | Yes |
 | Directory search (fallback) | No | Yes |
 
 ## Privacy & Security

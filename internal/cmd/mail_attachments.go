@@ -73,7 +73,8 @@ func safeWriteFile(path string, content []byte) (string, error) {
 	return "", fmt.Errorf("could not find available filename for %s after 1000 attempts", filepath.Base(path))
 }
 
-// sanitizeFilename removes path separators and leading dots to prevent path traversal.
+// sanitizeFilename removes path separators, control characters, and leading dots
+// to prevent path traversal and filename-based attacks.
 func sanitizeFilename(name string) string {
 	// Strip any directory components
 	name = filepath.Base(name)
@@ -81,6 +82,13 @@ func sanitizeFilename(name string) string {
 	name = strings.ReplaceAll(name, string(os.PathSeparator), "_")
 	name = strings.ReplaceAll(name, "/", "_")
 	name = strings.ReplaceAll(name, "\\", "_")
+	// Remove null bytes and control characters (U+0000–U+001F, U+007F)
+	name = strings.Map(func(r rune) rune {
+		if r < 0x20 || r == 0x7F {
+			return -1
+		}
+		return r
+	}, name)
 	// Remove leading dots to prevent hidden files or traversal
 	name = strings.TrimLeft(name, ".")
 	if name == "" {
