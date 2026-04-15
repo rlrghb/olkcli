@@ -161,6 +161,7 @@ type CLI struct {
 	Contacts ContactsCmd `cmd:"" help:"Contacts commands"`
 	Todo     TodoCmd     `cmd:"" help:"Microsoft To Do tasks"`
 	People   PeopleCmd   `cmd:"" help:"People directory search"`
+	Drive    DriveCmd    `cmd:"" help:"OneDrive file operations"`
 	Config   ConfigCmd   `cmd:"" help:"Configuration management"`
 	Version  VersionCmd  `cmd:"" help:"Show version information"`
 	Whoami   WhoamiCmd   `cmd:"" help:"Show current user profile"`

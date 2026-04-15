@@ -1,6 +1,6 @@
 ---
 name: olk
-description: Microsoft Outlook CLI for email, calendar, contacts, and tasks via Microsoft Graph API.
+description: Microsoft Outlook and OneDrive CLI for email, calendar, contacts, tasks, and files via Microsoft Graph API.
 homepage: https://github.com/rlrghb/olkcli
 metadata:
   {
@@ -24,7 +24,7 @@ metadata:
 
 # olk
 
-Use `olk` for Outlook Mail/Calendar/Contacts/Tasks. Works with personal Microsoft accounts and enterprise Azure AD/Entra ID.
+Use `olk` for Outlook Mail/Calendar/Contacts/Tasks and OneDrive files. Works with personal Microsoft accounts and enterprise Azure AD/Entra ID.
 
 Setup (once)
 
@@ -173,6 +173,26 @@ Linked Resources
 
 If `--list` is omitted, the default (first) task list is used automatically.
 
+OneDrive
+
+- List drives: `olk drive list`
+- Drive info: `olk drive info [--drive-id ID]`
+- List folder: `olk drive ls [PATH] [--drive-id ID] [-n 50]`
+- Get item details: `olk drive get <ID> [--drive-id ID]`
+- Search: `olk drive search <QUERY> [--drive-id ID] [-n 25]`
+- Recent files: `olk drive recent [--drive-id ID]`
+- Shared with me: `olk drive shared [--drive-id ID]`
+- Download: `olk drive download <ID> [--out DIR] [--drive-id ID]`
+- Upload: `olk drive upload <LOCAL_PATH> <REMOTE_PATH> [--drive-id ID] [--replace]`
+- Create folder: `olk drive mkdir <PATH> [--drive-id ID]`
+- Copy: `olk drive cp <ID> <DEST_PATH> [--name NEW_NAME] [--drive-id ID]`
+- Move/rename: `olk drive mv <ID> <DEST_PATH> [--drive-id ID]`
+- Delete: `olk drive rm <ID> --force [--drive-id ID]`
+- Share: `olk drive share <ID> [--type view|edit] [--scope anonymous|organization] [--drive-id ID]`
+- Version history: `olk drive versions <ID> [--drive-id ID]`
+
+If `--drive-id` is omitted, the user's primary drive is used automatically.
+
 Configuration
 
 - Set timezone: `olk config set timezone America/New_York`
@@ -231,12 +251,15 @@ Scripting Examples
 - Find meeting times: `olk calendar find-times --attendees a@b.com --attendees c@d.com --json --results-only | jq '.[0]'`
 - Search people: `olk people search "engineering" --json --results-only | jq -r '.[].email'`
 - Focused inbox unread: `olk mail list --focused --unread --json --results-only | jq length`
+- List large files: `olk drive ls /Documents --json --results-only | jq '[.[] | select(.size > 10000000)] | sort_by(.size) | reverse'`
+- Check quota: `olk drive info --json --results-only | jq '{used: .quotaUsed, total: .quotaTotal}'`
 
 Notes
 
 - Set `OLK_TIMEZONE=America/New_York` to display times in your timezone.
 - Set `OLK_ACCOUNT=you@example.com` to avoid repeating `--account`.
 - Set `OLK_TODO_LIST=<list-id>` to avoid repeating `--list` for todo commands.
+- Set `OLK_DRIVE_ID=<drive-id>` to avoid repeating `--drive-id` for drive commands.
 - For scripting, prefer `--json --results-only` plus `jq`.
 - IDs are opaque Microsoft Graph strings. Always get them from `list` or `search` first — never guess.
 - Dates are ISO 8601: `2025-06-15` or `2025-06-15T09:00`.
@@ -246,3 +269,4 @@ Notes
 - Confirm before sending mail or creating/deleting events.
 - If a command fails with an auth error, check `olk auth status` first.
 - Some features are enterprise-only (work/school accounts): out-of-office, inbox rules, find meeting times, and directory search. These require `olk auth login --enterprise`.
+- OneDrive commands require re-login (`olk auth login`) if you authenticated before OneDrive support was added.
