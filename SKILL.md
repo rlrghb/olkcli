@@ -260,6 +260,7 @@ Notes
 - Set `OLK_ACCOUNT=you@example.com` to avoid repeating `--account`.
 - Set `OLK_TODO_LIST=<list-id>` to avoid repeating `--list` for todo commands.
 - Set `OLK_DRIVE_ID=<drive-id>` to avoid repeating `--drive-id` for drive commands.
+- Set `OLK_KEYRING_PASSWORD=<password>` for headless/non-interactive environments (file-backend keyring).
 - For scripting, prefer `--json --results-only` plus `jq`.
 - IDs are opaque Microsoft Graph strings. Always get them from `list` or `search` first — never guess.
 - Dates are ISO 8601: `2025-06-15` or `2025-06-15T09:00`.

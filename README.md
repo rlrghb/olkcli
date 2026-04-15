@@ -219,6 +219,17 @@ Refresh tokens are stored in the OS credential manager:
 - **Linux**: Secret Service (GNOME Keyring / KDE Wallet)
 - **Windows**: Windows Credential Manager
 
+When no native credential manager is available (e.g. headless Linux without Secret Service), `olk` falls back to an encrypted file store and prompts for a password on **stderr**.
+
+#### Headless / Non-interactive Use
+
+For headless environments, CI/CD pipelines, or LLM-driven automation, set the `OLK_KEYRING_PASSWORD` environment variable to supply the file-backend password without an interactive prompt:
+
+```bash
+export OLK_KEYRING_PASSWORD="your-keyring-password"
+olk mail list --json | jq '.subject'
+```
+
 ## Shortcuts
 
 For common workflows, `olk` provides top-level shortcuts:
@@ -246,6 +257,7 @@ For common workflows, `olk` provides top-level shortcuts:
 | `--select FIELDS` | `OLK_SELECT` | Field projection |
 | `--results-only` | `OLK_RESULTS_ONLY` | Unwrap JSON envelope |
 | `--tz TIMEZONE` | `OLK_TIMEZONE` | IANA time zone for display (e.g. `America/New_York`) |
+| | `OLK_KEYRING_PASSWORD` | File-backend keyring password (for headless use) |
 
 ## Commands Reference
 
@@ -483,7 +495,7 @@ Most features work with both personal and enterprise accounts. A few features re
 
 - **No telemetry**: `olk` collects no analytics, usage data, or crash reports
 - **No third-party services**: All communication is directly between your machine and Microsoft Graph API
-- **Token storage**: OAuth refresh tokens are stored in your OS credential manager (macOS Keychain, Linux Secret Service, Windows Credential Manager) — never in plain-text files
+- **Token storage**: OAuth refresh tokens are stored in your OS credential manager (macOS Keychain, Linux Secret Service, Windows Credential Manager) — never in plain-text files. The encrypted file fallback prompts on stderr; set `OLK_KEYRING_PASSWORD` for non-interactive use
 - **PKCE**: Device code flow uses Proof Key for Code Exchange (RFC 7636) for defense-in-depth
 - **Data stays local**: Email bodies, attachments, and contacts are streamed to stdout and never cached to disk
 - **Clean removal**: Run `olk auth clean --force` to remove all stored accounts and tokens

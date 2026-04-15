@@ -53,7 +53,7 @@
 ## Security & Configuration
 
 - Never commit OAuth tokens or client secrets.
-- Prefer OS keychain backends; the file fallback is for headless environments only.
+- Prefer OS keychain backends; the file fallback is for headless environments only. Set `OLK_KEYRING_PASSWORD` for non-interactive file-backend access.
 - Config dir (`~/.config/olk/`) uses 0700 permissions; token files use 0600.
 - Device code flow uses PKCE (RFC 7636) — `code_challenge` sent with device code request, `code_verifier` sent during token polling.
 - Token refresh is serialized per-email via `sync.Map` of mutexes in `internal/msauth/auth.go` to prevent race conditions.
