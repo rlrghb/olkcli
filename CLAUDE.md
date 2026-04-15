@@ -20,7 +20,7 @@ go mod tidy         # After changing dependencies
 - **CLI framework**: `github.com/alecthomas/kong` — commands are Go structs with `Run(ctx *RunContext) error`
 - **Auth**: Raw OAuth2 device code flow with PKCE (RFC 7636) against `login.microsoftonline.com` — no MSAL. Scopes defined in `internal/msauth/scopes.go`. Enterprise-only scopes (`MailboxSettings.ReadWrite`, `User.ReadBasic.All`) are only requested with `--enterprise` flag — personal accounts cannot consent to them. Token refresh is serialized per-email via `sync.Map` of mutexes to prevent race conditions
 - **API**: Official `msgraph-sdk-go` wrapped in `internal/graphapi/` for ergonomic access
-- **Secrets**: OS keyring via `github.com/99designs/keyring` (macOS Keychain, Linux Secret Service, Windows WinCred)
+- **Secrets**: OS keyring via `github.com/99designs/keyring` (macOS Keychain, Linux Secret Service, Windows WinCred). File-backend password prompt writes to stderr (not stdout) to avoid corrupting piped output. Set `OLK_KEYRING_PASSWORD` for headless/non-interactive use
 - **Output**: JSON envelope (`--json`), aligned table (default), TSV (`--plain`)
 - **Timezone**: Display-layer conversion via `outfmt.ConvertTime()`. Resolved once per command via `RunContext.Timezone()` (flag > env > config > Local). JSON output keeps raw UTC; envelope includes `timezone` field. IANA db embedded via `import _ "time/tzdata"`
 

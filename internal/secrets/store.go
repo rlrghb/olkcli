@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/99designs/keyring"
+	"golang.org/x/term"
 
 	"github.com/rlrghb/olkcli/internal/config"
 )
@@ -32,6 +33,37 @@ type KeyringStore struct {
 	ring keyring.Keyring
 }
 
+// stderrPrompt prompts for a password on stderr and reads it from the
+// controlling terminal. Unlike keyring.TerminalPrompt it never writes to
+// stdout, so JSON/pipe output is not corrupted.
+func stderrPrompt(prompt string) (string, error) {
+	if runtime.GOOS == "windows" {
+		fmt.Fprintf(os.Stderr, "%s: ", prompt)
+		b, err := term.ReadPassword(int(os.Stdin.Fd()))
+		if err != nil {
+			return "", fmt.Errorf("reading password: %w", err)
+		}
+		fmt.Fprintln(os.Stderr)
+		return string(b), nil
+	}
+
+	tty, err := os.Open("/dev/tty")
+	if err != nil {
+		return "", fmt.Errorf(
+			"cannot open terminal for password prompt: %w\n"+
+				"Set OLK_KEYRING_PASSWORD to provide the keyring password non-interactively", err)
+	}
+	defer tty.Close()
+
+	fmt.Fprintf(os.Stderr, "%s: ", prompt)
+	b, err := term.ReadPassword(int(tty.Fd()))
+	if err != nil {
+		return "", fmt.Errorf("reading password: %w", err)
+	}
+	fmt.Fprintln(os.Stderr)
+	return string(b), nil
+}
+
 // NewKeyringStore creates a new KeyringStore backed by the OS credential manager.
 func NewKeyringStore() (*KeyringStore, error) {
 	// Pre-create keyring fallback directory with restrictive permissions
@@ -45,6 +77,15 @@ func NewKeyringStore() (*KeyringStore, error) {
 		if err := os.Chmod(keyringDir, 0o700); err != nil {
 			return nil, fmt.Errorf("setting keyring directory permissions: %w", err)
 		}
+	}
+
+	// Use OLK_KEYRING_PASSWORD for non-interactive/headless environments;
+	// otherwise prompt on stderr to avoid corrupting piped output.
+	var passwordFunc keyring.PromptFunc
+	if pw := os.Getenv("OLK_KEYRING_PASSWORD"); pw != "" {
+		passwordFunc = keyring.FixedStringPrompt(pw)
+	} else {
+		passwordFunc = stderrPrompt
 	}
 
 	cfg := keyring.Config{
@@ -64,7 +105,7 @@ func NewKeyringStore() (*KeyringStore, error) {
 		// Fall back to an encrypted file store when no native backend is
 		// available (e.g. headless Linux without Secret Service).
 		FileDir:          keyringDir,
-		FilePasswordFunc: keyring.TerminalPrompt,
+		FilePasswordFunc: passwordFunc,
 	}
 
 	// On macOS, prefer Keychain (native UI with "Always Allow") but fall
