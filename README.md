@@ -407,7 +407,7 @@ export OLK_TIMEZONE=Europe/London
 olk config set timezone America/Chicago
 ```
 
-Precedence: `--tz` flag > `OLK_TIMEZONE` env var > config file > system local timezone. JSON output always contains raw UTC strings; the `timezone` field in the envelope indicates the display timezone.
+Precedence: `--tz` flag > `OLK_TIMEZONE` env var > config file > system local timezone. JSON output emits UTC timestamps as RFC3339 with a `Z` suffix (e.g. `2026-04-22T15:15:00Z`), so `new Date(...)` parses them correctly; the `timezone` field in the envelope indicates the display timezone.
 
 ## Scripting Examples
 

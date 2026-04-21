@@ -13,6 +13,33 @@ import (
 // graphTimeZoneUTC is the time zone string Microsoft Graph expects on dateTimeTimeZone values.
 const graphTimeZoneUTC = "UTC"
 
+// graphDateTimeFormats are the layouts Microsoft Graph returns on dateTimeTimeZone.dateTime fields.
+// The values are UTC wall-clock times without a zone suffix, so we parse as UTC and re-emit as RFC3339.
+var graphDateTimeFormats = []string{
+	"2006-01-02T15:04:05.0000000",
+	"2006-01-02T15:04:05.9999999",
+	"2006-01-02T15:04:05",
+	"2006-01-02T15:04",
+	time.RFC3339Nano,
+	time.RFC3339,
+}
+
+// normalizeGraphUTC converts a Microsoft Graph dateTimeTimeZone.dateTime string to RFC3339 with a Z suffix.
+// Graph returns values like "2026-04-22T15:15:00.0000000" (UTC wall-clock, no zone), which JSON clients
+// misinterpret as local time. We always request timeZone=UTC, so it is safe to force Z here. Returns
+// the input unchanged if empty or unparseable.
+func normalizeGraphUTC(s string) string {
+	if s == "" {
+		return s
+	}
+	for _, layout := range graphDateTimeFormats {
+		if t, err := time.Parse(layout, s); err == nil {
+			return t.UTC().Format(time.RFC3339Nano)
+		}
+	}
+	return s
+}
+
 // safeIDPattern matches typical Microsoft Graph IDs (alphanumeric, hyphens, underscores, equals, plus, slash for base64, exclamation for OneDrive).
 var safeIDPattern = regexp.MustCompile(`^[a-zA-Z0-9_=+/!-]+$`)
 

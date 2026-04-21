@@ -22,7 +22,7 @@ go mod tidy         # After changing dependencies
 - **API**: Official `msgraph-sdk-go` wrapped in `internal/graphapi/` for ergonomic access
 - **Secrets**: OS keyring via `github.com/99designs/keyring` (macOS Keychain, Linux Secret Service, Windows WinCred). File-backend password prompt writes to stderr (not stdout) to avoid corrupting piped output. Set `OLK_KEYRING_PASSWORD` for headless/non-interactive use
 - **Output**: JSON envelope (`--json`), aligned table (default), TSV (`--plain`)
-- **Timezone**: Display-layer conversion via `outfmt.ConvertTime()`. Resolved once per command via `RunContext.Timezone()` (flag > env > config > Local). JSON output keeps raw UTC; envelope includes `timezone` field. IANA db embedded via `import _ "time/tzdata"`
+- **Timezone**: Display-layer conversion via `outfmt.ConvertTime()`. Resolved once per command via `RunContext.Timezone()` (flag > env > config > Local). JSON output emits UTC timestamps as RFC3339 with a `Z` suffix (normalized via `normalizeGraphUTC` — Graph's `DateTimeTimeZone.dateTime` strings lack a zone); envelope includes `timezone` field. IANA db embedded via `import _ "time/tzdata"`
 
 ## Key Patterns
 
@@ -65,7 +65,7 @@ Add it to `RootFlags` in `internal/cmd/root.go` with `env:"OLK_*"` tag.
 ### Adding timezone conversion to a new command
 1. Get the location: `loc, _ := ctx.Timezone()`
 2. Wrap time fields: `outfmt.ConvertTime(field, loc)`
-3. Only convert for table/plain output — JSON keeps raw UTC strings
+3. Only convert for table/plain output — JSON keeps RFC3339 UTC strings (`...Z`). When pulling a value from Graph's `DateTimeTimeZone.GetDateTime()` into a JSON-tagged field, wrap the deref with `normalizeGraphUTC(...)` so the emitted string has a zone suffix.
 
 ### Changing Graph API calls
 Edit files in `internal/graphapi/` — these wrap the verbose SDK calls into simple methods returning plain structs.
