@@ -198,7 +198,7 @@ Configuration
 - Set timezone: `olk config set timezone America/New_York`
 - Get timezone: `olk config get timezone`
 - Timezone precedence: `--tz` flag > `OLK_TIMEZONE` env > config file > system local
-- JSON output keeps raw UTC times; envelope includes `"timezone"` field
+- JSON output emits UTC times as RFC3339 with a `Z` suffix (so `new Date(...)` parses them correctly); envelope includes `"timezone"` field
 
 User Profile
 

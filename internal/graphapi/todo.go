@@ -470,22 +470,22 @@ func convertTodoTask(t models.TodoTaskable) TodoTask {
 		task.CreatedAt = t.GetCreatedDateTime().Format("2006-01-02T15:04:05Z")
 	}
 	if t.GetCompletedDateTime() != nil && t.GetCompletedDateTime().GetDateTime() != nil {
-		task.CompletedAt = *t.GetCompletedDateTime().GetDateTime()
+		task.CompletedAt = normalizeGraphUTC(*t.GetCompletedDateTime().GetDateTime())
 	}
 	if t.GetDueDateTime() != nil && t.GetDueDateTime().GetDateTime() != nil {
-		task.DueDate = *t.GetDueDateTime().GetDateTime()
+		task.DueDate = normalizeGraphUTC(*t.GetDueDateTime().GetDateTime())
 	}
 	if t.GetBody() != nil && t.GetBody().GetContent() != nil {
 		task.Body = *t.GetBody().GetContent()
 	}
 	if t.GetStartDateTime() != nil && t.GetStartDateTime().GetDateTime() != nil {
-		task.StartDate = *t.GetStartDateTime().GetDateTime()
+		task.StartDate = normalizeGraphUTC(*t.GetStartDateTime().GetDateTime())
 	}
 	if t.GetIsReminderOn() != nil {
 		task.IsReminderOn = *t.GetIsReminderOn()
 	}
 	if t.GetReminderDateTime() != nil && t.GetReminderDateTime().GetDateTime() != nil {
-		task.ReminderDate = *t.GetReminderDateTime().GetDateTime()
+		task.ReminderDate = normalizeGraphUTC(*t.GetReminderDateTime().GetDateTime())
 	}
 	if t.GetRecurrence() != nil {
 		task.Recurrence = formatRecurrence(t.GetRecurrence())

@@ -274,10 +274,10 @@ func convertEvent(e models.Eventable) CalendarEvent {
 		ev.Subject = *e.GetSubject()
 	}
 	if e.GetStart() != nil && e.GetStart().GetDateTime() != nil {
-		ev.Start = *e.GetStart().GetDateTime()
+		ev.Start = normalizeGraphUTC(*e.GetStart().GetDateTime())
 	}
 	if e.GetEnd() != nil && e.GetEnd().GetDateTime() != nil {
-		ev.End = *e.GetEnd().GetDateTime()
+		ev.End = normalizeGraphUTC(*e.GetEnd().GetDateTime())
 	}
 	if e.GetLocation() != nil && e.GetLocation().GetDisplayName() != nil {
 		ev.Location = *e.GetLocation().GetDisplayName()
@@ -550,10 +550,10 @@ func (c *Client) FindMeetingTimes(ctx context.Context, attendees []string, start
 		}
 		if ts := s.GetMeetingTimeSlot(); ts != nil {
 			if ts.GetStart() != nil && ts.GetStart().GetDateTime() != nil {
-				suggestion.Start = *ts.GetStart().GetDateTime()
+				suggestion.Start = normalizeGraphUTC(*ts.GetStart().GetDateTime())
 			}
 			if ts.GetEnd() != nil && ts.GetEnd().GetDateTime() != nil {
-				suggestion.End = *ts.GetEnd().GetDateTime()
+				suggestion.End = normalizeGraphUTC(*ts.GetEnd().GetDateTime())
 			}
 		}
 		for _, a := range s.GetAttendeeAvailability() {

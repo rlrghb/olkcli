@@ -49,10 +49,10 @@ func (c *Client) GetAutoReply(ctx context.Context) (*AutoReplySettings, error) {
 		result.ExternalAudience = ars.GetExternalAudience().String()
 	}
 	if ars.GetScheduledStartDateTime() != nil && ars.GetScheduledStartDateTime().GetDateTime() != nil {
-		result.StartTime = *ars.GetScheduledStartDateTime().GetDateTime()
+		result.StartTime = normalizeGraphUTC(*ars.GetScheduledStartDateTime().GetDateTime())
 	}
 	if ars.GetScheduledEndDateTime() != nil && ars.GetScheduledEndDateTime().GetDateTime() != nil {
-		result.EndTime = *ars.GetScheduledEndDateTime().GetDateTime()
+		result.EndTime = normalizeGraphUTC(*ars.GetScheduledEndDateTime().GetDateTime())
 	}
 
 	return result, nil

@@ -71,10 +71,10 @@ func (c *Client) GetSchedule(ctx context.Context, emails []string, start, end ti
 				si.Status = item.GetStatus().String()
 			}
 			if item.GetStart() != nil && item.GetStart().GetDateTime() != nil {
-				si.Start = *item.GetStart().GetDateTime()
+				si.Start = normalizeGraphUTC(*item.GetStart().GetDateTime())
 			}
 			if item.GetEnd() != nil && item.GetEnd().GetDateTime() != nil {
-				si.End = *item.GetEnd().GetDateTime()
+				si.End = normalizeGraphUTC(*item.GetEnd().GetDateTime())
 			}
 			if item.GetSubject() != nil {
 				si.Subject = *item.GetSubject()
