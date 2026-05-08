@@ -119,7 +119,12 @@ func (r *RunContext) GraphClient() (*graphapi.Client, error) {
 		return nil, fmt.Errorf("getting credentials: %w", err)
 	}
 
-	client, err := graphapi.NewClient(cred)
+	var client *graphapi.Client
+	if r.Flags.Verbose {
+		client, err = graphapi.NewClientVerbose(cred)
+	} else {
+		client, err = graphapi.NewClient(cred)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("creating Graph client: %w", err)
 	}

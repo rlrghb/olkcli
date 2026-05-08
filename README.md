@@ -177,14 +177,18 @@ Uses an embedded public client ID with device-code flow. The `--enterprise` flag
 If your organization blocks the default client ID, or your admin requires apps to be registered under your tenant, you'll need to create your own app registration:
 
 1. Go to [Azure Portal > App registrations](https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade) and click **New registration**
-2. Set **Supported account types** to match your needs (single tenant or multi-tenant)
+2. Set **Supported account types** to match your needs — use **"Personal Microsoft accounts only"** for outlook.com/hotmail.com, **"Accounts in any organizational directory and personal Microsoft accounts"** for both, or single-tenant for org-only
 3. Under **Authentication > Advanced settings**, set **Allow public client flows** to **Yes** (required for device-code flow)
 4. Under **API permissions**, add **Microsoft Graph** delegated permissions: `Mail.ReadWrite`, `Mail.Send`, `Calendars.ReadWrite`, `Contacts.ReadWrite`, `Tasks.ReadWrite`, `Files.ReadWrite`, `People.Read`, `User.Read`, `User.ReadBasic.All`, `MailboxSettings.ReadWrite`, `offline_access` (use `Files.Read` instead of `Files.ReadWrite` for read-only access)
-5. Copy the **Application (client) ID** and **Directory (tenant) ID** from the app's Overview page
+5. Copy the **Application (client) ID** from the app's Overview page
 
-Then use them:
+Then use it:
 
 ```bash
+# Personal Microsoft account (outlook.com, hotmail.com, live.com) — omit --tenant-id
+olk auth login --client-id YOUR_CLIENT_ID
+
+# Work or school account — include your Directory (tenant) ID from the app's Overview page
 olk auth login --client-id YOUR_CLIENT_ID --tenant-id YOUR_TENANT_ID
 ```
 
@@ -192,9 +196,11 @@ Or via environment variables:
 
 ```bash
 export OLK_CLIENT_ID=your-client-id
-export OLK_TENANT_ID=your-tenant-id
+export OLK_TENANT_ID=your-tenant-id  # omit for personal accounts
 olk auth login
 ```
+
+> **Note:** Personal Microsoft accounts (outlook.com, hotmail.com, live.com) do not have a meaningful tenant ID — they share Microsoft's common consumer tenant. Passing `--tenant-id` with a personal account will cause a 401 error. Omitting it lets `olk` use the `common` endpoint, which works for both personal and work/school accounts.
 
 ### Multi-Account
 
