@@ -22,10 +22,11 @@ type AuthCmd struct {
 }
 
 type AuthLoginCmd struct {
-	ClientID   string `help:"OAuth2 client ID" env:"OLK_CLIENT_ID"`
-	TenantID   string `help:"Azure AD tenant ID" env:"OLK_TENANT_ID" default:"common"`
-	ReadOnly   bool   `help:"Request read-only permissions"`
-	Enterprise bool   `help:"Request enterprise scopes (work/school accounts)" env:"OLK_ENTERPRISE"`
+	ClientID   string   `help:"OAuth2 client ID" env:"OLK_CLIENT_ID"`
+	TenantID   string   `help:"Azure AD tenant ID" env:"OLK_TENANT_ID" default:"common"`
+	ReadOnly   bool     `help:"Request read-only permissions"`
+	Enterprise bool     `help:"Request enterprise scopes (work/school accounts)" env:"OLK_ENTERPRISE"`
+	Scope      []string `help:"Additional OAuth scopes to request (repeatable, e.g. --scope Mail.Read.Shared)" name:"scope"`
 }
 
 func (c *AuthLoginCmd) Run(ctx *RunContext) error {
@@ -53,6 +54,12 @@ func (c *AuthLoginCmd) Run(ctx *RunContext) error {
 		} else {
 			scopes = msauth.ReadOnlyScopes()
 		}
+	}
+	// Merge --scope additions (e.g. Mail.Read.Shared for delegated mailbox access).
+	// Dedup is case-insensitive so callers can't accidentally request a duplicate
+	// that Graph would reject.
+	if len(c.Scope) > 0 {
+		scopes = msauth.MergeScopes(scopes, c.Scope)
 	}
 	// Use a dedicated context for login — the global --timeout (default 60s)
 	// is too short for device-code flow which needs minutes for the user to
