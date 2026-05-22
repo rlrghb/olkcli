@@ -78,7 +78,7 @@ func (c *CalendarEventsCmd) Run(ctx *RunContext) error {
 
 	loc, _ := ctx.Timezone()
 	headers := []string{"ID", "SUBJECT", "START", "END", "LOCATION", "STATUS", "RECURRENCE"}
-	var rows [][]string
+	rows := make([][]string, 0, len(events))
 	for i := range events {
 		e := &events[i]
 		id := outfmt.Truncate(e.ID, 15)
@@ -290,7 +290,7 @@ func (c *CalendarCalendarsCmd) Run(ctx *RunContext) error {
 	}
 
 	headers := []string{"ID", "NAME", "COLOR", "OWNER"}
-	var rows [][]string
+	rows := make([][]string, 0, len(calendars))
 	for _, cal := range calendars {
 		rows = append(rows, []string{cal.ID, cal.Name, cal.Color, cal.Owner})
 	}

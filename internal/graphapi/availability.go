@@ -56,7 +56,7 @@ func (c *Client) GetSchedule(ctx context.Context, emails []string, start, end ti
 		return nil, fmt.Errorf("getting schedule: %w", err)
 	}
 
-	var result []ScheduleInfo
+	result := make([]ScheduleInfo, 0, len(resp.GetValue()))
 	for _, si := range resp.GetValue() {
 		info := ScheduleInfo{}
 		if si.GetScheduleId() != nil {

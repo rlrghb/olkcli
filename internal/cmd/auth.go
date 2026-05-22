@@ -227,7 +227,7 @@ func (c *AuthListCmd) Run(ctx *RunContext) error {
 	}
 
 	headers := []string{"EMAIL", "NAME", "DEFAULT"}
-	var rows [][]string
+	rows := make([][]string, 0, len(accounts))
 	for _, a := range accounts {
 		def := ""
 		if strings.EqualFold(a.Email, defaultAccount) {

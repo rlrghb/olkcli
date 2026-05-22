@@ -31,7 +31,7 @@ var contactSelectFields = []string{
 
 // buildEmailAddresses validates and converts a slice of email strings to Graph EmailAddressable objects.
 func buildEmailAddresses(emails []string) ([]models.EmailAddressable, error) {
-	var addrs []models.EmailAddressable
+	addrs := make([]models.EmailAddressable, 0, len(emails))
 	for _, e := range emails {
 		if e == "" {
 			continue

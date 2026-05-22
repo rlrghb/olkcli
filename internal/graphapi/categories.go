@@ -20,7 +20,7 @@ func (c *Client) ListCategories(ctx context.Context) ([]Category, error) {
 		return nil, fmt.Errorf("listing categories: %s", graphErrorMessage(err))
 	}
 
-	var categories []Category
+	categories := make([]Category, 0, len(resp.GetValue()))
 	for _, cat := range resp.GetValue() {
 		categories = append(categories, convertCategory(cat))
 	}

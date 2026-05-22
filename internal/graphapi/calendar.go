@@ -55,8 +55,6 @@ func (c *Client) ListEvents(ctx context.Context, startTime, endTime time.Time, c
 		Orderby:       []string{"start/dateTime"},
 	}
 
-	var events []CalendarEvent
-
 	if calendarID != "" {
 		if err := validateID(calendarID, "calendar ID"); err != nil {
 			return nil, err
@@ -74,6 +72,7 @@ func (c *Client) ListEvents(ctx context.Context, startTime, endTime time.Time, c
 		if err != nil {
 			return nil, fmt.Errorf("listing events: %w", err)
 		}
+		events := make([]CalendarEvent, 0, len(resp.GetValue()))
 		for _, e := range resp.GetValue() {
 			events = append(events, convertEvent(e))
 		}
@@ -89,6 +88,7 @@ func (c *Client) ListEvents(ctx context.Context, startTime, endTime time.Time, c
 		return nil, fmt.Errorf("listing events: %w", err)
 	}
 
+	events := make([]CalendarEvent, 0, len(resp.GetValue()))
 	for _, e := range resp.GetValue() {
 		events = append(events, convertEvent(e))
 	}
@@ -245,7 +245,7 @@ func (c *Client) ListCalendars(ctx context.Context) ([]CalendarInfo, error) {
 		return nil, fmt.Errorf("listing calendars: %w", err)
 	}
 
-	var calendars []CalendarInfo
+	calendars := make([]CalendarInfo, 0, len(resp.GetValue()))
 	for _, cal := range resp.GetValue() {
 		ci := CalendarInfo{}
 		if cal.GetId() != nil {
@@ -493,7 +493,7 @@ func (c *Client) FindMeetingTimes(ctx context.Context, attendees []string, start
 	body := users.NewItemFindMeetingTimesPostRequestBody()
 
 	// Set attendees
-	var attList []models.AttendeeBaseable
+	attList := make([]models.AttendeeBaseable, 0, len(attendees))
 	for _, email := range attendees {
 		att := models.NewAttendeeBase()
 		addr := models.NewEmailAddress()
@@ -539,7 +539,7 @@ func (c *Client) FindMeetingTimes(ctx context.Context, attendees []string, start
 		return nil, fmt.Errorf("no meeting times available: %s", *resp.GetEmptySuggestionsReason())
 	}
 
-	var suggestions []MeetingTimeSuggestion
+	suggestions := make([]MeetingTimeSuggestion, 0, len(resp.GetMeetingTimeSuggestions()))
 	for _, s := range resp.GetMeetingTimeSuggestions() {
 		suggestion := MeetingTimeSuggestion{}
 		if s.GetConfidence() != nil {
