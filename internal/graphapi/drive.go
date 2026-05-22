@@ -229,7 +229,7 @@ func (c *Client) ListDrives(ctx context.Context) ([]DriveInfo, error) {
 	if err != nil {
 		return nil, scopeUpgradeError("listing drives", err)
 	}
-	var result []DriveInfo
+	result := make([]DriveInfo, 0, len(resp.GetValue()))
 	for _, d := range resp.GetValue() {
 		result = append(result, convertDrive(d))
 	}
@@ -276,7 +276,7 @@ func (c *Client) ListDriveChildren(ctx context.Context, driveID, itemID string, 
 	if err != nil {
 		return nil, scopeUpgradeError("listing folder contents", err)
 	}
-	var result []DriveItem
+	result := make([]DriveItem, 0, len(resp.GetValue()))
 	for _, d := range resp.GetValue() {
 		result = append(result, convertDriveItem(d))
 	}
@@ -312,7 +312,7 @@ func (c *Client) ListDriveChildrenByPath(ctx context.Context, driveID, path stri
 	if err != nil {
 		return nil, scopeUpgradeError("listing folder contents", err)
 	}
-	var result []DriveItem
+	result := make([]DriveItem, 0, len(resp.GetValue()))
 	for _, d := range resp.GetValue() {
 		result = append(result, convertDriveItem(d))
 	}

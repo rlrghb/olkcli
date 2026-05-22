@@ -220,7 +220,7 @@ func (a *Authenticator) ListAccounts() ([]AccountInfo, error) {
 		_ = os.Chmod(acctDir, 0o700)
 	}
 
-	var accounts []AccountInfo
+	accounts := make([]AccountInfo, 0, len(entries))
 	for _, entry := range entries {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
 			continue

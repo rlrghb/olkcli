@@ -32,7 +32,7 @@ func (c *Client) ListDrafts(ctx context.Context, top int32) ([]DraftMessage, err
 		return nil, fmt.Errorf("listing drafts: %w", err)
 	}
 
-	var drafts []DraftMessage
+	drafts := make([]DraftMessage, 0, len(resp.GetValue()))
 	for _, msg := range resp.GetValue() {
 		drafts = append(drafts, convertDraft(msg))
 	}

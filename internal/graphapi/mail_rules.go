@@ -30,7 +30,7 @@ func (c *Client) ListMailRules(ctx context.Context) ([]MailRule, error) {
 		return nil, enterpriseError("listing mail rules", err)
 	}
 
-	var rules []MailRule
+	rules := make([]MailRule, 0, len(resp.GetValue()))
 	for _, r := range resp.GetValue() {
 		rules = append(rules, convertMailRule(r))
 	}

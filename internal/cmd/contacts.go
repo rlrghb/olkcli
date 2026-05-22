@@ -75,7 +75,7 @@ func (c *ContactsListCmd) Run(ctx *RunContext) error {
 	}
 
 	headers := []string{"ID", "NAME", "EMAIL", "PHONE", "COMPANY", "TITLE"}
-	var rows [][]string
+	rows := make([][]string, 0, len(contacts))
 	for i := range contacts {
 		ct := &contacts[i]
 		id := outfmt.Truncate(ct.ID, 15)

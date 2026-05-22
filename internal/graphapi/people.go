@@ -41,7 +41,7 @@ func (c *Client) SearchPeople(ctx context.Context, query string, top int32) ([]P
 		return nil, enterpriseError("searching people", err)
 	}
 
-	var people []Person
+	people := make([]Person, 0, len(resp.GetValue()))
 	for _, p := range resp.GetValue() {
 		person := Person{
 			DisplayName: derefStr(p.GetDisplayName()),
@@ -93,7 +93,7 @@ func (c *Client) SearchDirectory(ctx context.Context, query string, top int32) (
 		return nil, fmt.Errorf("searching directory: %s", graphErrorMessage(err))
 	}
 
-	var people []Person
+	people := make([]Person, 0, len(resp.GetValue()))
 	for _, u := range resp.GetValue() {
 		person := Person{
 			DisplayName: derefStr(u.GetDisplayName()),

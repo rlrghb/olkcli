@@ -59,7 +59,7 @@ func (c *CalendarFindTimesCmd) Run(ctx *RunContext) error {
 
 	loc, _ := ctx.Timezone()
 	headers := []string{"START", "END", "CONFIDENCE", "ATTENDEE AVAILABILITY"}
-	var rows [][]string
+	rows := make([][]string, 0, len(suggestions))
 	for _, s := range suggestions {
 		var avails []string
 		for _, a := range s.AttendeeAvailabilities {
