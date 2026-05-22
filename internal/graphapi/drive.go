@@ -354,7 +354,7 @@ func (c *Client) SearchDrive(ctx context.Context, driveID, query string, top int
 	if err != nil {
 		return nil, scopeUpgradeError("searching drive", err)
 	}
-	var result []DriveItem
+	result := make([]DriveItem, 0, len(resp.GetValue()))
 	for _, d := range resp.GetValue() {
 		result = append(result, convertDriveItem(d))
 	}
@@ -374,7 +374,7 @@ func (c *Client) RecentDriveItems(ctx context.Context, driveID string) ([]DriveI
 	if err != nil {
 		return nil, scopeUpgradeError("getting recent items", err)
 	}
-	var result []DriveItem
+	result := make([]DriveItem, 0, len(resp.GetValue()))
 	for _, d := range resp.GetValue() {
 		result = append(result, convertDriveItem(d))
 	}
@@ -390,7 +390,7 @@ func (c *Client) SharedWithMeItems(ctx context.Context, driveID string) ([]Drive
 	if err != nil {
 		return nil, scopeUpgradeError("getting shared items", err)
 	}
-	var result []DriveItem
+	result := make([]DriveItem, 0, len(resp.GetValue()))
 	for _, d := range resp.GetValue() {
 		result = append(result, convertDriveItem(d))
 	}
@@ -621,7 +621,7 @@ func (c *Client) ListDriveItemVersions(ctx context.Context, driveID, itemID stri
 	if err != nil {
 		return nil, scopeUpgradeError("listing versions", err)
 	}
-	var result []DriveItemVersion
+	result := make([]DriveItemVersion, 0, len(resp.GetValue()))
 	for _, v := range resp.GetValue() {
 		result = append(result, convertDriveItemVersion(v))
 	}

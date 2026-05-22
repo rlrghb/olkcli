@@ -33,7 +33,7 @@ func (c *MailCategoriesListCmd) Run(ctx *RunContext) error {
 	}
 
 	headers := []string{"ID", "NAME", "COLOR"}
-	var rows [][]string
+	rows := make([][]string, 0, len(categories))
 	for _, cat := range categories {
 		rows = append(rows, []string{
 			outfmt.Truncate(outfmt.Sanitize(cat.ID), 20),

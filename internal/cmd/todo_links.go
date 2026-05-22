@@ -42,7 +42,7 @@ func (c *TodoLinksListCmd) Run(ctx *RunContext) error {
 	}
 
 	headers := []string{"ID", "NAME", "APP", "URL"}
-	var rows [][]string
+	rows := make([][]string, 0, len(links))
 	for _, l := range links {
 		rows = append(rows, []string{
 			outfmt.Truncate(outfmt.Sanitize(l.ID), 15),

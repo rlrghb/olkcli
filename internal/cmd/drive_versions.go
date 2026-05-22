@@ -44,7 +44,7 @@ func (c *DriveVersionsCmd) Run(ctx *RunContext) error {
 
 	loc, _ := ctx.Timezone()
 	headers := []string{"VERSION", "MODIFIED", "SIZE", "MODIFIED BY"}
-	var rows [][]string
+	rows := make([][]string, 0, len(versions))
 	for _, v := range versions {
 		rows = append(rows, []string{
 			outfmt.Sanitize(v.ID),

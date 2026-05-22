@@ -24,7 +24,7 @@ func (c *DriveListCmd) Run(ctx *RunContext) error {
 	}
 
 	headers := []string{"ID", "NAME", "TYPE", "USED", "TOTAL"}
-	var rows [][]string
+	rows := make([][]string, 0, len(drives))
 	for i := range drives {
 		d := &drives[i]
 		rows = append(rows, []string{

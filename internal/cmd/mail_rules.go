@@ -33,7 +33,7 @@ func (c *MailRulesListCmd) Run(ctx *RunContext) error {
 	}
 
 	headers := []string{"ID", "NAME", "ENABLED", "CONDITIONS", "ACTIONS"}
-	var rows [][]string
+	rows := make([][]string, 0, len(rules))
 	for _, r := range rules {
 		id := outfmt.Truncate(r.ID, 15)
 		enabled := "N"

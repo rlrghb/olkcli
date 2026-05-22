@@ -75,7 +75,7 @@ func (c *Client) ListTodoLists(ctx context.Context) ([]TodoList, error) {
 		return nil, fmt.Errorf("listing todo lists: %w", err)
 	}
 
-	var result []TodoList
+	result := make([]TodoList, 0, len(resp.GetValue()))
 	for _, l := range resp.GetValue() {
 		tl := TodoList{
 			DisplayName: derefStr(l.GetDisplayName()),
@@ -159,7 +159,7 @@ func (c *Client) ListTodoTasks(ctx context.Context, listID string, top int32, st
 		return nil, fmt.Errorf("listing todo tasks: %w", err)
 	}
 
-	var result []TodoTask
+	result := make([]TodoTask, 0, len(resp.GetValue()))
 	for _, t := range resp.GetValue() {
 		result = append(result, convertTodoTask(t))
 	}
@@ -515,7 +515,7 @@ func (c *Client) ListChecklistItems(ctx context.Context, listID, taskID string) 
 		return nil, fmt.Errorf("listing checklist items: %w", err)
 	}
 
-	var result []TodoChecklistItem
+	result := make([]TodoChecklistItem, 0, len(resp.GetValue()))
 	for _, item := range resp.GetValue() {
 		result = append(result, convertChecklistItem(item))
 	}
@@ -657,7 +657,7 @@ func (c *Client) ListTodoAttachments(ctx context.Context, listID, taskID string)
 		return nil, fmt.Errorf("listing todo attachments: %w", err)
 	}
 
-	var result []TodoAttachment
+	result := make([]TodoAttachment, 0, len(resp.GetValue()))
 	for _, a := range resp.GetValue() {
 		att := TodoAttachment{}
 		if a.GetId() != nil {
@@ -785,7 +785,7 @@ func (c *Client) ListLinkedResources(ctx context.Context, listID, taskID string)
 		return nil, fmt.Errorf("listing linked resources: %w", err)
 	}
 
-	var result []TodoLinkedResource
+	result := make([]TodoLinkedResource, 0, len(resp.GetValue()))
 	for _, r := range resp.GetValue() {
 		result = append(result, convertLinkedResource(r))
 	}

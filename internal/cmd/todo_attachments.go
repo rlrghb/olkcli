@@ -50,7 +50,7 @@ func (c *TodoAttachListCmd) Run(ctx *RunContext) error {
 	}
 
 	headers := []string{"ID", "NAME", "TYPE", "SIZE"}
-	var rows [][]string
+	rows := make([][]string, 0, len(attachments))
 	for _, a := range attachments {
 		rows = append(rows, []string{
 			outfmt.Sanitize(a.ID),

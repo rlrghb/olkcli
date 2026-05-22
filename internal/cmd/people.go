@@ -30,7 +30,7 @@ func (c *PeopleSearchCmd) Run(ctx *RunContext) error {
 	}
 
 	headers := []string{"NAME", "EMAIL", "JOB TITLE", "DEPARTMENT", "COMPANY"}
-	var rows [][]string
+	rows := make([][]string, 0, len(people))
 	for _, p := range people {
 		rows = append(rows, []string{
 			outfmt.Sanitize(p.DisplayName),

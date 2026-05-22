@@ -34,7 +34,7 @@ func (c *MailFoldersListCmd) Run(ctx *RunContext) error {
 	}
 
 	headers := []string{"ID", "NAME", "TOTAL", "UNREAD"}
-	var rows [][]string
+	rows := make([][]string, 0, len(folders))
 	for _, f := range folders {
 		rows = append(rows, []string{
 			f.ID,

@@ -63,7 +63,7 @@ func (c *MailListCmd) Run(ctx *RunContext) error {
 
 	loc, _ := ctx.Timezone()
 	headers := []string{"ID", "FROM", "SUBJECT", "DATE", "READ", "ATTACH"}
-	var rows [][]string
+	rows := make([][]string, 0, len(messages))
 	for i := range messages {
 		m := &messages[i]
 		read := " "

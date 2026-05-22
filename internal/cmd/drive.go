@@ -156,7 +156,7 @@ func printDriveItems(ctx *RunContext, items []graphapi.DriveItem) error {
 
 	loc, _ := ctx.Timezone()
 	headers := []string{"NAME", "TYPE", "SIZE", "MODIFIED", "ID"}
-	var rows [][]string
+	rows := make([][]string, 0, len(items))
 	for i := range items {
 		item := &items[i]
 		size := ""

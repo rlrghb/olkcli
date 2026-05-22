@@ -43,7 +43,7 @@ func (c *TodoChecklistListCmd) Run(ctx *RunContext) error {
 	}
 
 	headers := []string{"ID", "NAME", "CHECKED"}
-	var rows [][]string
+	rows := make([][]string, 0, len(items))
 	for _, item := range items {
 		checked := " "
 		if item.IsChecked {

@@ -70,7 +70,7 @@ func (c *TodoListsListCmd) Run(ctx *RunContext) error {
 	}
 
 	headers := []string{"ID", "NAME", "OWNER"}
-	var rows [][]string
+	rows := make([][]string, 0, len(lists))
 	for _, l := range lists {
 		owner := " "
 		if l.IsOwner {
@@ -174,7 +174,7 @@ func (c *TodoListCmd) Run(ctx *RunContext) error {
 
 	loc, _ := ctx.Timezone()
 	headers := []string{"ID", "TITLE", "STATUS", "IMPORTANCE", "DUE"}
-	var rows [][]string
+	rows := make([][]string, 0, len(tasks))
 	for i := range tasks {
 		t := &tasks[i]
 		rows = append(rows, []string{

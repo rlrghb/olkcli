@@ -25,7 +25,7 @@ func (c *MailSearchCmd) Run(ctx *RunContext) error {
 
 	loc, _ := ctx.Timezone()
 	headers := []string{"ID", "FROM", "SUBJECT", "DATE"}
-	var rows [][]string
+	rows := make([][]string, 0, len(messages))
 	for i := range messages {
 		m := &messages[i]
 		id := outfmt.Truncate(m.ID, 15)

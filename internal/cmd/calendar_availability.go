@@ -64,7 +64,7 @@ func (c *CalendarAvailabilityCmd) Run(ctx *RunContext) error {
 
 	loc, _ := ctx.Timezone()
 	headers := []string{"EMAIL", "STATUS", "START", "END", "SUBJECT"}
-	var rows [][]string
+	rows := make([][]string, 0, len(schedules))
 	for _, sched := range schedules {
 		if len(sched.Items) == 0 {
 			rows = append(rows, []string{sched.Email, "free", "", "", ""})

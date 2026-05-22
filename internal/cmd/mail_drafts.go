@@ -41,7 +41,7 @@ func (c *MailDraftsListCmd) Run(ctx *RunContext) error {
 
 	loc, _ := ctx.Timezone()
 	headers := []string{"ID", "SUBJECT", "TO", "CREATED"}
-	var rows [][]string
+	rows := make([][]string, 0, len(drafts))
 	for _, d := range drafts {
 		id := outfmt.Truncate(d.ID, 15)
 		subject := outfmt.Truncate(d.Subject, 60)
