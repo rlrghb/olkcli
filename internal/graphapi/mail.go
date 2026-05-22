@@ -121,8 +121,6 @@ func (c *Client) ListMessages(ctx context.Context, opts *ListMessagesOptions) ([
 		QueryParameters: queryParams,
 	}
 
-	var result []MailMessage
-
 	if opts.FolderID != "" {
 		if err := validateID(opts.FolderID, "folder ID"); err != nil {
 			return nil, err
@@ -146,6 +144,7 @@ func (c *Client) ListMessages(ctx context.Context, opts *ListMessagesOptions) ([
 		if err != nil {
 			return nil, fmt.Errorf("listing messages: %w", err)
 		}
+		result := make([]MailMessage, 0, len(resp.GetValue()))
 		for _, msg := range resp.GetValue() {
 			result = append(result, convertMessage(msg))
 		}
@@ -156,6 +155,7 @@ func (c *Client) ListMessages(ctx context.Context, opts *ListMessagesOptions) ([
 	if err != nil {
 		return nil, fmt.Errorf("listing messages: %w", err)
 	}
+	result := make([]MailMessage, 0, len(resp.GetValue()))
 	for _, msg := range resp.GetValue() {
 		result = append(result, convertMessage(msg))
 	}
