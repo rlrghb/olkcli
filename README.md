@@ -196,6 +196,20 @@ export OLK_TENANT_ID=your-tenant-id
 olk auth login
 ```
 
+### Additional Scopes
+
+Use `--scope` (repeatable) at login time to request additional OAuth scopes beyond the defaults — typically for tokens that need to read or act on a *different* user's mailbox under Microsoft 365 mailbox delegation (the executive-assistant pattern):
+
+```bash
+olk auth login --enterprise \
+  --scope Mail.Read.Shared \
+  --scope Calendars.Read.Shared
+```
+
+The flag merges with the default scope set (case-insensitive dedup) so you don't need to re-list the defaults. Make sure the corresponding API permissions are added to your app registration.
+
+> **Note:** `.Shared` scopes only grant the token *claim* — the existing `olk mail list` / `olk calendar events` calls still target your own mailbox via `/me`. Targeting another user's mailbox (`/users/{id}/...`) is a separate feature not yet implemented.
+
 ### Multi-Account
 
 ```bash
