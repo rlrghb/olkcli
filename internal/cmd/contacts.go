@@ -64,7 +64,12 @@ func (c *ContactsListCmd) Run(ctx *RunContext) error {
 		return err
 	}
 
-	contacts, err := client.ListContacts(ctx.Ctx, c.Top, c.Skip, c.Sort)
+	target, err := resolveMailboxTarget(ctx.Flags.Mailbox)
+	if err != nil {
+		return err
+	}
+
+	contacts, err := client.ListContacts(ctx.Ctx, target, c.Top, c.Skip, c.Sort)
 	if err != nil {
 		return err
 	}
@@ -99,7 +104,12 @@ func (c *ContactsGetCmd) Run(ctx *RunContext) error {
 		return err
 	}
 
-	contact, err := client.GetContact(ctx.Ctx, c.ID)
+	target, err := resolveMailboxTarget(ctx.Flags.Mailbox)
+	if err != nil {
+		return err
+	}
+
+	contact, err := client.GetContact(ctx.Ctx, target, c.ID)
 	if err != nil {
 		return err
 	}
@@ -361,7 +371,8 @@ func (c *ContactsUpdateCmd) Run(ctx *RunContext) error {
 	if c.Street != "" || c.City != "" || c.State != "" || c.PostalCode != "" || c.Country != "" {
 		// Read-modify-write: fetch existing address, merge provided fields,
 		// so unspecified fields are preserved. 'none' clears individual parts.
-		existing, err := client.GetContact(ctx.Ctx, c.ID)
+		// Update is not a delegated operation — always reads from /me.
+		existing, err := client.GetContact(ctx.Ctx, "", c.ID)
 		if err != nil {
 			return err
 		}
@@ -461,7 +472,12 @@ func (c *ContactsSearchCmd) Run(ctx *RunContext) error {
 		return err
 	}
 
-	contacts, err := client.SearchContacts(ctx.Ctx, c.Query, c.Top)
+	target, err := resolveMailboxTarget(ctx.Flags.Mailbox)
+	if err != nil {
+		return err
+	}
+
+	contacts, err := client.SearchContacts(ctx.Ctx, target, c.Query, c.Top)
 	if err != nil {
 		return err
 	}
