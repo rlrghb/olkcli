@@ -41,7 +41,11 @@ type CalendarInfo struct {
 	Owner string `json:"owner"`
 }
 
-func (c *Client) ListEvents(ctx context.Context, startTime, endTime time.Time, calendarID string, top int32) ([]CalendarEvent, error) {
+// ListEvents returns calendar events in [startTime, endTime] from the target
+// mailbox, or the signed-in user's calendar when target is empty. Targeting
+// another mailbox requires the calling token to carry Calendars.Read.Shared
+// and the calling user to have Exchange Full Access delegation on the target.
+func (c *Client) ListEvents(ctx context.Context, target string, startTime, endTime time.Time, calendarID string, top int32) ([]CalendarEvent, error) {
 	top = clampTop(top)
 
 	startStr := startTime.UTC().Format("2006-01-02T15:04:05")
@@ -68,7 +72,7 @@ func (c *Client) ListEvents(ctx context.Context, startTime, endTime time.Time, c
 				Orderby:       queryParams.Orderby,
 			},
 		}
-		resp, err := c.inner.Me().Calendars().ByCalendarId(calendarID).CalendarView().Get(ctx, calConfig)
+		resp, err := c.targetUser(target).Calendars().ByCalendarId(calendarID).CalendarView().Get(ctx, calConfig)
 		if err != nil {
 			return nil, fmt.Errorf("listing events: %w", err)
 		}
@@ -83,7 +87,7 @@ func (c *Client) ListEvents(ctx context.Context, startTime, endTime time.Time, c
 		QueryParameters: queryParams,
 	}
 
-	resp, err := c.inner.Me().CalendarView().Get(ctx, config)
+	resp, err := c.targetUser(target).CalendarView().Get(ctx, config)
 	if err != nil {
 		return nil, fmt.Errorf("listing events: %w", err)
 	}
@@ -95,11 +99,13 @@ func (c *Client) ListEvents(ctx context.Context, startTime, endTime time.Time, c
 	return events, nil
 }
 
-func (c *Client) GetEvent(ctx context.Context, eventID string) (*CalendarEvent, error) {
+// GetEvent returns a single event from the target mailbox, or the signed-in
+// user's calendar when target is empty. See ListEvents for scope requirements.
+func (c *Client) GetEvent(ctx context.Context, target, eventID string) (*CalendarEvent, error) {
 	if err := validateID(eventID, "event ID"); err != nil {
 		return nil, err
 	}
-	event, err := c.inner.Me().Events().ByEventId(eventID).Get(ctx, nil)
+	event, err := c.targetUser(target).Events().ByEventId(eventID).Get(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("getting event: %w", err)
 	}
@@ -239,8 +245,10 @@ func (c *Client) RespondToEvent(ctx context.Context, eventID, response string) e
 	}
 }
 
-func (c *Client) ListCalendars(ctx context.Context) ([]CalendarInfo, error) {
-	resp, err := c.inner.Me().Calendars().Get(ctx, nil)
+// ListCalendars returns calendars from the target mailbox, or the signed-in
+// user's mailbox when target is empty. See ListEvents for scope requirements.
+func (c *Client) ListCalendars(ctx context.Context, target string) ([]CalendarInfo, error) {
+	resp, err := c.targetUser(target).Calendars().Get(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("listing calendars: %w", err)
 	}
@@ -462,9 +470,10 @@ func formatDaysOfWeek(days []models.DayOfWeek) string {
 }
 
 // ListCalendarView returns expanded occurrences (including recurring) in a date range.
-func (c *Client) ListCalendarView(ctx context.Context, startTime, endTime time.Time, calendarID string, top int32) ([]CalendarEvent, error) {
-	// This uses the same calendarView endpoint as ListEvents, which already expands recurrences.
-	return c.ListEvents(ctx, startTime, endTime, calendarID, top)
+// ListCalendarView is an alias for ListEvents (which already calls the
+// calendarView endpoint and expands recurrences). Kept for caller clarity.
+func (c *Client) ListCalendarView(ctx context.Context, target string, startTime, endTime time.Time, calendarID string, top int32) ([]CalendarEvent, error) {
+	return c.ListEvents(ctx, target, startTime, endTime, calendarID, top)
 }
 
 // MeetingTimeSuggestion represents a suggested meeting time
