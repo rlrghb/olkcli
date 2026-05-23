@@ -74,7 +74,11 @@ type ListMessagesOptions struct {
 	Select   []string
 }
 
-func (c *Client) ListMessages(ctx context.Context, opts *ListMessagesOptions) ([]MailMessage, error) {
+// ListMessages returns messages from the target mailbox, or the signed-in user's
+// mailbox when target is empty. Targeting another mailbox requires the calling
+// token to carry the Mail.Read.Shared scope claim and the calling user to have
+// Full Access delegation on the target mailbox in Exchange.
+func (c *Client) ListMessages(ctx context.Context, target string, opts *ListMessagesOptions) ([]MailMessage, error) {
 	if opts == nil {
 		opts = &ListMessagesOptions{}
 	}
@@ -138,7 +142,7 @@ func (c *Client) ListMessages(ctx context.Context, opts *ListMessagesOptions) ([
 		if opts.Search != "" {
 			folderQueryParams.Search = &opts.Search
 		}
-		resp, err := c.inner.Me().MailFolders().ByMailFolderId(opts.FolderID).Messages().Get(ctx, &users.ItemMailFoldersItemMessagesRequestBuilderGetRequestConfiguration{
+		resp, err := c.targetUser(target).MailFolders().ByMailFolderId(opts.FolderID).Messages().Get(ctx, &users.ItemMailFoldersItemMessagesRequestBuilderGetRequestConfiguration{
 			QueryParameters: folderQueryParams,
 		})
 		if err != nil {
@@ -151,7 +155,7 @@ func (c *Client) ListMessages(ctx context.Context, opts *ListMessagesOptions) ([
 		return result, nil
 	}
 
-	resp, err := c.inner.Me().Messages().Get(ctx, config)
+	resp, err := c.targetUser(target).Messages().Get(ctx, config)
 	if err != nil {
 		return nil, fmt.Errorf("listing messages: %w", err)
 	}
@@ -162,11 +166,13 @@ func (c *Client) ListMessages(ctx context.Context, opts *ListMessagesOptions) ([
 	return result, nil
 }
 
-func (c *Client) GetMessage(ctx context.Context, messageID string) (*MailMessage, error) {
+// GetMessage returns a single message from the target mailbox, or the signed-in
+// user's mailbox when target is empty. See ListMessages for scope requirements.
+func (c *Client) GetMessage(ctx context.Context, target, messageID string) (*MailMessage, error) {
 	if err := validateID(messageID, "message ID"); err != nil {
 		return nil, err
 	}
-	msg, err := c.inner.Me().Messages().ByMessageId(messageID).Get(ctx, &users.ItemMessagesMessageItemRequestBuilderGetRequestConfiguration{
+	msg, err := c.targetUser(target).Messages().ByMessageId(messageID).Get(ctx, &users.ItemMessagesMessageItemRequestBuilderGetRequestConfiguration{
 		QueryParameters: &users.ItemMessagesMessageItemRequestBuilderGetQueryParameters{
 			Select: []string{"id", "subject", "from", "toRecipients", "ccRecipients", "bccRecipients", "receivedDateTime", "isRead", "hasAttachments", "body", "bodyPreview"},
 		},
@@ -353,9 +359,11 @@ func (c *Client) MarkMessage(ctx context.Context, messageID string, isRead bool)
 	return nil
 }
 
-func (c *Client) ListMailFolders(ctx context.Context) ([]MailFolder, error) {
+// ListMailFolders returns folders from the target mailbox, or the signed-in
+// user's mailbox when target is empty. See ListMessages for scope requirements.
+func (c *Client) ListMailFolders(ctx context.Context, target string) ([]MailFolder, error) {
 	var top int32 = 100
-	resp, err := c.inner.Me().MailFolders().Get(ctx, &users.ItemMailFoldersRequestBuilderGetRequestConfiguration{
+	resp, err := c.targetUser(target).MailFolders().Get(ctx, &users.ItemMailFoldersRequestBuilderGetRequestConfiguration{
 		QueryParameters: &users.ItemMailFoldersRequestBuilderGetQueryParameters{
 			Top: &top,
 		},
@@ -446,13 +454,15 @@ func (c *Client) DeleteMailFolder(ctx context.Context, folderID string) error {
 	return nil
 }
 
-func (c *Client) SearchMessages(ctx context.Context, query string, top int32) ([]MailMessage, error) {
+// SearchMessages runs a KQL search against the target mailbox, or the signed-in
+// user's mailbox when target is empty. See ListMessages for scope requirements.
+func (c *Client) SearchMessages(ctx context.Context, target, query string, top int32) ([]MailMessage, error) {
 	// The $search parameter value must be wrapped in double quotes per
 	// Graph API requirements. KQL property restrictions (from:, subject:, etc.)
 	// and boolean operators (AND, OR, NOT) work inside the quoted string.
 	// Strip literal double quotes from user input to prevent breaking the wrapper.
 	search := `"` + strings.ReplaceAll(query, `"`, "") + `"`
-	return c.ListMessages(ctx, &ListMessagesOptions{
+	return c.ListMessages(ctx, target, &ListMessagesOptions{
 		Top:    top,
 		Search: search,
 	})
