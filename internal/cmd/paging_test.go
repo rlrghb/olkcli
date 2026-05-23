@@ -5,6 +5,66 @@ import (
 	"testing"
 )
 
+func TestResolveMailboxTarget_Empty(t *testing.T) {
+	got, err := resolveMailboxTarget("")
+	if err != nil {
+		t.Fatalf("empty input should be a no-op, got err: %v", err)
+	}
+	if got != "" {
+		t.Errorf("empty input should return empty string, got %q", got)
+	}
+}
+
+func TestResolveMailboxTarget_TrimsWhitespace(t *testing.T) {
+	got, err := resolveMailboxTarget("   ")
+	if err != nil {
+		t.Fatalf("whitespace-only input should be treated as empty, got err: %v", err)
+	}
+	if got != "" {
+		t.Errorf("whitespace-only input should return empty string, got %q", got)
+	}
+}
+
+func TestResolveMailboxTarget_Valid(t *testing.T) {
+	got, err := resolveMailboxTarget("boss@example.com")
+	if err != nil {
+		t.Fatalf("valid email should pass, got err: %v", err)
+	}
+	if got != "boss@example.com" {
+		t.Errorf("got %q, want %q", got, "boss@example.com")
+	}
+}
+
+func TestResolveMailboxTarget_TrimsAroundValid(t *testing.T) {
+	got, err := resolveMailboxTarget("  boss@example.com  ")
+	if err != nil {
+		t.Fatalf("trimmed valid email should pass, got err: %v", err)
+	}
+	if got != "boss@example.com" {
+		t.Errorf("got %q, want %q", got, "boss@example.com")
+	}
+}
+
+func TestResolveMailboxTarget_Invalid(t *testing.T) {
+	cases := []string{
+		"not-an-email",
+		"@example.com",
+		"boss@",
+		"boss example.com",
+	}
+	for _, in := range cases {
+		t.Run(in, func(t *testing.T) {
+			_, err := resolveMailboxTarget(in)
+			if err == nil {
+				t.Errorf("expected error for %q, got nil", in)
+			}
+			if err != nil && !strings.Contains(err.Error(), "--mailbox") {
+				t.Errorf("error message should mention --mailbox; got %v", err)
+			}
+		})
+	}
+}
+
 func TestBuildMailFilter_Empty(t *testing.T) {
 	got, err := buildMailFilter(false, "", "", "")
 	if err != nil {

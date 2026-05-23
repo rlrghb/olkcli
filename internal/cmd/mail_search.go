@@ -13,7 +13,12 @@ func (c *MailSearchCmd) Run(ctx *RunContext) error {
 		return err
 	}
 
-	messages, err := client.SearchMessages(ctx.Ctx, c.Query, c.Top)
+	target, err := resolveMailboxTarget(ctx.Flags.Mailbox)
+	if err != nil {
+		return err
+	}
+
+	messages, err := client.SearchMessages(ctx.Ctx, target, c.Query, c.Top)
 	if err != nil {
 		return err
 	}

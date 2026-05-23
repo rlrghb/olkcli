@@ -45,13 +45,18 @@ func (c *MailListCmd) Run(ctx *RunContext) error {
 		filter += "inferenceClassification eq 'other'"
 	}
 
+	target, err := resolveMailboxTarget(ctx.Flags.Mailbox)
+	if err != nil {
+		return err
+	}
+
 	opts := graphapi.ListMessagesOptions{
 		FolderID: c.Folder,
 		Top:      c.Top,
 		Filter:   filter,
 	}
 
-	messages, err := client.ListMessages(ctx.Ctx, &opts)
+	messages, err := client.ListMessages(ctx.Ctx, target, &opts)
 	if err != nil {
 		return err
 	}

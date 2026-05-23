@@ -18,7 +18,12 @@ func (c *MailGetCmd) Run(ctx *RunContext) error {
 		return err
 	}
 
-	msg, err := client.GetMessage(ctx.Ctx, c.ID)
+	target, err := resolveMailboxTarget(ctx.Flags.Mailbox)
+	if err != nil {
+		return err
+	}
+
+	msg, err := client.GetMessage(ctx.Ctx, target, c.ID)
 	if err != nil {
 		return err
 	}

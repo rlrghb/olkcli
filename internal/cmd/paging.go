@@ -8,6 +8,21 @@ import (
 	"github.com/rlrghb/olkcli/internal/graphapi"
 )
 
+// resolveMailboxTarget validates the --mailbox value and returns it for use in
+// graphapi calls. Empty input is a no-op (the call targets /me). Non-empty input
+// must parse as a valid email address — Graph requires either the userPrincipalName
+// or the user's object id, and we constrain to UPN-shaped values for safety.
+func resolveMailboxTarget(mailbox string) (string, error) {
+	mailbox = strings.TrimSpace(mailbox)
+	if mailbox == "" {
+		return "", nil
+	}
+	if err := graphapi.ValidateEmail(mailbox); err != nil {
+		return "", fmt.Errorf("invalid --mailbox value: %w", err)
+	}
+	return mailbox, nil
+}
+
 // buildMailFilter builds an OData filter string from common mail filter options
 func buildMailFilter(unread bool, from, after, before string) (string, error) {
 	var filters []string

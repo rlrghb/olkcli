@@ -26,6 +26,7 @@ type RootFlags struct {
 	JSON        bool   `help:"Output as JSON" env:"OLK_JSON"`
 	Plain       bool   `help:"Output as plain TSV" env:"OLK_PLAIN"`
 	Account     string `help:"Account email to use" env:"OLK_ACCOUNT"`
+	Mailbox     string `help:"Target a different user's mailbox via delegated access (requires Mail.Read.Shared at login)" env:"OLK_MAILBOX"`
 	Verbose     bool   `help:"Verbose output" short:"v" env:"OLK_VERBOSE"`
 	DryRun      bool   `help:"Dry run mode" env:"OLK_DRY_RUN"`
 	Force       bool   `help:"Force operation" env:"OLK_FORCE"`

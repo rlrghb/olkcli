@@ -23,7 +23,12 @@ func (c *MailFoldersListCmd) Run(ctx *RunContext) error {
 		return err
 	}
 
-	folders, err := client.ListMailFolders(ctx.Ctx)
+	target, err := resolveMailboxTarget(ctx.Flags.Mailbox)
+	if err != nil {
+		return err
+	}
+
+	folders, err := client.ListMailFolders(ctx.Ctx, target)
 	if err != nil {
 		return err
 	}
