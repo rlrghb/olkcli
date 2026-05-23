@@ -5,11 +5,10 @@
 - `cmd/olk/`: CLI entrypoint — minimal, delegates to `internal/cmd.Execute()`.
 - `internal/cmd/`: Command implementations using kong structs. Each command group has its own file(s): `mail_*.go`, `calendar*.go`, `todo.go`, `todo_checklist.go`, `todo_attachments.go`, `todo_links.go`, `whoami.go`, etc.
 - `internal/msauth/`: Microsoft OAuth2 implementation — device code flow, token refresh, credential bridge.
-- `internal/graphapi/`: Microsoft Graph API wrapper — mail, calendar, contacts, todo (tasks, checklist items, attachments, linked resources), availability, mailbox settings, mail rules, people.
+- `internal/graphapi/`: Microsoft Graph API wrapper — mail, calendar, contacts, todo (tasks, checklist items, attachments, linked resources), availability, mailbox settings, mail rules, people. Includes the `targetUser` helper that routes reads to `/me` or `/users/{id}` for delegated mailbox access, and error-shaping helpers (`graphErrorMessage`, `enterpriseError`, `scopeUpgradeError`) in `validate.go`.
 - `internal/config/`: Configuration and XDG paths (`~/.config/olk/`).
 - `internal/secrets/`: OS keyring integration via `99designs/keyring`.
 - `internal/outfmt/`: Output formatting — JSON envelope, aligned tables, TSV, timezone conversion via `ConvertTime()`.
-- `internal/errfmt/`: Graph API error mapping to actionable user messages.
 - `SKILL.md`: [Agent Skills](https://agentskills.io) standard file — teaches AI assistants (Claude Code, OpenClaw, etc.) how to use `olk` commands.
 - `bin/`: build outputs (gitignored).
 
@@ -24,7 +23,7 @@
 
 ## Coding Style & Naming Conventions
 
-- Formatting: `goimports` with local prefix `github.com/rlrghb/olkcli` + `gofumpt`.
+- Formatting: `gofmt` + `goimports` with local prefix `github.com/rlrghb/olkcli` (configured in `.golangci.yml`).
 - Output: keep stdout parseable (`--json` / `--plain`); send human hints/progress to stderr.
 - Graph API pointer types: always nil-check before dereferencing (`if x.GetFoo() != nil`).
 - Kong commands: one struct per command, `Run(ctx *RunContext) error` method.
@@ -32,9 +31,17 @@
 
 ## Testing Guidelines
 
-- Unit tests: stdlib `testing` package.
-- Integration tests require a valid OAuth token — run manually, not in CI.
-- Test files go next to the code they test (`*_test.go`).
+- Unit tests: stdlib `testing` package. Test files go next to the code they test (`*_test.go`).
+- Existing coverage: `internal/outfmt`, `internal/config`, `internal/msauth/scopes`, `internal/graphapi/validate`, and `internal/cmd/paging` (filter builder + mailbox-target validation). Other packages are not yet unit-tested.
+- Integration tests require a valid OAuth token + live Graph access — run manually, not in CI.
+- New tests should run cleanly under `go test -race -count=1 ./...` and pass `golangci-lint run`.
+
+## CI
+
+- `.github/workflows/ci.yml` runs on every pull request and push to `main`.
+- The `test` job runs `go mod tidy` drift check → `go vet ./...` → `go build ./...` → `go test -race -count=1 ./...` on Ubuntu using the Go version pinned in `go.mod`.
+- The `lint` job runs `golangci-lint` v2.5.0 against `.golangci.yml`.
+- Both jobs use pinned action SHAs to match `release.yml` style.
 
 ## Key Design Decisions
 
@@ -43,6 +50,7 @@
 - **Embedded Client ID**: `51e726d0-22a4-45f7-a71c-b472ff84c027`. Overridable via `--client-id` / `OLK_CLIENT_ID`.
 - **Tenant `common`**: Default tenant accepts both personal and enterprise accounts.
 - **Lazy client init**: `RunContext.GraphClient()` initializes on first call — auth commands don't need a Graph client.
+- **Delegated mailbox routing**: read paths in `internal/graphapi/{mail,calendar,contacts}.go` take a `target string` first parameter and route through `c.targetUser(target)`. Empty target preserves `/me` behavior; a non-empty value hits `/users/{target}/…`. The CLI exposes this as the global `--mailbox` flag (env `OLK_MAILBOX`), validated once via `resolveMailboxTarget` in `internal/cmd/paging.go`. New read methods should follow the same shape; write paths intentionally stay on `/me` for now.
 
 ## Commit & Pull Request Guidelines
 
