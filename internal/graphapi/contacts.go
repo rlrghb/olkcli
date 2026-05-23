@@ -86,7 +86,11 @@ type Contact struct {
 	OtherAddress     *Address `json:"otherAddress,omitempty"`
 }
 
-func (c *Client) ListContacts(ctx context.Context, top, skip int32, orderBy string) ([]Contact, error) {
+// ListContacts returns contacts from the target mailbox, or the signed-in
+// user's mailbox when target is empty. Targeting another mailbox requires the
+// calling token to carry Contacts.Read.Shared and the calling user to have
+// Exchange Full Access delegation on the target.
+func (c *Client) ListContacts(ctx context.Context, target string, top, skip int32, orderBy string) ([]Contact, error) {
 	top = clampTop(top)
 
 	queryParams := &users.ItemContactsRequestBuilderGetQueryParameters{
@@ -107,7 +111,7 @@ func (c *Client) ListContacts(ctx context.Context, top, skip int32, orderBy stri
 		QueryParameters: queryParams,
 	}
 
-	resp, err := c.inner.Me().Contacts().Get(ctx, config)
+	resp, err := c.targetUser(target).Contacts().Get(ctx, config)
 	if err != nil {
 		return nil, fmt.Errorf("listing contacts: %w", err)
 	}
@@ -119,11 +123,13 @@ func (c *Client) ListContacts(ctx context.Context, top, skip int32, orderBy stri
 	return contacts, nil
 }
 
-func (c *Client) GetContact(ctx context.Context, contactID string) (*Contact, error) {
+// GetContact returns a single contact from the target mailbox, or the signed-in
+// user's mailbox when target is empty. See ListContacts for scope requirements.
+func (c *Client) GetContact(ctx context.Context, target, contactID string) (*Contact, error) {
 	if err := validateID(contactID, "contact ID"); err != nil {
 		return nil, err
 	}
-	ct, err := c.inner.Me().Contacts().ByContactId(contactID).Get(ctx, nil)
+	ct, err := c.targetUser(target).Contacts().ByContactId(contactID).Get(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("getting contact: %w", err)
 	}
@@ -520,7 +526,10 @@ func (c *Client) DeleteContact(ctx context.Context, contactID string) error {
 	return nil
 }
 
-func (c *Client) SearchContacts(ctx context.Context, query string, top int32) ([]Contact, error) {
+// SearchContacts runs a prefix search against contacts in the target mailbox,
+// or the signed-in user's mailbox when target is empty. See ListContacts for
+// scope requirements.
+func (c *Client) SearchContacts(ctx context.Context, target, query string, top int32) ([]Contact, error) {
 	top = clampTop(top)
 	// Strict allowlist: only safe characters permitted in search queries
 	if !safeSearchQuery.MatchString(query) {
@@ -540,7 +549,7 @@ func (c *Client) SearchContacts(ctx context.Context, query string, top int32) ([
 		QueryParameters: queryParams,
 	}
 
-	resp, err := c.inner.Me().Contacts().Get(ctx, config)
+	resp, err := c.targetUser(target).Contacts().Get(ctx, config)
 	if err != nil {
 		return nil, fmt.Errorf("searching contacts: %w", err)
 	}
