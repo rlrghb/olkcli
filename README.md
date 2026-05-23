@@ -203,7 +203,8 @@ Use `--scope` (repeatable) at login time to request additional OAuth scopes beyo
 ```bash
 olk auth login --enterprise \
   --scope Mail.Read.Shared \
-  --scope Calendars.Read.Shared
+  --scope Calendars.Read.Shared \
+  --scope Contacts.Read.Shared
 ```
 
 The flag merges with the default scope set (case-insensitive dedup) so you don't need to re-list the defaults. Make sure the corresponding API permissions are added to your app registration.
@@ -225,6 +226,11 @@ olk calendar view --mailbox boss@example.com --after 2026-06-01 --before 2026-06
 olk calendar get EVENT_ID --mailbox boss@example.com
 olk calendar calendars --mailbox boss@example.com
 
+# Contacts (requires Contacts.Read.Shared)
+olk contacts list --mailbox boss@example.com
+olk contacts get CONTACT_ID --mailbox boss@example.com
+olk contacts search "alice" --mailbox boss@example.com
+
 # Or set it once for the shell session
 export OLK_MAILBOX=boss@example.com
 olk mail list
@@ -233,7 +239,7 @@ olk calendar events
 
 This is the canonical executive-assistant / AI-agent pattern: the signed-in identity is your own (or a service account), Exchange ACLs control which mailboxes you can reach, and the OAuth scope controls what you can do inside them.
 
-> **Scope limits:** read-only delegated access — mail (list / get / search / folders) and calendar (events / view / get / calendars). Sending mail, creating/updating/deleting events, modifying anything, and contacts / drive / todo across delegation are not yet supported.
+> **Scope limits:** read-only delegated access — mail (list / get / search / folders), calendar (events / view / get / calendars), and contacts (list / get / search). Sending mail, creating/updating/deleting anything, and drive / todo across delegation are not yet supported.
 
 ### Multi-Account
 
