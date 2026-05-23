@@ -66,7 +66,12 @@ func (c *CalendarEventsCmd) Run(ctx *RunContext) error {
 		end = t
 	}
 
-	events, err := client.ListEvents(ctx.Ctx, start, end, c.Calendar, c.Top)
+	target, err := resolveMailboxTarget(ctx.Flags.Mailbox)
+	if err != nil {
+		return err
+	}
+
+	events, err := client.ListEvents(ctx.Ctx, target, start, end, c.Calendar, c.Top)
 	if err != nil {
 		return err
 	}
@@ -101,7 +106,12 @@ func (c *CalendarGetCmd) Run(ctx *RunContext) error {
 		return err
 	}
 
-	event, err := client.GetEvent(ctx.Ctx, c.ID)
+	target, err := resolveMailboxTarget(ctx.Flags.Mailbox)
+	if err != nil {
+		return err
+	}
+
+	event, err := client.GetEvent(ctx.Ctx, target, c.ID)
 	if err != nil {
 		return err
 	}
@@ -279,7 +289,12 @@ func (c *CalendarCalendarsCmd) Run(ctx *RunContext) error {
 		return err
 	}
 
-	calendars, err := client.ListCalendars(ctx.Ctx)
+	target, err := resolveMailboxTarget(ctx.Flags.Mailbox)
+	if err != nil {
+		return err
+	}
+
+	calendars, err := client.ListCalendars(ctx.Ctx, target)
 	if err != nil {
 		return err
 	}

@@ -46,7 +46,12 @@ func (c *CalendarViewCmd) Run(ctx *RunContext) error {
 		end = t
 	}
 
-	events, err := client.ListCalendarView(ctx.Ctx, start, end, c.Calendar, c.Top)
+	target, err := resolveMailboxTarget(ctx.Flags.Mailbox)
+	if err != nil {
+		return err
+	}
+
+	events, err := client.ListCalendarView(ctx.Ctx, target, start, end, c.Calendar, c.Top)
 	if err != nil {
 		return err
 	}
