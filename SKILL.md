@@ -31,6 +31,7 @@ Setup (once)
 - `olk auth login` — device-code OAuth2 flow for personal accounts (opens browser)
 - `olk auth login --enterprise` — login with enterprise scopes for work/school accounts (enables OOO, inbox rules, directory search)
 - `olk auth login --client-id ID --tenant-id ID` — enterprise custom app registration
+- `olk auth login --scope SCOPE` — request additional OAuth scopes (repeatable). Use for delegated access, e.g. `--scope Mail.Read.Shared --scope Calendars.Read.Shared --scope Contacts.Read.Shared`. Merges with the default set, case-insensitive dedup.
 - `olk auth list` — list authenticated accounts
 - `olk auth status` — check token validity
 - `olk auth logout [EMAIL]` — remove stored credentials
@@ -204,6 +205,21 @@ User Profile
 
 - `olk whoami` — display current user's name, email, job title, department, office, phone
 
+Delegated Mailbox Access (executive-assistant pattern)
+
+Use when the signed-in account needs to read another user's mailbox under Microsoft 365 mailbox delegation. The signed-in identity is your own (or a service account), Exchange ACLs control which mailboxes you can reach, and the OAuth scope controls what you can do inside them. Read-only for now — sending mail or modifying anything in a delegated mailbox is not supported.
+
+- One-time login with shared scopes: `olk auth login --enterprise --scope Mail.Read.Shared --scope Calendars.Read.Shared --scope Contacts.Read.Shared`
+- Read another user's mail: `olk mail list --mailbox boss@example.com`
+- Read a specific message: `olk mail get <ID> --mailbox boss@example.com`
+- Search via KQL: `olk mail search "from:partner@example.com" --mailbox boss@example.com`
+- List their folders: `olk mail folders --mailbox boss@example.com`
+- Their calendar: `olk calendar events --mailbox boss@example.com` (also `view`, `get`, `calendars`)
+- Their contacts: `olk contacts list --mailbox boss@example.com` (also `get`, `search`)
+- Persist for the shell session: `export OLK_MAILBOX=boss@example.com`
+- The target must have granted Full Access via M365 Admin Center → Mailbox permissions; the calling token must carry the matching `.Shared` scope.
+- Write commands (send, reply, move, flag, create event, update contact, etc.) ignore `--mailbox` and always act on the signed-in user's own mailbox.
+
 Shortcuts
 
 - `olk send ...` → `olk mail send ...`
@@ -226,6 +242,7 @@ Global Flags
 - `--json` — JSON output (env: `OLK_JSON`)
 - `--plain` — TSV output (env: `OLK_PLAIN`)
 - `--account EMAIL` — use a specific account (env: `OLK_ACCOUNT`)
+- `--mailbox EMAIL` — target a different user's mailbox via delegated access for mail / calendar / contacts reads. Requires the corresponding `.Shared` scope at login and Exchange Full Access delegation on the target (env: `OLK_MAILBOX`)
 - `--results-only` — unwrap JSON envelope (env: `OLK_RESULTS_ONLY`)
 - `--select FIELDS` — field projection (env: `OLK_SELECT`)
 - `--force` — skip confirmations (env: `OLK_FORCE`)
@@ -251,6 +268,7 @@ Scripting Examples
 - Find meeting times: `olk calendar find-times --attendees a@b.com --attendees c@d.com --json --results-only | jq '.[0]'`
 - Search people: `olk people search "engineering" --json --results-only | jq -r '.[].email'`
 - Focused inbox unread: `olk mail list --focused --unread --json --results-only | jq length`
+- Summarize boss's unread (delegated): `olk mail list --mailbox boss@example.com --unread --json --results-only | jq -r '.[] | "\(.from): \(.subject)"'`
 - List large files: `olk drive ls /Documents --json --results-only | jq '[.[] | select(.size > 10000000)] | sort_by(.size) | reverse'`
 - Check quota: `olk drive info --json --results-only | jq '{used: .quotaUsed, total: .quotaTotal}'`
 
@@ -258,6 +276,7 @@ Notes
 
 - Set `OLK_TIMEZONE=America/New_York` to display times in your timezone.
 - Set `OLK_ACCOUNT=you@example.com` to avoid repeating `--account`.
+- Set `OLK_MAILBOX=boss@example.com` to read a delegated mailbox by default for mail / calendar / contacts (requires the matching `.Shared` scope at login).
 - Set `OLK_TODO_LIST=<list-id>` to avoid repeating `--list` for todo commands.
 - Set `OLK_DRIVE_ID=<drive-id>` to avoid repeating `--drive-id` for drive commands.
 - Set `OLK_KEYRING_PASSWORD=<password>` for headless/non-interactive environments (file-backend keyring).
