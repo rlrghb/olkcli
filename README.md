@@ -424,6 +424,15 @@ olk config get timezone                              Get current timezone settin
 olk whoami                                           Display current user info
 ```
 
+### MCP Server
+
+```
+olk mcp [--profile safe|full]                        Run an MCP server over stdio
+olk mcp --http :8765 [--profile safe|full]           Run an MCP server over streamable HTTP
+```
+
+See [MCP Server](#mcp-server) for profiles, Claude Desktop config, and HTTP security.
+
 ## Configuration
 
 Config is stored at `~/.config/olk/`:
@@ -512,6 +521,57 @@ Then ask your AI assistant to "check my inbox" or "send an email" and it will us
 - KQL search syntax for mail
 - How to handle auth errors
 - Safety rules (confirm before sending, never guess IDs, use `--force` for deletes)
+
+## MCP Server
+
+`olk` has a built-in [Model Context Protocol](https://modelcontextprotocol.io) server, so any MCP client (Claude Desktop, IDE extensions, agents) can drive olk directly — no wrapper needed. Every olk command is auto-exposed as an MCP tool (e.g. `mail_list`, `calendar_events`, `drive_ls`), with input schemas derived from each command's flags. Tools return olk's JSON output.
+
+```bash
+olk mcp                       # stdio server, safe profile (default)
+olk mcp --profile full        # expose everything, including destructive tools
+olk mcp --http :8765          # serve over streamable HTTP instead of stdio
+```
+
+### Profiles
+
+Pick a profile to bound what the client can do. Register both as separate services if you want a low-risk default plus an escalated one.
+
+| Profile | Exposes | Excludes |
+|---------|---------|----------|
+| `safe` *(default)* | Reads (`list`/`get`/`search`/`view`) and non-destructive writes (`send`/`create`/`update`/`reply`/…) | Destructive ops: `delete`, `rm`, `auth clean`, `auth logout` |
+| `full` | Every non-interactive command, including destructive ones | Interactive `auth login` and the `mcp` command itself |
+
+Interactive `auth login` is never exposed (run it once in your terminal first). Tool calls are executed one at a time (serialized).
+
+### Claude Desktop
+
+Register two services in your `claude_desktop_config.json` — a safe default and an escalated one:
+
+```json
+{
+  "mcpServers": {
+    "olk-safe": { "command": "olk", "args": ["mcp", "--profile", "safe"] },
+    "olk-full": { "command": "olk", "args": ["mcp", "--profile", "full"] }
+  }
+}
+```
+
+The server uses whichever account is your olk default; run `olk auth login` first.
+
+### HTTP transport & security
+
+`--http` is opt-in and carries real risk: every caller shares the server's single authenticated identity. Controls:
+
+- **Loopback by default** — a port-only value (`:8765` or `8765`) binds `127.0.0.1`. Binding a non-loopback host prints a warning.
+- **Bearer token** — set `OLK_MCP_TOKEN` (preferred), `OLK_MCP_TOKEN_FILE` (path to a token file), or `--http-token` (discouraged; visible in `ps`/shell history). Clients must send `Authorization: Bearer <token>`. Serving on a non-loopback address **without** a token is refused.
+- **Origin checking** — browser `Origin` headers must be loopback (DNS-rebinding guard).
+- Prefer `full`=stdio-only; if you must expose `full` over HTTP, always set a token.
+
+### Troubleshooting
+
+- **"no account configured"** — run `olk auth login` first; the server uses your default account.
+- **Garbled stdio output** — nothing should write to stdout besides the server; olk handles this by capturing each command's stdout/stderr during a call.
+- **Calls feel sequential** — they are; tool execution is single-flight by design.
 
 ## Account Compatibility
 

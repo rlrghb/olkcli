@@ -9,6 +9,7 @@
 - `internal/config/`: Configuration and XDG paths (`~/.config/olk/`).
 - `internal/secrets/`: OS keyring integration via `99designs/keyring`.
 - `internal/outfmt/`: Output formatting — JSON envelope, aligned tables, TSV, timezone conversion via `ConvertTime()`.
+- `internal/cmd/mcp*.go`: Built-in MCP server (`olk mcp`). Auto-generates one MCP tool per leaf command from the kong model; lives in package `cmd` to avoid an import cycle. `mcp.go` (command + stdio/HTTP transports + HTTP auth), `mcp_server.go` (tool/schema generation), `mcp_invoke.go` (argv rebuild + handler), `mcp_capture.go` (stdout/stderr capture), `mcp_profiles.go` (safe/full classification).
 - `SKILL.md`: [Agent Skills](https://agentskills.io) standard file — teaches AI assistants (Claude Code, OpenClaw, etc.) how to use `olk` commands.
 - `bin/`: build outputs (gitignored).
 
@@ -51,6 +52,7 @@
 - **Tenant `common`**: Default tenant accepts both personal and enterprise accounts.
 - **Lazy client init**: `RunContext.GraphClient()` initializes on first call — auth commands don't need a Graph client.
 - **Delegated mailbox routing**: read paths in `internal/graphapi/{mail,calendar,contacts}.go` take a `target string` first parameter and route through `c.targetUser(target)`. Empty target preserves `/me` behavior; a non-empty value hits `/users/{target}/…`. The CLI exposes this as the global `--mailbox` flag (env `OLK_MAILBOX`), validated once via `resolveMailboxTarget` in `internal/cmd/paging.go`. New read methods should follow the same shape; write paths intentionally stay on `/me` for now.
+- **MCP out of the box**: `olk mcp` reflects over the kong command tree and exposes each leaf command as an MCP tool (stdio default, `--http` for streamable HTTP). Two profiles — `safe` (no destructive ops, default) and `full` — let the binary be registered as two MCP services. Tool calls are serialized because each redirects the process-global `os.Stdout`/`os.Stderr` to capture command output (commands print directly to stdout in many places, which would otherwise corrupt the MCP stream). HTTP requires a bearer token unless bound to loopback. New commands become tools automatically; classify destructive verbs in `mcp_profiles.go`.
 
 ## Commit & Pull Request Guidelines
 

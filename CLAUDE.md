@@ -18,7 +18,7 @@ go mod tidy         # After changing dependencies
 ## Architecture
 
 - **CLI framework**: `github.com/alecthomas/kong` — commands are Go structs with `Run(ctx *RunContext) error`
-- **Auth**: Raw OAuth2 device code flow with PKCE (RFC 7636) against `login.microsoftonline.com` — no MSAL. Scopes defined in `internal/msauth/scopes.go`. Enterprise-only scopes (`MailboxSettings.ReadWrite`, `User.ReadBasic.All`) are only requested with `--enterprise` flag — personal accounts cannot consent to them. Token refresh is serialized per-email via `sync.Map` of mutexes to prevent race conditions
+- **Auth**: Raw OAuth2 device code flow with PKCE (RFC 7636) against `login.microsoftonline.com` — no MSAL. Scopes defined in `internal/msauth/scopes.go`. Enterprise-only scopes (`MailboxSettings.ReadWrite`, `User.ReadBasic.All`) are only requested with `--enterprise` flag — personal accounts cannot consent to them. `auth login --scope <s>` (repeatable) layers extra scopes (e.g. `Mail.Read.Shared`) onto the default set via `MergeScopes` (case-insensitive dedup). Token refresh is serialized per-email via `sync.Map` of mutexes to prevent race conditions
 - **API**: Official `msgraph-sdk-go` wrapped in `internal/graphapi/` for ergonomic access
 - **Secrets**: OS keyring via `github.com/99designs/keyring` (macOS Keychain, Linux Secret Service, Windows WinCred). File-backend password prompt writes to stderr (not stdout) to avoid corrupting piped output. Set `OLK_KEYRING_PASSWORD` for headless/non-interactive use
 - **Output**: JSON envelope (`--json`), aligned table (default), TSV (`--plain`)
@@ -31,6 +31,8 @@ go mod tidy         # After changing dependencies
 - Each command is in its own file: `mail_list.go`, `mail_get.go`, etc.
 - Desire paths in `desire_paths.go` delegate to real commands (e.g. `SendCmd` creates `MailSendCmd`)
 - Config lives at `~/.config/olk/`, tokens in OS keyring keyed by `olk:token:<email>`
+- **Delegated mailbox access** (`--mailbox <email>` / `OLK_MAILBOX`): read paths can target another user's mailbox. Commands resolve and validate the flag via `resolveMailboxTarget(ctx.Flags.Mailbox)` (in `paging.go`), then pass the resulting `target string` as the first arg to graphapi methods. `Client.targetUser(target)` (in `graphapi/client.go`) routes to `Me()` when empty or `Users().ByUserId(target)` otherwise — both return the same `*UserItemRequestBuilder`, so chained calls are identical. Requires the `*.Shared` scope (e.g. `Mail.Read.Shared`) granted at login. Only wired for read paths, not writes
+- **MCP server** (`olk mcp`, in package `cmd`): lives in `cmd` — not a separate package — because it must introspect the kong grammar, re-parse an argv into a `kong.Context`, and run commands with a `RunContext` (all `cmd`-internal); a separate package would create an import cycle. `buildMCPServer(profile)` (`mcp_server.go`) walks the kong model (`kong.New(&CLI{}).Model`) and auto-registers one MCP tool per leaf command, with the input schema derived from each command's flags/positionals. The handler (`mcp_invoke.go`) rebuilds an argv (`[path…, --json, flags…, --, positionals…]`), reparses with a fresh `CLI`, runs it, and returns captured output. `captureStd` (`mcp_capture.go`) redirects `os.Stdout`/`os.Stderr` to pipes under a global mutex (so command output — 221 direct `os.Stdout` writes plus the Printer — never corrupts the MCP transport's own stdout); this makes tool calls single-flight. Profiles `safe`/`full` are classified in `mcp_profiles.go` by the leaf command's final path token. Uses `github.com/modelcontextprotocol/go-sdk` + `github.com/google/jsonschema-go`
 
 ## Common Tasks
 
@@ -59,6 +61,9 @@ go mod tidy         # After changing dependencies
 2. Add the struct to `DriveCmd` in `internal/cmd/drive.go`
 3. If needed, add the API method to `internal/graphapi/drive.go`
 
+### Supporting `--mailbox` in a new read command
+graphapi read methods take a `target string` first param threaded to `targetUser(target)`. In the command's `Run`, resolve it once with `target, err := resolveMailboxTarget(ctx.Flags.Mailbox)` and pass it through. Pass `""` for write paths (delegation is read-only by design).
+
 ### Adding a new flag to all commands
 Add it to `RootFlags` in `internal/cmd/root.go` with `env:"OLK_*"` tag.
 
@@ -69,6 +74,9 @@ Add it to `RootFlags` in `internal/cmd/root.go` with `env:"OLK_*"` tag.
 
 ### Changing Graph API calls
 Edit files in `internal/graphapi/` — these wrap the verbose SDK calls into simple methods returning plain structs.
+
+### MCP tools (auto-generated)
+Any new leaf command is automatically exposed as an MCP tool — no per-tool wiring. It is classified by its final path token in `internal/cmd/mcp_profiles.go`: `delete`/`rm`/`clean`/`logout` ⇒ destructive (`full` profile only); a read verb (`list`/`get`/`search`/…) ⇒ read; otherwise write. If you add a command with a new destructive verb or an ambiguous name, add it to `destructiveVerbs`/`readVerbs` or `pathOverrides`, or the `TestSafeProfileHasNoDestructiveLeaf` guard test will catch the gap. Interactive commands (only `auth login` today) and the `mcp` command are excluded.
 
 ## Dependencies
 
@@ -90,5 +98,9 @@ The project uses `msgraph-sdk-go` v1.96.0 which has some naming quirks:
 - Todo linked resources: `Me().Todo().Lists().ByTodoTaskListId(listID).Tasks().ByTodoTaskId(taskID).LinkedResources()`
 - Drive: `Me().Drive()` for default drive, `Me().Drives()` for all drives, `Drives().ByDriveId(id)` for specific drive
 - DriveItems: `Drives().ByDriveId(id).Items().ByDriveItemId(itemID)` for item operations; `.Children()` for folder contents; `.Content()` for file download/upload
+
+MCP server deps:
+- `github.com/modelcontextprotocol/go-sdk` v1.2.0 — `mcp.NewServer` / `Server.AddTool(*Tool, ToolHandler)` (raw handler, since schemas are built dynamically); `mcp.StdioTransport{}` for stdio; `mcp.NewStreamableHTTPHandler` for HTTP; `mcp.NewInMemoryTransports()` for tests. `ToolHandler = func(ctx, *CallToolRequest)(*CallToolResult, error)`; read args from `req.Params.Arguments` (a `json.RawMessage`)
+- `github.com/google/jsonschema-go` — `jsonschema.Schema{Type, Properties, Required, Enum, Items, Description}` for tool input schemas
 - Drive path-based access requires raw URL builders: `drives.NewItemItemsDriveItemItemRequestBuilder(rawURL, c.inner.GetAdapter())` with URL pattern `/drives/{id}/root:/{path}:`
 - Drive sharing: `CreateLink().Post()` body uses `SetTypeEscaped()` not `SetType()` (same Go keyword collision as Attendee)

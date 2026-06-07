@@ -164,6 +164,7 @@ type CLI struct {
 	People   PeopleCmd   `cmd:"" help:"People directory search"`
 	Drive    DriveCmd    `cmd:"" help:"OneDrive file operations"`
 	Config   ConfigCmd   `cmd:"" help:"Configuration management"`
+	MCP      MCPCmd      `cmd:"" name:"mcp" help:"Run an MCP server exposing olk as tools"`
 	Version  VersionCmd  `cmd:"" help:"Show version information"`
 	Whoami   WhoamiCmd   `cmd:"" help:"Show current user profile"`
 

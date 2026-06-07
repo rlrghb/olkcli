@@ -272,6 +272,12 @@ Scripting Examples
 - List large files: `olk drive ls /Documents --json --results-only | jq '[.[] | select(.size > 10000000)] | sort_by(.size) | reverse'`
 - Check quota: `olk drive info --json --results-only | jq '{used: .quotaUsed, total: .quotaTotal}'`
 
+MCP server
+
+- `olk` is also a built-in MCP server, so MCP clients can call olk commands as tools without this skill. Run `olk auth login` first, then `olk mcp` (stdio) or `olk mcp --http :8765`.
+- `--profile safe` (default) exposes reads + non-destructive writes; `--profile full` also exposes destructive tools (`delete`, `rm`). Tools are named after commands, e.g. `mail_list`, `calendar_events`, `drive_ls`.
+- HTTP requires a bearer token (`OLK_MCP_TOKEN`) unless bound to loopback.
+
 Notes
 
 - Set `OLK_TIMEZONE=America/New_York` to display times in your timezone.
