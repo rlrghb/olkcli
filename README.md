@@ -564,8 +564,17 @@ The server uses whichever account is your olk default; run `olk auth login` firs
 
 - **Loopback by default** — a port-only value (`:8765` or `8765`) binds `127.0.0.1`. Binding a non-loopback host prints a warning.
 - **Bearer token** — set `OLK_MCP_TOKEN` (preferred), `OLK_MCP_TOKEN_FILE` (path to a token file), or `--http-token` (discouraged; visible in `ps`/shell history). Clients must send `Authorization: Bearer <token>`. Serving on a non-loopback address **without** a token is refused.
+- **Per-profile API keys** — instead of one token, set `OLK_MCP_KEY_SAFE` and/or `OLK_MCP_KEY_FULL` (each has a `*_FILE` variant). One endpoint then serves **both** profiles and the key the client presents selects the toolset: the safe key gets the safe tools, the full key gets everything (including `delete`/`rm`). An unknown or missing key gets `401`, and a profile with no configured key is unreachable. When any key is set, the legacy `OLK_MCP_TOKEN`/`--http-token` is ignored (with a warning) and `--profile` no longer selects the toolset.
 - **Origin checking** — browser `Origin` headers must be loopback (DNS-rebinding guard).
-- Prefer `full`=stdio-only; if you must expose `full` over HTTP, always set a token.
+- Prefer `full`=stdio-only; if you must expose `full` over HTTP, always set a token or the full key.
+
+**Security notes for API keys**
+
+- A key grants exactly its profile's capabilities — the **full key grants destructive tools to anyone who holds it**. Treat it like a production credential.
+- The transport is plain HTTP with **no TLS**. For any non-loopback use, terminate TLS at a reverse proxy or tunnel over SSH; binding a non-loopback host is your responsibility.
+- `OLK_MCP_KEY_SAFE` and `OLK_MCP_KEY_FULL` **must differ** — identical keys are refused at startup (they would silently grant the full profile).
+- Prefer the `*_FILE` variants (mode `0600`) over inline env vars in shared or CI environments.
+- Keys are read **once at process start**. Rotating a key means updating the secret and **restarting** the server — there is no live reload or old/new overlap.
 
 ### Troubleshooting
 

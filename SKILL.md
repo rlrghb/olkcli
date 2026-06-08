@@ -276,7 +276,7 @@ MCP server
 
 - `olk` is also a built-in MCP server, so MCP clients can call olk commands as tools without this skill. Run `olk auth login` first, then `olk mcp` (stdio) or `olk mcp --http :8765`.
 - `--profile safe` (default) exposes reads + non-destructive writes; `--profile full` also exposes destructive tools (`delete`, `rm`). Tools are named after commands, e.g. `mail_list`, `calendar_events`, `drive_ls`.
-- HTTP requires a bearer token (`OLK_MCP_TOKEN`) unless bound to loopback.
+- HTTP requires a bearer token (`OLK_MCP_TOKEN`) unless bound to loopback. Or set per-profile API keys (`OLK_MCP_KEY_SAFE`/`OLK_MCP_KEY_FULL`): one endpoint serves both profiles and the key the client sends selects the safe or full toolset.
 
 Notes
 
