@@ -1,7 +1,7 @@
 {
   "name": "olkcli",
   "version": "0.0.0",
-  "mcpName": "io.github.rlrghb/olk",
+  "mcpName": "io.github.rlrghb/outlook",
   "description": "CLI for Microsoft Outlook and OneDrive via the Microsoft Graph API (mail, calendar, contacts, tasks, files) — and an MCP server for AI agents (olk mcp).",
   "bin": {
     "olk": "bin/olk.js"

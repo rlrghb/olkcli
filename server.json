@@ -1,8 +1,8 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.rlrghb/olk",
+  "name": "io.github.rlrghb/outlook",
   "description": "Microsoft Outlook & OneDrive: curated read-first mail, calendar, contacts & file tools for agents",
-  "version": "0.9.1",
+  "version": "0.9.5",
   "repository": {
     "url": "https://github.com/rlrghb/olkcli",
     "source": "github"
@@ -12,7 +12,7 @@
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "olkcli",
-      "version": "0.9.1",
+      "version": "0.9.5",
       "transport": {
         "type": "stdio"
       },
