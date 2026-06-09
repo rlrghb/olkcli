@@ -1,7 +1,7 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.rlrghb/olk",
-  "description": "Microsoft Outlook & OneDrive (mail, calendar, contacts, tasks, files) as curated, read-first tools for AI agents. Requires a one-time `olk auth login` first.",
+  "description": "Microsoft Outlook & OneDrive: curated read-first mail, calendar, contacts & file tools for agents",
   "version": "0.9.1",
   "repository": {
     "url": "https://github.com/rlrghb/olkcli",
