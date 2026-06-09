@@ -38,10 +38,11 @@ type Printer struct {
 	ResultsOnly   bool
 	Timezone      string // IANA timezone name for JSON envelope metadata
 	WrapUntrusted bool   // wrap externally-controlled free-text fields in JSON output
+	Concise       bool   // drop large free-text fields (bodies, previews, attendees) from JSON output
 }
 
 // NewPrinter creates a printer from flags
-func NewPrinter(jsonFlag, plainFlag, resultsOnly bool, selectFields, timezone string, wrapUntrusted bool) *Printer {
+func NewPrinter(jsonFlag, plainFlag, resultsOnly bool, selectFields, timezone string, wrapUntrusted, concise bool) *Printer {
 	f := FormatTable
 	if jsonFlag {
 		f = FormatJSON
@@ -55,6 +56,7 @@ func NewPrinter(jsonFlag, plainFlag, resultsOnly bool, selectFields, timezone st
 		ResultsOnly:   resultsOnly,
 		Timezone:      timezone,
 		WrapUntrusted: wrapUntrusted,
+		Concise:       concise,
 	}
 }
 
@@ -62,6 +64,9 @@ func NewPrinter(jsonFlag, plainFlag, resultsOnly bool, selectFields, timezone st
 // fields tagged `untrusted:"true"` are wrapped with markers so an LLM/agent
 // consumer can distinguish externally-controlled text from trusted output.
 func (p *Printer) PrintJSON(results interface{}, count int, nextLink string) error {
+	if p.Concise {
+		results = dropConcise(results)
+	}
 	notice := ""
 	if p.WrapUntrusted {
 		id := newUntrustedID()

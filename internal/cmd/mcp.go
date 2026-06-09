@@ -22,6 +22,7 @@ import (
 // capturing command output requires temporarily redirecting the process stdout.
 type MCPCmd struct {
 	AllowWrite     []string `help:"Expose these curated write tools by name (e.g. mail_drafts_create, todo_create). Repeatable; default exposes none." name:"allow-write" env:"OLK_MCP_ALLOW_WRITE"`
+	AllowTool      []string `help:"Restrict exposed tools to these selectors: exact name (mail_list), prefix glob (mail_*, mail.*), or category (read, write, all). Repeatable/csv; default exposes all curated tools." name:"allow-tool" env:"OLK_MCP_ALLOW_TOOL"`
 	MaxOutputBytes int      `help:"Cap a single tool call's output text in bytes (truncated past this; 0 uses the built-in default)." name:"max-output-bytes" env:"OLK_MCP_MAX_OUTPUT_BYTES"`
 }
 
@@ -49,6 +50,7 @@ func (c *MCPCmd) Run(ctx *RunContext) error {
 	srv, _, err := buildMCPServer(mcpConfig{
 		allowWrite:     allowWrite,
 		allowed:        func(path []string) bool { return commandAllowed(flags, path) },
+		allowTool:      toolSelectorPredicate(c.AllowTool),
 		maxOutputBytes: c.MaxOutputBytes,
 	})
 	if err != nil {

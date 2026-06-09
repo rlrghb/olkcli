@@ -22,7 +22,7 @@ func TestNewPrinter_FormatDispatch(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			p := NewPrinter(tc.json, tc.plain, false, "", "UTC", false)
+			p := NewPrinter(tc.json, tc.plain, false, "", "UTC", false, false)
 			if p.Format != tc.wantFormat {
 				t.Fatalf("got format %d, want %d", p.Format, tc.wantFormat)
 			}

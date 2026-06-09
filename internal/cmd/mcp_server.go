@@ -69,9 +69,10 @@ var curatedTools = []curatedTool{
 
 // mcpConfig controls which curated tools a server exposes.
 type mcpConfig struct {
-	allowWrite     map[string]bool          // set of curated write tool names to expose (nil/empty = none)
-	allowed        func(path []string) bool // nil = allow all; else command allow/deny lists
-	maxOutputBytes int                      // cap on a single tool call's output text (<=0 = defaultMaxOutputBytes)
+	allowWrite     map[string]bool                       // set of curated write tool names to expose (nil/empty = none)
+	allowed        func(path []string) bool              // nil = allow all; else command allow/deny lists
+	allowTool      func(name string, readOnly bool) bool // nil = allow all; else --allow-tool selectors
+	maxOutputBytes int                                   // cap on a single tool call's output text (<=0 = defaultMaxOutputBytes)
 }
 
 // defaultMaxOutputBytes bounds a single tool call's returned text so a runaway
@@ -82,6 +83,12 @@ const defaultMaxOutputBytes = 100_000
 // helpFlagName is kong's auto-injected --help flag, skipped when projecting a
 // command's flags into an MCP schema or argv.
 const helpFlagName = "help"
+
+// conciseArg is a synthetic boolean injected into every read tool's schema. It
+// maps to olk's global --concise flag (which isn't a per-command flag, so it
+// wouldn't otherwise appear in the tool schema), letting an agent shrink a
+// response per call without affecting tools where the body is the point.
+const conciseArg = "concise"
 
 // writeToolNames returns the set of curated write tool names (the only tools
 // eligible to be exposed via --allow-write).
@@ -150,6 +157,9 @@ func buildMCPServer(cfg mcpConfig) (*mcp.Server, []*toolBinding, error) {
 		if cfg.allowed != nil && !cfg.allowed(ct.path) {
 			continue
 		}
+		if cfg.allowTool != nil && !cfg.allowTool(ct.name, !ct.write) {
+			continue
+		}
 		node, ok := leaves[strings.Join(ct.path, ".")]
 		if !ok {
 			return nil, nil, fmt.Errorf("curated MCP tool %q maps to unknown command %q", ct.name, strings.Join(ct.path, " "))
@@ -191,10 +201,23 @@ func registerTool(srv *mcp.Server, b *toolBinding) {
 	tool := &mcp.Tool{
 		Name:        b.name,
 		Description: desc,
-		InputSchema: flagSchema(b.node),
+		InputSchema: toolSchema(b),
 		Annotations: annotationsFor(b.readOnly),
 	}
 	srv.AddTool(tool, makeHandler(b))
+}
+
+// toolSchema builds a binding's MCP input schema: the command's own flags and
+// positionals, plus the synthetic `concise` boolean for read tools.
+func toolSchema(b *toolBinding) *jsonschema.Schema {
+	schema := flagSchema(b.node)
+	if b.readOnly {
+		schema.Properties[conciseArg] = &jsonschema.Schema{
+			Type:        "boolean",
+			Description: "Drop large free-text fields (message/event/task bodies, previews, attendee lists) to reduce payload size.",
+		}
+	}
+	return schema
 }
 
 func annotationsFor(readOnly bool) *mcp.ToolAnnotations {

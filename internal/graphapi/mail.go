@@ -49,8 +49,8 @@ type MailMessage struct {
 	ReceivedAt     string   `json:"receivedDateTime"`
 	IsRead         bool     `json:"isRead"`
 	HasAttachments bool     `json:"hasAttachments"`
-	BodyPreview    string   `json:"bodyPreview" untrusted:"true"`
-	Body           string   `json:"body,omitempty" untrusted:"true"`
+	BodyPreview    string   `json:"bodyPreview,omitempty" untrusted:"true" concise:"omit"`
+	Body           string   `json:"body,omitempty" untrusted:"true" concise:"omit"`
 	BodyType       string   `json:"bodyType,omitempty"`
 	Categories     []string `json:"categories,omitempty"`
 }

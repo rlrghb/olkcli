@@ -108,6 +108,9 @@ func rejectUnknownArgs(b *toolBinding, args map[string]any) error {
 	for _, p := range b.node.Positional {
 		known[p.Name] = true
 	}
+	if b.readOnly {
+		known[conciseArg] = true // synthetic flag injected into read-tool schemas
+	}
 	for k := range args {
 		if !known[k] {
 			return fmt.Errorf("unknown argument %q for tool %q", k, b.name)
@@ -203,6 +206,14 @@ func buildArgv(b *toolBinding, args map[string]any) ([]string, error) {
 			return nil, err
 		}
 		argv = append(argv, toks...)
+	}
+
+	// Honor the synthetic concise flag injected into read-tool schemas: it maps
+	// to olk's global --concise rather than a per-command flag.
+	if b.readOnly {
+		if on, _ := asBool(args[conciseArg]); on {
+			argv = append(argv, "--concise")
+		}
 	}
 
 	// Force structured output.

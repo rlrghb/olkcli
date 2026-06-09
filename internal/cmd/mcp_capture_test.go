@@ -17,7 +17,7 @@ func TestCaptureStd_DirectAndPrinter(t *testing.T) {
 		fmt.Println("direct stdout line")
 		fmt.Fprintln(os.Stderr, "direct stderr line")
 		// outfmt.Printer defaults to os.Stdout, which is redirected during capture.
-		p := outfmt.NewPrinter(true, false, false, "", "UTC", false)
+		p := outfmt.NewPrinter(true, false, false, "", "UTC", false, false)
 		return p.PrintJSON(map[string]string{"k": "v"}, 1, "")
 	})
 	if err != nil {
