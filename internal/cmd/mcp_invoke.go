@@ -134,7 +134,7 @@ func buildArgv(b *toolBinding, args map[string]any) ([]string, error) {
 	// Force structured output.
 	argv = append(argv, "--json")
 
-	var pos []string
+	pos := make([]string, 0, len(b.node.Positional))
 	for _, p := range b.node.Positional {
 		v, ok := args[p.Name]
 		if !ok {

@@ -95,7 +95,7 @@ func buildMCPServer(cfg mcpConfig) (*mcp.Server, []*toolBinding, error) {
 
 	srv := mcp.NewServer(&mcp.Implementation{Name: "olk", Version: Version}, nil)
 
-	var bindings []*toolBinding
+	bindings := make([]*toolBinding, 0, len(curatedTools))
 	for _, ct := range curatedTools {
 		if ct.write && !cfg.allowWrite {
 			continue

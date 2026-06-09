@@ -10,8 +10,9 @@ import (
 // "get"}) for a parsed kong context. kong's Command() renders positional
 // arguments as "<name>" tokens, which we drop so only command names remain.
 func selectedCommandPath(kctx *kong.Context) []string {
-	var path []string
-	for _, tok := range strings.Fields(kctx.Command()) {
+	fields := strings.Fields(kctx.Command())
+	path := make([]string, 0, len(fields))
+	for _, tok := range fields {
 		if strings.HasPrefix(tok, "<") || strings.HasPrefix(tok, "[") {
 			continue
 		}
