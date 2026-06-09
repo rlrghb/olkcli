@@ -69,3 +69,77 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAP_GITHUB_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
+
+  # Publish the `olk` CLI to npm (esbuild-style binary wrapper) so it is
+  # installable via npx/npm and listable on the MCP Registry. Gated on the
+  # PUBLISH_NPM repo variable so releases keep working until npm is set up:
+  # set repo secret NPM_TOKEN and repo variable PUBLISH_NPM=true to enable.
+  npm-publish:
+    runs-on: ubuntu-latest
+    needs: release
+    if: ${{ vars.PUBLISH_NPM == 'true' }}
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "lts/*"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Extract release binaries into per-platform packages
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          mkdir -p rel tmpx
+          gh release download "$GITHUB_REF_NAME" -p "olk_${VERSION}_*" -D rel
+          extract() { # archive dest exe
+            mkdir -p "$(dirname "$2")"
+            if [[ "$1" == *.zip ]]; then unzip -o "$1" "$3" -d tmpx; else tar -xzf "$1" -C tmpx "$3"; fi
+            mv "tmpx/$3" "$2"
+          }
+          extract "rel/olk_${VERSION}_darwin_amd64.tar.gz"  npm/olk-darwin-x64/bin/olk      olk
+          extract "rel/olk_${VERSION}_darwin_arm64.tar.gz"  npm/olk-darwin-arm64/bin/olk    olk
+          extract "rel/olk_${VERSION}_linux_amd64.tar.gz"   npm/olk-linux-x64/bin/olk       olk
+          extract "rel/olk_${VERSION}_linux_arm64.tar.gz"   npm/olk-linux-arm64/bin/olk     olk
+          extract "rel/olk_${VERSION}_windows_amd64.zip"    npm/olk-win32-x64/bin/olk.exe   olk.exe
+          extract "rel/olk_${VERSION}_windows_arm64.zip"    npm/olk-win32-arm64/bin/olk.exe olk.exe
+          chmod +x npm/olk-*/bin/olk
+
+      - name: Stamp versions and publish to npm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: node scripts/build-npm.mjs "${GITHUB_REF_NAME}" --publish
+
+  # Publish the server.json to the official MCP Registry. Runs after the npm
+  # package is live (the registry validates it). Uses GitHub OIDC — no secret.
+  registry-publish:
+    runs-on: ubuntu-latest
+    needs: npm-publish
+    if: ${{ vars.PUBLISH_NPM == 'true' }}
+    timeout-minutes: 15
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Install mcp-publisher
+        run: |
+          curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
+
+      - name: Stamp server.json version
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          jq --arg v "$VERSION" '.version=$v | .packages[0].version=$v' server.json > server.tmp && mv server.tmp server.json
+
+      - name: Authenticate (GitHub OIDC)
+        run: ./mcp-publisher login github-oidc
+
+      - name: Publish to MCP Registry
+        run: ./mcp-publisher publish

@@ -1,0 +1,20 @@
+{
+  "name": "olk-linux-x64",
+  "version": "0.0.0",
+  "description": "olk binary for linux-x64",
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "files": [
+    "bin/"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rlrghb/olkcli.git"
+  },
+  "homepage": "https://github.com/rlrghb/olkcli",
+  "license": "MIT"
+}

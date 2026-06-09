@@ -1,0 +1,20 @@
+{
+  "name": "olk-darwin-x64",
+  "version": "0.0.0",
+  "description": "olk binary for darwin-x64",
+  "os": [
+    "darwin"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "files": [
+    "bin/"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rlrghb/olkcli.git"
+  },
+  "homepage": "https://github.com/rlrghb/olkcli",
+  "license": "MIT"
+}

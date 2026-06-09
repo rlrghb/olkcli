@@ -32,7 +32,7 @@ go.work.sum
 *~
 
 # Local build output
-bin/
+/bin/
 /olk
 
 # GoReleaser
@@ -43,3 +43,7 @@ prebuilt-archives/
 # OS files
 .DS_Store
 Thumbs.db
+
+# olk binaries dropped into per-platform npm packages by the release pipeline
+npm/olk-*/bin/olk
+npm/olk-*/bin/olk.exe

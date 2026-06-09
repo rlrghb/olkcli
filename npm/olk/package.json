@@ -1,0 +1,39 @@
+{
+  "name": "olk",
+  "version": "0.0.0",
+  "mcpName": "io.github.rlrghb/olk",
+  "description": "CLI for Microsoft Outlook and OneDrive via the Microsoft Graph API (mail, calendar, contacts, tasks, files) — and an MCP server for AI agents (olk mcp).",
+  "bin": {
+    "olk": "bin/olk.js"
+  },
+  "files": [
+    "bin/olk.js"
+  ],
+  "optionalDependencies": {
+    "olk-darwin-arm64": "0.0.0",
+    "olk-darwin-x64": "0.0.0",
+    "olk-linux-arm64": "0.0.0",
+    "olk-linux-x64": "0.0.0",
+    "olk-win32-arm64": "0.0.0",
+    "olk-win32-x64": "0.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rlrghb/olkcli.git"
+  },
+  "homepage": "https://github.com/rlrghb/olkcli",
+  "bugs": "https://github.com/rlrghb/olkcli/issues",
+  "license": "MIT",
+  "keywords": [
+    "outlook",
+    "microsoft-graph",
+    "onedrive",
+    "cli",
+    "mcp",
+    "email",
+    "calendar"
+  ],
+  "engines": {
+    "node": ">=18"
+  }
+}
