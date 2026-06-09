@@ -362,13 +362,14 @@ It's also published to the [MCP Registry](https://registry.modelcontextprotocol.
 
 Either way, run `olk auth login` once first so the server has a token to reuse.
 
-- **Read-only by default.** A curated set of 32 read tools is exposed; destructive and send commands have **no** MCP exposure path at all:
-  - **Mail:** `mail_list`, `mail_get`, `mail_search`, `mail_folders_list`, `mail_attachments`, `mail_categories_list`, `mail_rules_list`, `mail_ooo_get`
-  - **Calendar:** `calendar_events`, `calendar_view`, `calendar_get`, `calendar_calendars`, `calendar_availability`, `calendar_find_times`
-  - **Contacts:** `contacts_list`, `contacts_get`, `contacts_search`
+- **Read-only by default.** A curated set of 36 read tools is exposed; destructive and send commands have **no** MCP exposure path at all:
+  - **Mail:** `mail_list`, `mail_get`, `mail_search`, `mail_folders_list`, `mail_attachments`, `mail_categories_list`, `mail_rules_list`, `mail_ooo_get`, `mail_delta`
+  - **Calendar:** `calendar_events`, `calendar_view`, `calendar_get`, `calendar_calendars`, `calendar_availability`, `calendar_find_times`, `calendar_delta`
+  - **Contacts:** `contacts_list`, `contacts_get`, `contacts_search`, `contacts_delta`
   - **OneDrive:** `drive_ls`, `drive_get`, `drive_info`, `drive_search`, `drive_recent`, `drive_shared`, `drive_versions` *(reads only — no upload/move/delete/share via MCP)*
   - **To Do:** `todo_lists_list`, `todo_list`, `todo_get`, `todo_checklist_list`, `todo_links_list`
-  - **Directory & meta:** `people_search`, `whoami`, `version`
+  - **Directory & meta:** `people_search`, `changes`, `whoami`, `version`
+- **Incremental sync (delta).** `mail_delta`, `calendar_delta`, and `contacts_delta` return only what changed since an opaque cursor token (the unified `changes` tool digests all three in one call, each with its own token). Pass an empty token for a fresh sync, then hand the returned token back next time; deletions come through as items with `"removed": true`. Tokens are validated to be Microsoft Graph URLs before reuse, so a model can't redirect an authenticated request elsewhere.
 - **Opt into safe writes per-tool** by naming each one: `olk mcp --allow-write mail_drafts_create` (repeatable, or `OLK_MCP_ALLOW_WRITE=mail_drafts_create,todo_create`). Only the curated, non-send/non-destructive writes — `mail_drafts_create` and `todo_create` — are eligible; nothing is exposed by default. Naming a write is a deliberate action separate from starting the server (defense in depth).
 - **Narrow the exposed set with `--allow-tool`** (`OLK_MCP_ALLOW_TOOL`, repeatable/csv). Selectors are an exact name (`mail_list`), a prefix glob (`mail_*`, or `mail.*`), or a category (`read`, `write`, `all`). E.g. `olk mcp --allow-tool 'mail.*' --allow-tool calendar_events` exposes only the mail tools plus that one calendar tool. This narrows tools by name; it never grants a write that `--allow-write` hasn't already enabled.
 - **Shrink responses with `concise`.** Every read tool accepts a `concise` boolean (maps to the global `--concise` / `OLK_CONCISE`) that drops large free-text — message/event/task bodies, previews, attendee lists — to cut token usage when an agent only needs headers/metadata.

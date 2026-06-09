@@ -2,6 +2,7 @@ package cmd
 
 type MailCmd struct {
 	List        MailListCmd        `cmd:"" help:"List messages in inbox"`
+	Delta       MailDeltaCmd       `cmd:"" help:"Incremental sync of a mail folder (delta)"`
 	Get         MailGetCmd         `cmd:"" help:"Get a message"`
 	Send        MailSendCmd        `cmd:"" help:"Send a message"`
 	Search      MailSearchCmd      `cmd:"" help:"Search messages"`

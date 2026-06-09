@@ -27,7 +27,12 @@ type Envelope struct {
 	Results         interface{} `json:"results"`
 	Count           int         `json:"count"`
 	NextLink        string      `json:"nextLink,omitempty"`
-	Timezone        string      `json:"timezone,omitempty"`
+	// Delta-sync continuation (set only by delta/changes commands). DeltaToken is
+	// the opaque cursor to pass back next time; DeltaComplete reports whether the
+	// caller is caught up (token is a deltaLink) or more pages remain now.
+	DeltaToken    string `json:"deltaToken,omitempty"`
+	DeltaComplete *bool  `json:"deltaComplete,omitempty"`
+	Timezone      string `json:"timezone,omitempty"`
 }
 
 // Printer handles output formatting
@@ -87,6 +92,48 @@ func (p *Printer) PrintJSON(results interface{}, count int, nextLink string) err
 		NextLink:        nextLink,
 		Timezone:        p.Timezone,
 	})
+}
+
+// PrintDelta renders a delta-sync page: in JSON mode it emits the envelope with
+// the continuation token and completeness (results still wrapped/concised like
+// PrintJSON); in table/plain mode it prints the rows followed by the token and
+// complete flag so a human/script can resume.
+func (p *Printer) PrintDelta(headers []string, rows [][]string, jsonData interface{}, count int, token string, complete bool) error {
+	if p.Format == FormatJSON {
+		results := jsonData
+		if p.Concise {
+			results = dropConcise(results)
+		}
+		notice := ""
+		if p.WrapUntrusted {
+			id := newUntrustedID()
+			results = wrapUntrusted(results, id)
+			notice = untrustedNotice(id)
+		}
+		enc := json.NewEncoder(p.Writer)
+		enc.SetIndent("", "  ")
+		if p.ResultsOnly {
+			return enc.Encode(results)
+		}
+		return enc.Encode(Envelope{
+			UntrustedNotice: notice,
+			Results:         results,
+			Count:           count,
+			DeltaToken:      token,
+			DeltaComplete:   &complete,
+			Timezone:        p.Timezone,
+		})
+	}
+
+	if p.Format == FormatPlain {
+		if err := p.PrintPlain(headers, rows); err != nil {
+			return err
+		}
+	} else if err := p.PrintTable(headers, rows); err != nil {
+		return err
+	}
+	_, err := fmt.Fprintf(p.Writer, "\nDelta token: %s\nComplete: %v\n", token, complete)
+	return err
 }
 
 // PrintTable outputs data as an aligned table

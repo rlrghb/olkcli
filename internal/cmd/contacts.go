@@ -45,6 +45,7 @@ func bestPhone(ct *graphapi.Contact) string {
 
 type ContactsCmd struct {
 	List   ContactsListCmd   `cmd:"" help:"List contacts"`
+	Delta  ContactsDeltaCmd  `cmd:"" help:"Incremental sync of contacts (delta)"`
 	Get    ContactsGetCmd    `cmd:"" help:"Get contact details"`
 	Create ContactsCreateCmd `cmd:"" help:"Create a contact"`
 	Update ContactsUpdateCmd `cmd:"" help:"Update a contact"`

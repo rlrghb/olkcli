@@ -55,18 +55,41 @@ func dropConcise(v any) any {
 }
 
 // scrubConcise zeroes fields tagged concise:"omit" on an addressable struct
-// value. Non-struct values are left untouched.
+// value, recursing into nested and embedded structs, struct pointers, and
+// slices so a tagged field is dropped wherever it sits (e.g. a Body inside an
+// embedded MailMessage). Non-struct values are left untouched.
 func scrubConcise(sv reflect.Value) {
 	if sv.Kind() != reflect.Struct {
 		return
 	}
 	t := sv.Type()
 	for i := 0; i < t.NumField(); i++ {
-		if t.Field(i).Tag.Get(conciseTagKey) != "omit" {
+		f := sv.Field(i)
+		if !f.CanSet() {
 			continue
 		}
-		if f := sv.Field(i); f.CanSet() {
+		if t.Field(i).Tag.Get(conciseTagKey) == "omit" {
 			f.Set(reflect.Zero(f.Type()))
+			continue
+		}
+		switch f.Kind() { //nolint:exhaustive // only nested struct-bearing kinds need recursion
+		case reflect.Struct:
+			scrubConcise(f)
+		case reflect.Pointer:
+			if !f.IsNil() && f.Elem().Kind() == reflect.Struct {
+				scrubConcise(f.Elem())
+			}
+		case reflect.Slice:
+			for j := 0; j < f.Len(); j++ {
+				switch el := f.Index(j); el.Kind() { //nolint:exhaustive // only struct elements recurse
+				case reflect.Struct:
+					scrubConcise(el)
+				case reflect.Pointer:
+					if !el.IsNil() && el.Elem().Kind() == reflect.Struct {
+						scrubConcise(el.Elem())
+					}
+				}
+			}
 		}
 	}
 }

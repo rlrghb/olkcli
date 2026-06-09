@@ -191,6 +191,7 @@ type CLI struct {
 	MCP      MCPCmd      `cmd:"" name:"mcp" help:"Run an MCP server exposing olk as tools (stdio)"`
 	Version  VersionCmd  `cmd:"" help:"Show version information"`
 	Whoami   WhoamiCmd   `cmd:"" help:"Show current user profile"`
+	Changes  ChangesCmd  `cmd:"" help:"Unified delta digest across mail, calendar, and contacts"`
 
 	// Desire path shortcuts
 	Send   SendCmd   `cmd:"" help:"Send an email (shortcut for mail send)" hidden:""`

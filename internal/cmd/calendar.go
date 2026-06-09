@@ -10,6 +10,7 @@ import (
 
 type CalendarCmd struct {
 	Events       CalendarEventsCmd       `cmd:"" help:"List calendar events"`
+	Delta        CalendarDeltaCmd        `cmd:"" help:"Incremental sync of calendar events (delta)"`
 	Get          CalendarGetCmd          `cmd:"" help:"Get event details"`
 	Create       CalendarCreateCmd       `cmd:"" help:"Create a calendar event"`
 	Update       CalendarUpdateCmd       `cmd:"" help:"Update a calendar event"`

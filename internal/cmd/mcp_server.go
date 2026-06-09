@@ -33,6 +33,7 @@ var curatedTools = []curatedTool{
 	{"mail_categories_list", []string{"mail", "categories", "list"}, false},
 	{"mail_rules_list", []string{"mail", "rules", "list"}, false},
 	{"mail_ooo_get", []string{"mail", "ooo", "get"}, false},
+	{"mail_delta", []string{"mail", "delta"}, false},
 	// Calendar (read)
 	{"calendar_events", []string{"calendar", "events"}, false},
 	{"calendar_view", []string{"calendar", "view"}, false},
@@ -40,10 +41,12 @@ var curatedTools = []curatedTool{
 	{"calendar_calendars", []string{"calendar", "calendars"}, false},
 	{"calendar_availability", []string{"calendar", "availability"}, false},
 	{"calendar_find_times", []string{"calendar", "find-times"}, false},
+	{"calendar_delta", []string{"calendar", "delta"}, false},
 	// Contacts (read)
 	{"contacts_list", []string{"contacts", "list"}, false},
 	{"contacts_get", []string{"contacts", "get"}, false},
 	{"contacts_search", []string{"contacts", "search"}, false},
+	{"contacts_delta", []string{"contacts", "delta"}, false},
 	// Drive (read)
 	{"drive_ls", []string{"drive", "ls"}, false},
 	{"drive_get", []string{"drive", "get"}, false},
@@ -60,6 +63,7 @@ var curatedTools = []curatedTool{
 	{"todo_links_list", []string{"todo", "links", "list"}, false},
 	// Directory + meta (read)
 	{"people_search", []string{"people", "search"}, false},
+	{"changes", []string{"changes"}, false},
 	{"whoami", []string{"whoami"}, false},
 	{"version", []string{"version"}, false},
 	// Safe writes (opt-in: --allow-write, non-send and non-destructive)

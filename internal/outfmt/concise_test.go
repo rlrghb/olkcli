@@ -58,3 +58,43 @@ func TestPrintJSON_ConciseDropsBody(t *testing.T) {
 		t.Errorf("concise output dropped non-omitted field:\n%s", out)
 	}
 }
+
+// EmbedSample mimics a delta item: a wrapper embedding a struct whose Body is
+// tagged concise:"omit". Concise must reach through the embedding.
+type EmbedInner struct {
+	ID   string `json:"id"`
+	Body string `json:"body,omitempty" concise:"omit"`
+}
+type EmbedSample struct {
+	EmbedInner
+	Removed bool `json:"removed,omitempty"`
+}
+
+func TestDropConcise_RecursesIntoEmbedded(t *testing.T) {
+	in := []EmbedSample{{EmbedInner: EmbedInner{ID: "1", Body: "huge body"}, Removed: false}}
+	out := dropConcise(in).([]EmbedSample)
+	if out[0].Body != "" {
+		t.Errorf("embedded Body not scrubbed: %q", out[0].Body)
+	}
+	if out[0].ID != "1" {
+		t.Errorf("embedded ID wrongly cleared: %q", out[0].ID)
+	}
+	if in[0].Body == "" {
+		t.Error("dropConcise mutated caller data")
+	}
+}
+
+func TestPrintDelta_JSONEnvelope(t *testing.T) {
+	var sb strings.Builder
+	p := &Printer{Format: FormatJSON, Writer: &sb}
+	if err := p.PrintDelta(nil, nil, []EmbedSample{{EmbedInner: EmbedInner{ID: "1"}}}, 1, "TOKEN123", true); err != nil {
+		t.Fatalf("PrintDelta: %v", err)
+	}
+	out := sb.String()
+	if !strings.Contains(out, `"deltaToken": "TOKEN123"`) {
+		t.Errorf("missing deltaToken:\n%s", out)
+	}
+	if !strings.Contains(out, `"deltaComplete": true`) {
+		t.Errorf("missing deltaComplete:\n%s", out)
+	}
+}
