@@ -71,14 +71,20 @@ jobs:
           TAP_GITHUB_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
 
   # Publish the `olk` CLI to npm (esbuild-style binary wrapper) so it is
-  # installable via npx/npm and listable on the MCP Registry. Gated on the
-  # PUBLISH_NPM repo variable so releases keep working until npm is set up:
-  # set repo secret NPM_TOKEN and repo variable PUBLISH_NPM=true to enable.
+  # installable via npx/npm and listable on the MCP Registry. Publishes via
+  # npm Trusted Publishing (OIDC) — no stored token: each package
+  # (olkcli + the six olk-<platform> packages) has a trusted publisher
+  # configured for this repo + workflow, and npm mints a short-lived
+  # credential per run from the GitHub OIDC identity. Gated on the
+  # PUBLISH_NPM repo variable.
   npm-publish:
     runs-on: ubuntu-latest
     needs: release
     if: ${{ vars.PUBLISH_NPM == 'true' }}
     timeout-minutes: 15
+    permissions:
+      id-token: write # OIDC token for npm Trusted Publishing
+      contents: read # checkout + gh release download
     steps:
       - name: Checkout
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
@@ -88,6 +94,9 @@ jobs:
         with:
           node-version: "lts/*"
           registry-url: "https://registry.npmjs.org"
+
+      - name: Upgrade npm (Trusted Publishing/OIDC requires >= 11.5.1)
+        run: npm install -g npm@latest
 
       - name: Extract release binaries into per-platform packages
         env:
@@ -111,8 +120,6 @@ jobs:
           chmod +x npm/olk-*/bin/olk
 
       - name: Stamp versions and publish to npm
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: node scripts/build-npm.mjs "${GITHUB_REF_NAME}" --publish
 
   # Publish the server.json to the official MCP Registry. Runs after the npm
