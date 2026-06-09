@@ -206,3 +206,13 @@ func TestToolSchema_ConciseInjectedForReadOnly(t *testing.T) {
 		t.Error("write tool schema must not include concise property")
 	}
 }
+
+// TestCuratedReadToolCount pins the default (read-only) registry size so the
+// "N read tools" figure in README.md can't silently drift. If you add or remove
+// a read tool, update both this number and the README.
+func TestCuratedReadToolCount(t *testing.T) {
+	const documentedReadTools = 32
+	if got := len(buildBindings(t)); got != documentedReadTools {
+		t.Errorf("default read-only registry has %d tools; expected %d — update README.md and this constant in lockstep", got, documentedReadTools)
+	}
+}

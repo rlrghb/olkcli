@@ -362,7 +362,7 @@ It's also published to the [MCP Registry](https://registry.modelcontextprotocol.
 
 Either way, run `olk auth login` once first so the server has a token to reuse.
 
-- **Read-only by default.** A curated set of 30 read tools is exposed; destructive and send commands have **no** MCP exposure path at all:
+- **Read-only by default.** A curated set of 32 read tools is exposed; destructive and send commands have **no** MCP exposure path at all:
   - **Mail:** `mail_list`, `mail_get`, `mail_search`, `mail_folders_list`, `mail_attachments`, `mail_categories_list`, `mail_rules_list`, `mail_ooo_get`
   - **Calendar:** `calendar_events`, `calendar_view`, `calendar_get`, `calendar_calendars`, `calendar_availability`, `calendar_find_times`
   - **Contacts:** `contacts_list`, `contacts_get`, `contacts_search`
