@@ -34,6 +34,7 @@
 - Unit tests: stdlib `testing` package. Test files go next to the code they test (`*_test.go`).
 - Existing coverage: `internal/outfmt` (formatting + untrusted-wrapping), `internal/config`, `internal/msauth/scopes`, `internal/graphapi` (validate + capability guards), and `internal/cmd` (paging filters + mailbox-target validation, MCP server/registry, schema generation, argv building, output capture). Coverage is partial — many command and Graph-wrapper paths remain untested.
 - Integration tests require a valid OAuth token + live Graph access — run manually, not in CI.
+- **macOS validation:** each `make build` produces a fresh (ad-hoc) binary identity, so the first run of the new `./bin/olk` that reads stored tokens triggers a macOS Keychain access prompt — a human must click **"Always Allow"**. An automated/agent run can't dismiss the dialog, so a hang on the first post-build command is expected (not a code bug); surface it for manual approval.
 - New tests should run cleanly under `go test -race -count=1 ./...` and pass `golangci-lint run`.
 
 ## CI

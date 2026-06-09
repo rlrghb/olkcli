@@ -15,6 +15,8 @@ make lint           # Lint with golangci-lint
 go mod tidy         # After changing dependencies
 ```
 
+> **Validating on macOS:** running a freshly built `./bin/olk` against a real account triggers a macOS Keychain access prompt (each build is a new identity). A human must click **"Always Allow"** — you (an agent) can't dismiss the dialog, so don't treat a first-run hang as a bug; ask the user to approve it.
+
 ## Architecture
 
 - **CLI framework**: `github.com/alecthomas/kong` — commands are Go structs with `Run(ctx *RunContext) error`
