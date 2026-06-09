@@ -1,6 +1,6 @@
 # olk — Microsoft Outlook in Your Terminal
 
-A fast, scriptable CLI for Microsoft Outlook and OneDrive via the Microsoft Graph API. Manage email, calendar, contacts, tasks, and OneDrive files from the command line.
+A fast, scriptable **CLI and MCP server** for Microsoft Outlook and OneDrive via the Microsoft Graph API. Manage email, calendar, contacts, tasks, and OneDrive files from the command line — or expose them to AI agents as curated, read-first tools over the [Model Context Protocol](#mcp-server-ai-agents).
 
 Works with both **personal Microsoft accounts** and **enterprise (Azure AD / Entra ID)** accounts. Zero-config setup with device-code authentication — just run `olk auth login` and go. For enterprise accounts, use `olk auth login --enterprise` to enable additional features like out-of-office, inbox rules, and directory search.
 
