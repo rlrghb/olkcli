@@ -4,6 +4,8 @@ type MailCmd struct {
 	List        MailListCmd        `cmd:"" help:"List messages in inbox"`
 	Delta       MailDeltaCmd       `cmd:"" help:"Incremental sync of a mail folder (delta)"`
 	Get         MailGetCmd         `cmd:"" help:"Get a message"`
+	Batch       MailBatchCmd       `cmd:"" help:"Fetch up to 20 messages by ID in one request ($batch)"`
+	Thread      MailThreadCmd      `cmd:"" help:"List all messages in a conversation thread"`
 	Send        MailSendCmd        `cmd:"" help:"Send a message"`
 	Search      MailSearchCmd      `cmd:"" help:"Search messages"`
 	Reply       MailReplyCmd       `cmd:"" help:"Reply to a message"`

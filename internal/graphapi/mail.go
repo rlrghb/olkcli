@@ -53,6 +53,14 @@ type MailMessage struct {
 	Body           string   `json:"body,omitempty" untrusted:"true" concise:"omit"`
 	BodyType       string   `json:"bodyType,omitempty"`
 	Categories     []string `json:"categories,omitempty"`
+	ConversationID string   `json:"conversationId,omitempty"`
+}
+
+// messageDetailSelect is the $select field set for a full single message (used by
+// GetMessage and the batch fetch) — includes the body and conversation id.
+var messageDetailSelect = []string{
+	"id", "subject", "from", "toRecipients", "ccRecipients", "bccRecipients",
+	"receivedDateTime", "isRead", "hasAttachments", "body", "bodyPreview", "conversationId",
 }
 
 // MailFolder is a simplified folder representation
@@ -99,8 +107,11 @@ func (c *Client) ListMessages(ctx context.Context, target string, opts *ListMess
 	queryParams := &users.ItemMessagesRequestBuilderGetQueryParameters{
 		Top: &top,
 	}
-	// Microsoft Graph does not support $orderBy combined with $search or inferenceClassification filter.
-	skipOrderBy := opts.Search != "" || strings.Contains(opts.Filter, "inferenceClassification")
+	// Microsoft Graph does not support $orderBy combined with $search, an
+	// inferenceClassification filter, or a conversationId filter ("restriction or
+	// sort order is too complex"). Callers that need ordering in those cases sort
+	// client-side.
+	skipOrderBy := opts.Search != "" || strings.Contains(opts.Filter, "inferenceClassification") || strings.Contains(opts.Filter, "conversationId")
 	if !skipOrderBy {
 		queryParams.Orderby = []string{orderBy}
 	}
@@ -118,7 +129,7 @@ func (c *Client) ListMessages(ctx context.Context, target string, opts *ListMess
 		}
 		queryParams.Select = opts.Select
 	} else {
-		queryParams.Select = []string{"id", "subject", "from", "toRecipients", "receivedDateTime", "isRead", "hasAttachments", "bodyPreview", "categories"}
+		queryParams.Select = []string{"id", "subject", "from", "toRecipients", "receivedDateTime", "isRead", "hasAttachments", "bodyPreview", "categories", "conversationId"}
 	}
 
 	config = &users.ItemMessagesRequestBuilderGetRequestConfiguration{
@@ -174,23 +185,14 @@ func (c *Client) GetMessage(ctx context.Context, target, messageID string) (*Mai
 	}
 	msg, err := c.targetUser(target).Messages().ByMessageId(messageID).Get(ctx, &users.ItemMessagesMessageItemRequestBuilderGetRequestConfiguration{
 		QueryParameters: &users.ItemMessagesMessageItemRequestBuilderGetQueryParameters{
-			Select: []string{"id", "subject", "from", "toRecipients", "ccRecipients", "bccRecipients", "receivedDateTime", "isRead", "hasAttachments", "body", "bodyPreview"},
+			Select: messageDetailSelect,
 		},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("getting message: %w", err)
 	}
 	m := convertMessage(msg)
-	if msg.GetBody() != nil {
-		content := msg.GetBody().GetContent()
-		if content != nil {
-			m.Body = *content
-		}
-		ct := msg.GetBody().GetContentType()
-		if ct != nil {
-			m.BodyType = ct.String()
-		}
-	}
+	fillBody(&m, msg)
 	return &m, nil
 }
 
@@ -688,7 +690,24 @@ func convertMessage(msg models.Messageable) MailMessage {
 	if cats := msg.GetCategories(); len(cats) > 0 {
 		m.Categories = cats
 	}
+	if msg.GetConversationId() != nil {
+		m.ConversationID = *msg.GetConversationId()
+	}
 	return m
+}
+
+// fillBody copies a message's body content and type into m (convertMessage only
+// sets the preview, since list responses don't include the full body).
+func fillBody(m *MailMessage, msg models.Messageable) {
+	if msg.GetBody() == nil {
+		return
+	}
+	if content := msg.GetBody().GetContent(); content != nil {
+		m.Body = *content
+	}
+	if ct := msg.GetBody().GetContentType(); ct != nil {
+		m.BodyType = ct.String()
+	}
 }
 
 func makeRecipients(emails []string) ([]models.Recipientable, error) {

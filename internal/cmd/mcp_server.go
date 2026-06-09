@@ -27,6 +27,8 @@ var curatedTools = []curatedTool{
 	// Mail (read)
 	{"mail_list", []string{"mail", "list"}, false},
 	{"mail_get", []string{"mail", "get"}, false},
+	{"mail_batch", []string{"mail", "batch"}, false},
+	{"mail_thread", []string{"mail", "thread"}, false},
 	{"mail_search", []string{"mail", "search"}, false},
 	{"mail_folders_list", []string{"mail", "folders", "list"}, false},
 	{"mail_attachments", []string{"mail", "attachments"}, false},

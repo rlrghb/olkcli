@@ -61,6 +61,12 @@ func (c *MailListCmd) Run(ctx *RunContext) error {
 		return err
 	}
 
+	return printMessageList(ctx, messages)
+}
+
+// printMessageList renders a slice of messages as JSON (full structs) or an
+// aligned table, shared by mail list, mail batch, and mail thread.
+func printMessageList(ctx *RunContext, messages []graphapi.MailMessage) error {
 	printer := ctx.Printer()
 	if ctx.Flags.JSON {
 		return printer.PrintJSON(messages, len(messages), "")
