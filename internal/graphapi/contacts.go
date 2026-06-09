@@ -48,39 +48,39 @@ func buildEmailAddresses(emails []string) ([]models.EmailAddressable, error) {
 
 // Address is a physical address.
 type Address struct {
-	Street          string `json:"street,omitempty"`
-	City            string `json:"city,omitempty"`
-	State           string `json:"state,omitempty"`
-	PostalCode      string `json:"postalCode,omitempty"`
-	CountryOrRegion string `json:"countryOrRegion,omitempty"`
+	Street          string `json:"street,omitempty" untrusted:"true"`
+	City            string `json:"city,omitempty" untrusted:"true"`
+	State           string `json:"state,omitempty" untrusted:"true"`
+	PostalCode      string `json:"postalCode,omitempty" untrusted:"true"`
+	CountryOrRegion string `json:"countryOrRegion,omitempty" untrusted:"true"`
 }
 
 // Contact is a simplified contact representation
 type Contact struct {
 	ID               string   `json:"id"`
-	DisplayName      string   `json:"displayName"`
-	FirstName        string   `json:"givenName"`
-	LastName         string   `json:"surname"`
-	MiddleName       string   `json:"middleName,omitempty"`
-	NickName         string   `json:"nickName,omitempty"`
+	DisplayName      string   `json:"displayName" untrusted:"true"`
+	FirstName        string   `json:"givenName" untrusted:"true"`
+	LastName         string   `json:"surname" untrusted:"true"`
+	MiddleName       string   `json:"middleName,omitempty" untrusted:"true"`
+	NickName         string   `json:"nickName,omitempty" untrusted:"true"`
 	Emails           []string `json:"emailAddresses"`
 	BusinessPhones   []string `json:"businessPhones,omitempty"`
 	HomePhones       []string `json:"homePhones,omitempty"`
 	MobilePhone      string   `json:"mobilePhone,omitempty"`
 	ImAddresses      []string `json:"imAddresses,omitempty"`
-	Company          string   `json:"companyName"`
-	JobTitle         string   `json:"jobTitle"`
-	Department       string   `json:"department,omitempty"`
-	OfficeLocation   string   `json:"officeLocation,omitempty"`
-	Profession       string   `json:"profession,omitempty"`
-	Manager          string   `json:"manager,omitempty"`
-	AssistantName    string   `json:"assistantName,omitempty"`
+	Company          string   `json:"companyName" untrusted:"true"`
+	JobTitle         string   `json:"jobTitle" untrusted:"true"`
+	Department       string   `json:"department,omitempty" untrusted:"true"`
+	OfficeLocation   string   `json:"officeLocation,omitempty" untrusted:"true"`
+	Profession       string   `json:"profession,omitempty" untrusted:"true"`
+	Manager          string   `json:"manager,omitempty" untrusted:"true"`
+	AssistantName    string   `json:"assistantName,omitempty" untrusted:"true"`
 	Birthday         string   `json:"birthday,omitempty"`
-	PersonalNotes    string   `json:"personalNotes,omitempty"`
-	SpouseName       string   `json:"spouseName,omitempty"`
-	Children         []string `json:"children,omitempty"`
+	PersonalNotes    string   `json:"personalNotes,omitempty" untrusted:"true"`
+	SpouseName       string   `json:"spouseName,omitempty" untrusted:"true"`
+	Children         []string `json:"children,omitempty" untrusted:"true"`
 	Categories       []string `json:"categories,omitempty"`
-	BusinessHomePage string   `json:"businessHomePage,omitempty"`
+	BusinessHomePage string   `json:"businessHomePage,omitempty" untrusted:"true"`
 	BusinessAddress  *Address `json:"businessAddress,omitempty"`
 	HomeAddress      *Address `json:"homeAddress,omitempty"`
 	OtherAddress     *Address `json:"otherAddress,omitempty"`
@@ -346,6 +346,9 @@ func buildPhysicalAddressComplete(a *Address) models.PhysicalAddressable {
 }
 
 func (c *Client) CreateContact(ctx context.Context, in *ContactCreateInput) (*Contact, error) {
+	if err := c.ensureWritable(); err != nil {
+		return nil, err
+	}
 	ct := models.NewContact()
 	if err := applyContactFields(ct, in); err != nil {
 		return nil, err
@@ -498,6 +501,9 @@ func applyContactUpdateFields(ct models.Contactable, in *ContactUpdateInput) err
 }
 
 func (c *Client) UpdateContact(ctx context.Context, contactID string, in *ContactUpdateInput) (*Contact, error) {
+	if err := c.ensureWritable(); err != nil {
+		return nil, err
+	}
 	if err := validateID(contactID, "contact ID"); err != nil {
 		return nil, err
 	}
@@ -516,6 +522,9 @@ func (c *Client) UpdateContact(ctx context.Context, contactID string, in *Contac
 }
 
 func (c *Client) DeleteContact(ctx context.Context, contactID string) error {
+	if err := c.ensureWritable(); err != nil {
+		return err
+	}
 	if err := validateID(contactID, "contact ID"); err != nil {
 		return err
 	}

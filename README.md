@@ -308,7 +308,36 @@ For common workflows, `olk` provides top-level shortcuts:
 | `--select FIELDS` | `OLK_SELECT` | Field projection |
 | `--results-only` | `OLK_RESULTS_ONLY` | Unwrap JSON envelope |
 | `--tz TIMEZONE` | `OLK_TIMEZONE` | IANA time zone for display (e.g. `America/New_York`) |
+| `--no-write` | `OLK_NO_WRITE` | Refuse any mutating operation (hard guarantee, all surfaces) |
+| `--no-send` | `OLK_NO_SEND` | Refuse sending mail or meeting invites |
+| `--no-input` | `OLK_NO_INPUT` | Fail instead of prompting (headless/agent safety) |
+| `--wrap-untrusted` | `OLK_WRAP_UNTRUSTED` | Wrap external free-text in untrusted-content markers (JSON/plain) |
+| `--enable-commands CSV` | `OLK_ENABLE_COMMANDS` | Allow only these command prefixes (e.g. `mail,calendar`) |
+| `--enable-commands-exact CSV` | `OLK_ENABLE_COMMANDS_EXACT` | Allow only these exact command paths (e.g. `mail.list,mail.get`) |
+| `--disable-commands CSV` | `OLK_DISABLE_COMMANDS` | Block these command paths (overrides allows) |
 | | `OLK_KEYRING_PASSWORD` | File-backend keyring password (for headless use) |
+
+These capability guards apply to **every** entry path — the bare CLI, scripts/CI, and the MCP server — so `OLK_NO_WRITE=1 olk --mailbox boss@example.com mail list` is a hard "read this mailbox, never write" guarantee.
+
+## MCP Server (AI agents)
+
+`olk mcp` runs a [Model Context Protocol](https://modelcontextprotocol.io) server over **stdio**, exposing a **curated, read-first** set of tools to MCP clients (Claude Desktop, IDEs, agents). It reuses your existing olk login — no separate auth.
+
+```jsonc
+// Claude Desktop / MCP client config
+{
+  "mcpServers": {
+    "olk": { "command": "olk", "args": ["mcp"] }
+  }
+}
+```
+
+- **Read-only by default.** Only safe read tools (`mail_list`, `mail_get`, `mail_search`, `calendar_events`, `contacts_search`, `drive_ls`, …) are exposed. Destructive and send commands have **no** MCP exposure path at all.
+- **Opt into safe writes** with `olk mcp --allow-write`, which adds `mail_drafts_create` and `todo_create` (non-send, non-destructive). Each must also be permitted via `--enable-commands-exact`.
+- **Prompt-injection defense.** Tool output is emitted with `--wrap-untrusted` forced on: externally-controlled fields (email bodies, subjects, sender names, file names…) are wrapped in `‹untrusted›…‹/untrusted›` markers. Instruct your agent to treat marked spans as data, never instructions.
+- **No HTTP transport** is shipped (stdio only) — a deliberate scope choice to avoid running a networked service.
+
+> **Not affiliated with Microsoft.** olk is an independent client for the Microsoft Graph API.
 
 ## Commands Reference
 

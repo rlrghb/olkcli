@@ -28,13 +28,13 @@ type TodoList struct {
 // TodoTask is a simplified task for output
 type TodoTask struct {
 	ID             string   `json:"id"`
-	Title          string   `json:"title"`
+	Title          string   `json:"title" untrusted:"true"`
 	Status         string   `json:"status"`
 	Importance     string   `json:"importance"`
 	DueDate        string   `json:"dueDateTime,omitempty"`
 	CreatedAt      string   `json:"createdDateTime"`
 	CompletedAt    string   `json:"completedDateTime,omitempty"`
-	Body           string   `json:"body,omitempty"`
+	Body           string   `json:"body,omitempty" untrusted:"true"`
 	StartDate      string   `json:"startDateTime,omitempty"`
 	IsReminderOn   bool     `json:"isReminderOn"`
 	ReminderDate   string   `json:"reminderDateTime,omitempty"`
@@ -93,6 +93,9 @@ func (c *Client) ListTodoLists(ctx context.Context) ([]TodoList, error) {
 
 // CreateTodoList creates a new task list.
 func (c *Client) CreateTodoList(ctx context.Context, displayName string) (*TodoList, error) {
+	if err := c.ensureWritable(); err != nil {
+		return nil, err
+	}
 	list := models.NewTodoTaskList()
 	list.SetDisplayName(&displayName)
 
@@ -115,6 +118,9 @@ func (c *Client) CreateTodoList(ctx context.Context, displayName string) (*TodoL
 
 // DeleteTodoList deletes a task list.
 func (c *Client) DeleteTodoList(ctx context.Context, listID string) error {
+	if err := c.ensureWritable(); err != nil {
+		return err
+	}
 	if err := validateID(listID, "list ID"); err != nil {
 		return err
 	}
@@ -186,6 +192,9 @@ func (c *Client) GetTodoTask(ctx context.Context, listID, taskID string) (*TodoT
 
 // CreateTodoTask creates a new task in the given list.
 func (c *Client) CreateTodoTask(ctx context.Context, listID, title, dueDate, importance, body, startDate, reminderDate, recurrence string, categories []string) (*TodoTask, error) {
+	if err := c.ensureWritable(); err != nil {
+		return nil, err
+	}
 	if err := validateID(listID, "list ID"); err != nil {
 		return nil, err
 	}
@@ -290,6 +299,9 @@ func (c *Client) CreateTodoTask(ctx context.Context, listID, title, dueDate, imp
 
 // CompleteTodoTask marks a task as completed.
 func (c *Client) CompleteTodoTask(ctx context.Context, listID, taskID string) error {
+	if err := c.ensureWritable(); err != nil {
+		return err
+	}
 	if err := validateID(listID, "list ID"); err != nil {
 		return err
 	}
@@ -310,6 +322,9 @@ func (c *Client) CompleteTodoTask(ctx context.Context, listID, taskID string) er
 
 // UpdateTodoTask updates a task's properties.
 func (c *Client) UpdateTodoTask(ctx context.Context, listID, taskID string, title, dueDate, importance, body, startDate, reminderDate, recurrence *string, categories *[]string) (*TodoTask, error) {
+	if err := c.ensureWritable(); err != nil {
+		return nil, err
+	}
 	if err := validateID(listID, "list ID"); err != nil {
 		return nil, err
 	}
@@ -438,6 +453,9 @@ func (c *Client) UpdateTodoTask(ctx context.Context, listID, taskID string, titl
 
 // DeleteTodoTask deletes a task.
 func (c *Client) DeleteTodoTask(ctx context.Context, listID, taskID string) error {
+	if err := c.ensureWritable(); err != nil {
+		return err
+	}
 	if err := validateID(listID, "list ID"); err != nil {
 		return err
 	}
@@ -524,6 +542,9 @@ func (c *Client) ListChecklistItems(ctx context.Context, listID, taskID string) 
 
 // CreateChecklistItem creates a new checklist item on a task.
 func (c *Client) CreateChecklistItem(ctx context.Context, listID, taskID, displayName string) (*TodoChecklistItem, error) {
+	if err := c.ensureWritable(); err != nil {
+		return nil, err
+	}
 	if err := validateID(listID, "list ID"); err != nil {
 		return nil, err
 	}
@@ -545,6 +566,9 @@ func (c *Client) CreateChecklistItem(ctx context.Context, listID, taskID, displa
 
 // UpdateChecklistItem updates a checklist item's properties.
 func (c *Client) UpdateChecklistItem(ctx context.Context, listID, taskID, itemID string, displayName *string, isChecked *bool) (*TodoChecklistItem, error) {
+	if err := c.ensureWritable(); err != nil {
+		return nil, err
+	}
 	if err := validateID(listID, "list ID"); err != nil {
 		return nil, err
 	}
@@ -574,6 +598,9 @@ func (c *Client) UpdateChecklistItem(ctx context.Context, listID, taskID, itemID
 
 // DeleteChecklistItem deletes a checklist item.
 func (c *Client) DeleteChecklistItem(ctx context.Context, listID, taskID, itemID string) error {
+	if err := c.ensureWritable(); err != nil {
+		return err
+	}
 	if err := validateID(listID, "list ID"); err != nil {
 		return err
 	}
@@ -679,6 +706,9 @@ func (c *Client) ListTodoAttachments(ctx context.Context, listID, taskID string)
 
 // UploadTodoAttachment uploads a file attachment to a task.
 func (c *Client) UploadTodoAttachment(ctx context.Context, listID, taskID, name, contentType string, content []byte) (*TodoAttachment, error) {
+	if err := c.ensureWritable(); err != nil {
+		return nil, err
+	}
 	if err := validateID(listID, "list ID"); err != nil {
 		return nil, err
 	}
@@ -752,6 +782,9 @@ func (c *Client) DownloadTodoAttachment(ctx context.Context, listID, taskID, att
 
 // DeleteTodoAttachment deletes a task attachment.
 func (c *Client) DeleteTodoAttachment(ctx context.Context, listID, taskID, attachmentID string) error {
+	if err := c.ensureWritable(); err != nil {
+		return err
+	}
 	if err := validateID(listID, "list ID"); err != nil {
 		return err
 	}
@@ -794,6 +827,9 @@ func (c *Client) ListLinkedResources(ctx context.Context, listID, taskID string)
 
 // CreateLinkedResource creates a new linked resource on a task.
 func (c *Client) CreateLinkedResource(ctx context.Context, listID, taskID, displayName, appName, externalID, webURL string) (*TodoLinkedResource, error) {
+	if err := c.ensureWritable(); err != nil {
+		return nil, err
+	}
 	if err := validateID(listID, "list ID"); err != nil {
 		return nil, err
 	}
@@ -818,6 +854,9 @@ func (c *Client) CreateLinkedResource(ctx context.Context, listID, taskID, displ
 
 // DeleteLinkedResource deletes a linked resource from a task.
 func (c *Client) DeleteLinkedResource(ctx context.Context, listID, taskID, resourceID string) error {
+	if err := c.ensureWritable(); err != nil {
+		return err
+	}
 	if err := validateID(listID, "list ID"); err != nil {
 		return err
 	}

@@ -28,6 +28,9 @@ func (c *Client) ListCategories(ctx context.Context) ([]Category, error) {
 }
 
 func (c *Client) CreateCategory(ctx context.Context, name, color string) (*Category, error) {
+	if err := c.ensureWritable(); err != nil {
+		return nil, err
+	}
 	cat := models.NewOutlookCategory()
 	cat.SetDisplayName(&name)
 
@@ -49,6 +52,9 @@ func (c *Client) CreateCategory(ctx context.Context, name, color string) (*Categ
 }
 
 func (c *Client) DeleteCategory(ctx context.Context, categoryID string) error {
+	if err := c.ensureWritable(); err != nil {
+		return err
+	}
 	if err := validateID(categoryID, "category ID"); err != nil {
 		return err
 	}

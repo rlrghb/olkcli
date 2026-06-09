@@ -60,6 +60,9 @@ func (c *Client) GetAutoReply(ctx context.Context) (*AutoReplySettings, error) {
 
 // SetAutoReply updates the auto-reply (out-of-office) settings
 func (c *Client) SetAutoReply(ctx context.Context, status, internalMsg, externalMsg, startTime, endTime, audience string) error {
+	if err := c.ensureWritable(); err != nil {
+		return err
+	}
 	autoReply := models.NewAutomaticRepliesSetting()
 
 	// Set status

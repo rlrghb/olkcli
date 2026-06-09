@@ -22,6 +22,8 @@ go mod tidy         # After changing dependencies
 - **API**: Official `msgraph-sdk-go` wrapped in `internal/graphapi/` for ergonomic access
 - **Secrets**: OS keyring via `github.com/99designs/keyring` (macOS Keychain, Linux Secret Service, Windows WinCred). File-backend password prompt writes to stderr (not stdout) to avoid corrupting piped output. Set `OLK_KEYRING_PASSWORD` for headless/non-interactive use
 - **Output**: JSON envelope (`--json`), aligned table (default), TSV (`--plain`)
+- **MCP server**: `olk mcp` (in `internal/cmd/mcp*.go`) runs a stdio Model Context Protocol server exposing a **curated** allowlist of read-first tools (`curatedTools` in `mcp_server.go`) — NOT the whole command tree. Tool calls reparse a rebuilt argv and run in-process with stdout captured under a mutex (`mcp_capture.go`). Read-only by default; `--allow-write` adds curated safe writes. No HTTP transport
+- **Capability guards**: `--no-write`/`--no-send` are enforced once at the `graphapi.Client` layer (`ensureWritable`/`ensureMaySend`), so the guarantee holds across CLI, MCP, and scripts. `--enable-commands[-exact]`/`--disable-commands` gate dispatch via `commandAllowed()` (`commands.go`), checked in `Execute()` and reused to filter the MCP registry. `--wrap-untrusted` wraps `untrusted:"true"`-tagged struct fields in JSON/plain output (`internal/outfmt/untrusted.go`)
 - **Timezone**: Display-layer conversion via `outfmt.ConvertTime()`. Resolved once per command via `RunContext.Timezone()` (flag > env > config > Local). JSON output emits UTC timestamps as RFC3339 with a `Z` suffix (normalized via `normalizeGraphUTC` — Graph's `DateTimeTimeZone.dateTime` strings lack a zone); envelope includes `timezone` field. IANA db embedded via `import _ "time/tzdata"`
 
 ## Key Patterns
@@ -61,6 +63,12 @@ go mod tidy         # After changing dependencies
 
 ### Adding a new flag to all commands
 Add it to `RootFlags` in `internal/cmd/root.go` with `env:"OLK_*"` tag.
+
+### Exposing a command as an MCP tool
+Add an entry to `curatedTools` in `internal/cmd/mcp_server.go` (`{name, path, write}`). Only do this for safe read or non-destructive/non-send write commands — destructive and send commands must never be added. A test (`TestCuratedToolsResolve`) fails if the path doesn't resolve; another (`TestCuratedRegistry_NoDestructiveOrSend`) fails if a forbidden verb sneaks in.
+
+### Marking a field as agent-untrusted
+Add `untrusted:"true"` to the struct tag of any externally-controlled free-text field on a `graphapi` result struct. `--wrap-untrusted` (forced on under MCP) wraps it in markers.
 
 ### Adding timezone conversion to a new command
 1. Get the location: `loc, _ := ctx.Timezone()`

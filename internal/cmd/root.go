@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 	_ "time/tzdata"
 
@@ -35,6 +36,19 @@ type RootFlags struct {
 	ResultsOnly bool   `help:"Output only the results array (no envelope)" env:"OLK_RESULTS_ONLY"`
 	Timeout     int    `help:"Request timeout in seconds" default:"60" env:"OLK_TIMEOUT"`
 	TimeZone    string `help:"IANA time zone for display (e.g. America/New_York, Local, UTC)" name:"tz" env:"OLK_TIMEZONE"`
+
+	// Capability guards (enforced for CLI, MCP, scripts, and --mailbox alike).
+	// Named --no-write rather than --read-only because `auth login --read-only`
+	// already exists (it requests read-only OAuth scopes).
+	NoWrite       bool `help:"Refuse any mutating operation" env:"OLK_NO_WRITE"`
+	NoSend        bool `help:"Refuse sending mail or meeting invites" env:"OLK_NO_SEND"`
+	NoInput       bool `help:"Fail instead of prompting (headless/agent safety)" env:"OLK_NO_INPUT"`
+	WrapUntrusted bool `help:"Wrap external free-text in untrusted-content markers (JSON/plain output)" env:"OLK_WRAP_UNTRUSTED"`
+
+	// Command-scoping (gog-style allow/deny lists, comma-separated dotted paths).
+	EnableCommands      string `help:"Allow only these command prefixes (csv; e.g. mail,calendar)" env:"OLK_ENABLE_COMMANDS"`
+	EnableCommandsExact string `help:"Allow only these exact command paths (csv; e.g. mail.list,mail.get)" env:"OLK_ENABLE_COMMANDS_EXACT"`
+	DisableCommands     string `help:"Block these command paths (csv; overrides allows)" env:"OLK_DISABLE_COMMANDS"`
 }
 
 type RunContext struct {
@@ -130,6 +144,10 @@ func (r *RunContext) GraphClient() (*graphapi.Client, error) {
 		return nil, fmt.Errorf("creating Graph client: %w", err)
 	}
 
+	// Capability guards apply at the client layer, so they cover every command
+	// path uniformly (CLI, MCP, scripts, delegated --mailbox).
+	client.SetGuards(r.Flags.NoWrite, r.Flags.NoSend)
+
 	r.client = client
 	return client, nil
 }
@@ -155,7 +173,7 @@ func (r *RunContext) Printer() *outfmt.Printer {
 	if loc, err := r.Timezone(); err == nil {
 		tzName = loc.String()
 	}
-	return outfmt.NewPrinter(r.Flags.JSON, r.Flags.Plain, r.Flags.ResultsOnly, r.Flags.Select, tzName)
+	return outfmt.NewPrinter(r.Flags.JSON, r.Flags.Plain, r.Flags.ResultsOnly, r.Flags.Select, tzName, r.Flags.WrapUntrusted)
 }
 
 type CLI struct {
@@ -169,6 +187,7 @@ type CLI struct {
 	People   PeopleCmd   `cmd:"" help:"People directory search"`
 	Drive    DriveCmd    `cmd:"" help:"OneDrive file operations"`
 	Config   ConfigCmd   `cmd:"" help:"Configuration management"`
+	MCP      MCPCmd      `cmd:"" name:"mcp" help:"Run an MCP server exposing olk as tools (stdio)"`
 	Version  VersionCmd  `cmd:"" help:"Show version information"`
 	Whoami   WhoamiCmd   `cmd:"" help:"Show current user profile"`
 
@@ -210,6 +229,13 @@ func Execute() int {
 	runCtx := &RunContext{
 		Ctx:   ctx_bg,
 		Flags: &cli.RootFlags,
+	}
+
+	// Command allow/deny lists gate dispatch (gog-style). Applies to the bare
+	// CLI; the MCP server reuses the same predicate to filter its tool registry.
+	if path := selectedCommandPath(ctx); !commandAllowed(&cli.RootFlags, path) {
+		fmt.Fprintf(os.Stderr, "Error: command %q is not allowed by --enable-commands/--disable-commands\n", strings.Join(path, " "))
+		return 1
 	}
 
 	err := ctx.Run(runCtx)

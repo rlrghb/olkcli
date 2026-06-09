@@ -29,15 +29,16 @@ type Envelope struct {
 
 // Printer handles output formatting
 type Printer struct {
-	Format      Format
-	Writer      io.Writer
-	Select      string // comma-separated field names
-	ResultsOnly bool
-	Timezone    string // IANA timezone name for JSON envelope metadata
+	Format        Format
+	Writer        io.Writer
+	Select        string // comma-separated field names
+	ResultsOnly   bool
+	Timezone      string // IANA timezone name for JSON envelope metadata
+	WrapUntrusted bool   // wrap externally-controlled free-text fields in JSON output
 }
 
 // NewPrinter creates a printer from flags
-func NewPrinter(jsonFlag, plainFlag, resultsOnly bool, selectFields, timezone string) *Printer {
+func NewPrinter(jsonFlag, plainFlag, resultsOnly bool, selectFields, timezone string, wrapUntrusted bool) *Printer {
 	f := FormatTable
 	if jsonFlag {
 		f = FormatJSON
@@ -45,16 +46,22 @@ func NewPrinter(jsonFlag, plainFlag, resultsOnly bool, selectFields, timezone st
 		f = FormatPlain
 	}
 	return &Printer{
-		Format:      f,
-		Writer:      os.Stdout,
-		Select:      selectFields,
-		ResultsOnly: resultsOnly,
-		Timezone:    timezone,
+		Format:        f,
+		Writer:        os.Stdout,
+		Select:        selectFields,
+		ResultsOnly:   resultsOnly,
+		Timezone:      timezone,
+		WrapUntrusted: wrapUntrusted,
 	}
 }
 
-// PrintJSON outputs data as JSON with envelope
+// PrintJSON outputs data as JSON with envelope. When WrapUntrusted is set,
+// fields tagged `untrusted:"true"` are wrapped with markers so an LLM/agent
+// consumer can distinguish externally-controlled text from trusted output.
 func (p *Printer) PrintJSON(results interface{}, count int, nextLink string) error {
+	if p.WrapUntrusted {
+		results = wrapUntrusted(results)
+	}
 	enc := json.NewEncoder(p.Writer)
 	enc.SetIndent("", "  ")
 	if p.ResultsOnly {

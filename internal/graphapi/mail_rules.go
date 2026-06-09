@@ -38,6 +38,9 @@ func (c *Client) ListMailRules(ctx context.Context) ([]MailRule, error) {
 }
 
 func (c *Client) CreateMailRule(ctx context.Context, name, from, subjectContains string, hasAttachment bool, moveFolder string, markRead, deleteMsg bool, forwardTo, importance string) (*MailRule, error) {
+	if err := c.ensureWritable(); err != nil {
+		return nil, err
+	}
 	rule := models.NewMessageRule()
 	rule.SetDisplayName(&name)
 	enabled := true
@@ -125,6 +128,9 @@ func (c *Client) CreateMailRule(ctx context.Context, name, from, subjectContains
 }
 
 func (c *Client) DeleteMailRule(ctx context.Context, ruleID string) error {
+	if err := c.ensureWritable(); err != nil {
+		return err
+	}
 	if err := validateID(ruleID, "rule ID"); err != nil {
 		return err
 	}

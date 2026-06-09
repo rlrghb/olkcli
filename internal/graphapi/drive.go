@@ -33,7 +33,7 @@ type DriveInfo struct {
 // DriveItem is a simplified drive item for output.
 type DriveItem struct {
 	ID          string `json:"id"`
-	Name        string `json:"name"`
+	Name        string `json:"name" untrusted:"true"`
 	Size        int64  `json:"size"`
 	ItemType    string `json:"itemType"`
 	MimeType    string `json:"mimeType,omitempty"`
@@ -41,10 +41,10 @@ type DriveItem struct {
 	ModifiedAt  string `json:"lastModifiedDateTime"`
 	WebURL      string `json:"webUrl"`
 	DownloadURL string `json:"-"` // pre-authenticated URL with embedded token; excluded from JSON for security
-	ParentPath  string `json:"parentPath,omitempty"`
+	ParentPath  string `json:"parentPath,omitempty" untrusted:"true"`
 	ChildCount  int32  `json:"childCount,omitempty"`
-	CreatedBy   string `json:"createdBy,omitempty"`
-	ModifiedBy  string `json:"modifiedBy,omitempty"`
+	CreatedBy   string `json:"createdBy,omitempty" untrusted:"true"`
+	ModifiedBy  string `json:"modifiedBy,omitempty" untrusted:"true"`
 }
 
 // DriveItemVersion is a simplified version entry for output.
@@ -415,6 +415,9 @@ func (c *Client) DownloadDriveItem(ctx context.Context, driveID, itemID string) 
 
 // UploadSmallFile uploads a file under 4MB via simple PUT.
 func (c *Client) UploadSmallFile(ctx context.Context, driveID, remotePath string, content []byte, replace bool) (*DriveItem, error) {
+	if err := c.ensureWritable(); err != nil {
+		return nil, err
+	}
 	if err := validateID(driveID, "drive ID"); err != nil {
 		return nil, err
 	}
@@ -439,6 +442,9 @@ func (c *Client) UploadSmallFile(ctx context.Context, driveID, remotePath string
 
 // CreateUploadSession creates a resumable upload session for large files (>= 4MB).
 func (c *Client) CreateUploadSession(ctx context.Context, driveID, remotePath string, replace bool) (string, error) {
+	if err := c.ensureWritable(); err != nil {
+		return "", err
+	}
 	if err := validateID(driveID, "drive ID"); err != nil {
 		return "", err
 	}
@@ -474,6 +480,9 @@ func (c *Client) CreateUploadSession(ctx context.Context, driveID, remotePath st
 
 // CreateFolder creates a new folder under the given parent item ID.
 func (c *Client) CreateFolder(ctx context.Context, driveID, parentItemID, folderName string) (*DriveItem, error) {
+	if err := c.ensureWritable(); err != nil {
+		return nil, err
+	}
 	if err := validateID(driveID, "drive ID"); err != nil {
 		return nil, err
 	}
@@ -530,6 +539,9 @@ func (c *Client) CopyDriveItem(ctx context.Context, driveID, itemID, destParentI
 
 // MoveDriveItem moves or renames an item.
 func (c *Client) MoveDriveItem(ctx context.Context, driveID, itemID, destParentID, newName string) (*DriveItem, error) {
+	if err := c.ensureWritable(); err != nil {
+		return nil, err
+	}
 	if err := validateID(driveID, "drive ID"); err != nil {
 		return nil, err
 	}
@@ -560,6 +572,9 @@ func (c *Client) MoveDriveItem(ctx context.Context, driveID, itemID, destParentI
 
 // DeleteDriveItem deletes an item.
 func (c *Client) DeleteDriveItem(ctx context.Context, driveID, itemID string) error {
+	if err := c.ensureWritable(); err != nil {
+		return err
+	}
 	if err := validateID(driveID, "drive ID"); err != nil {
 		return err
 	}
@@ -575,6 +590,9 @@ func (c *Client) DeleteDriveItem(ctx context.Context, driveID, itemID string) er
 
 // CreateShareLink creates a sharing link for an item.
 func (c *Client) CreateShareLink(ctx context.Context, driveID, itemID, linkType, scope string) (*ShareLink, error) {
+	if err := c.ensureWritable(); err != nil {
+		return nil, err
+	}
 	if err := validateID(driveID, "drive ID"); err != nil {
 		return nil, err
 	}

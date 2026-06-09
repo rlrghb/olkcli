@@ -2,6 +2,7 @@ package graphapi
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -19,6 +20,46 @@ import (
 // Client wraps the Graph SDK client
 type Client struct {
 	inner *msgraphsdk.GraphServiceClient
+
+	// Capability guards. When set, mutating methods refuse to run. They are the
+	// single enforcement point for --no-write / --no-send, so the guarantee
+	// holds across every entry path (CLI, MCP, scripts, delegated --mailbox).
+	noWrite bool
+	noSend  bool
+}
+
+// SetGuards configures the no-write / no-send capability guards on the client.
+func (c *Client) SetGuards(noWrite, noSend bool) {
+	c.noWrite = noWrite
+	c.noSend = noSend
+}
+
+// ErrNoWrite and ErrNoSend are returned by mutating methods when the
+// corresponding guard is active.
+var (
+	ErrNoWrite = errors.New("refused: writes are disabled (--no-write / OLK_NO_WRITE)")
+	ErrNoSend  = errors.New("refused: sending is disabled (--no-send / OLK_NO_SEND)")
+)
+
+// ensureWritable returns ErrNoWrite when the no-write guard is active. Call it
+// at the top of every method that mutates server state.
+func (c *Client) ensureWritable() error {
+	if c.noWrite {
+		return ErrNoWrite
+	}
+	return nil
+}
+
+// ensureMaySend returns an error when sending is disallowed. Sending implies a
+// mutation, so it also honors the no-write guard.
+func (c *Client) ensureMaySend() error {
+	if c.noWrite {
+		return ErrNoWrite
+	}
+	if c.noSend {
+		return ErrNoSend
+	}
+	return nil
 }
 
 // NewClient creates a new Graph API client from a token credential

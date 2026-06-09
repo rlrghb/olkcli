@@ -41,6 +41,9 @@ func (c *Client) ListDrafts(ctx context.Context, top int32) ([]DraftMessage, err
 
 // CreateDraft creates a draft message without sending it
 func (c *Client) CreateDraft(ctx context.Context, subject, body string, to, cc, bcc []string, isHTML bool) (*DraftMessage, error) {
+	if err := c.ensureWritable(); err != nil {
+		return nil, err
+	}
 	msg := models.NewMessage()
 	msg.SetSubject(&subject)
 
@@ -87,6 +90,9 @@ func (c *Client) CreateDraft(ctx context.Context, subject, body string, to, cc, 
 
 // SendDraft sends an existing draft message
 func (c *Client) SendDraft(ctx context.Context, draftID string) error {
+	if err := c.ensureMaySend(); err != nil {
+		return err
+	}
 	if err := validateID(draftID, "draft ID"); err != nil {
 		return err
 	}
@@ -99,6 +105,9 @@ func (c *Client) SendDraft(ctx context.Context, draftID string) error {
 
 // DeleteDraft deletes a draft message
 func (c *Client) DeleteDraft(ctx context.Context, draftID string) error {
+	if err := c.ensureWritable(); err != nil {
+		return err
+	}
 	if err := validateID(draftID, "draft ID"); err != nil {
 		return err
 	}

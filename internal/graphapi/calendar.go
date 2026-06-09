@@ -18,19 +18,19 @@ var dayNameTitle = cases.Title(language.English)
 // CalendarEvent is a simplified calendar event for output
 type CalendarEvent struct {
 	ID          string   `json:"id"`
-	Subject     string   `json:"subject"`
+	Subject     string   `json:"subject" untrusted:"true"`
 	Start       string   `json:"start"`
 	End         string   `json:"end"`
-	Location    string   `json:"location"`
-	Organizer   string   `json:"organizer"`
-	Attendees   []string `json:"attendees,omitempty"`
+	Location    string   `json:"location" untrusted:"true"`
+	Organizer   string   `json:"organizer" untrusted:"true"`
+	Attendees   []string `json:"attendees,omitempty" untrusted:"true"`
 	IsAllDay    bool     `json:"isAllDay"`
 	IsOnline    bool     `json:"isOnlineMeeting"`
 	OnlineURL   string   `json:"onlineMeetingUrl,omitempty"`
 	Status      string   `json:"showAs"`
 	Recurrence  string   `json:"recurrence,omitempty"`
-	BodyPreview string   `json:"bodyPreview"`
-	Body        string   `json:"body,omitempty"`
+	BodyPreview string   `json:"bodyPreview" untrusted:"true"`
+	Body        string   `json:"body,omitempty" untrusted:"true"`
 }
 
 // CalendarInfo is a simplified calendar representation
@@ -117,6 +117,14 @@ func (c *Client) GetEvent(ctx context.Context, target, eventID string) (*Calenda
 }
 
 func (c *Client) CreateEvent(ctx context.Context, subject string, start, end time.Time, location string, attendees []string, isAllDay, isOnlineMeeting bool, recurrence string) (*CalendarEvent, error) {
+	if err := c.ensureWritable(); err != nil {
+		return nil, err
+	}
+	if len(attendees) > 0 {
+		if err := c.ensureMaySend(); err != nil {
+			return nil, err
+		}
+	}
 	event := models.NewEvent()
 	event.SetSubject(&subject)
 
@@ -177,6 +185,9 @@ func (c *Client) CreateEvent(ctx context.Context, subject string, start, end tim
 }
 
 func (c *Client) UpdateEvent(ctx context.Context, eventID string, subject *string, start, end *time.Time, location *string) (*CalendarEvent, error) {
+	if err := c.ensureWritable(); err != nil {
+		return nil, err
+	}
 	if err := validateID(eventID, "event ID"); err != nil {
 		return nil, err
 	}
@@ -216,6 +227,9 @@ func (c *Client) UpdateEvent(ctx context.Context, eventID string, subject *strin
 }
 
 func (c *Client) DeleteEvent(ctx context.Context, eventID string) error {
+	if err := c.ensureWritable(); err != nil {
+		return err
+	}
 	if err := validateID(eventID, "event ID"); err != nil {
 		return err
 	}
@@ -227,6 +241,9 @@ func (c *Client) DeleteEvent(ctx context.Context, eventID string) error {
 }
 
 func (c *Client) RespondToEvent(ctx context.Context, eventID, response string) error {
+	if err := c.ensureMaySend(); err != nil {
+		return err
+	}
 	if err := validateID(eventID, "event ID"); err != nil {
 		return err
 	}

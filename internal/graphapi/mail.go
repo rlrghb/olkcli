@@ -43,14 +43,14 @@ var allowedSelectFields = map[string]bool{
 // MailMessage is a simplified mail message for output
 type MailMessage struct {
 	ID             string   `json:"id"`
-	Subject        string   `json:"subject"`
-	From           string   `json:"from"`
+	Subject        string   `json:"subject" untrusted:"true"`
+	From           string   `json:"from" untrusted:"true"`
 	To             []string `json:"to"`
 	ReceivedAt     string   `json:"receivedDateTime"`
 	IsRead         bool     `json:"isRead"`
 	HasAttachments bool     `json:"hasAttachments"`
-	BodyPreview    string   `json:"bodyPreview"`
-	Body           string   `json:"body,omitempty"`
+	BodyPreview    string   `json:"bodyPreview" untrusted:"true"`
+	Body           string   `json:"body,omitempty" untrusted:"true"`
 	BodyType       string   `json:"bodyType,omitempty"`
 	Categories     []string `json:"categories,omitempty"`
 }
@@ -195,6 +195,9 @@ func (c *Client) GetMessage(ctx context.Context, target, messageID string) (*Mai
 }
 
 func (c *Client) SendMessage(ctx context.Context, subject, body string, toRecipients, ccRecipients, bccRecipients []string, isHTML bool, attachments []AttachmentInput, importance string, readReceipt bool) error {
+	if err := c.ensureMaySend(); err != nil {
+		return err
+	}
 	msg := models.NewMessage()
 	msg.SetSubject(&subject)
 
@@ -276,6 +279,9 @@ func (c *Client) SendMessage(ctx context.Context, subject, body string, toRecipi
 }
 
 func (c *Client) ReplyMessage(ctx context.Context, messageID, comment string, replyAll bool) error {
+	if err := c.ensureMaySend(); err != nil {
+		return err
+	}
 	if err := validateID(messageID, "message ID"); err != nil {
 		return err
 	}
@@ -299,6 +305,9 @@ func (c *Client) ReplyMessage(ctx context.Context, messageID, comment string, re
 }
 
 func (c *Client) ForwardMessage(ctx context.Context, messageID, comment string, toRecipients []string) error {
+	if err := c.ensureMaySend(); err != nil {
+		return err
+	}
 	if err := validateID(messageID, "message ID"); err != nil {
 		return err
 	}
@@ -318,6 +327,9 @@ func (c *Client) ForwardMessage(ctx context.Context, messageID, comment string, 
 }
 
 func (c *Client) MoveMessage(ctx context.Context, messageID, folderID string) error {
+	if err := c.ensureWritable(); err != nil {
+		return err
+	}
 	if err := validateID(messageID, "message ID"); err != nil {
 		return err
 	}
@@ -335,6 +347,9 @@ func (c *Client) MoveMessage(ctx context.Context, messageID, folderID string) er
 }
 
 func (c *Client) DeleteMessage(ctx context.Context, messageID string) error {
+	if err := c.ensureWritable(); err != nil {
+		return err
+	}
 	if err := validateID(messageID, "message ID"); err != nil {
 		return err
 	}
@@ -396,6 +411,9 @@ func (c *Client) ListMailFolders(ctx context.Context, target string) ([]MailFold
 
 // CreateMailFolder creates a new mail folder.
 func (c *Client) CreateMailFolder(ctx context.Context, displayName string) (*MailFolder, error) {
+	if err := c.ensureWritable(); err != nil {
+		return nil, err
+	}
 	folder := models.NewMailFolder()
 	folder.SetDisplayName(&displayName)
 
@@ -421,6 +439,9 @@ func (c *Client) CreateMailFolder(ctx context.Context, displayName string) (*Mai
 
 // RenameMailFolder renames a mail folder.
 func (c *Client) RenameMailFolder(ctx context.Context, folderID, displayName string) (*MailFolder, error) {
+	if err := c.ensureWritable(); err != nil {
+		return nil, err
+	}
 	if err := validateID(folderID, "folder ID"); err != nil {
 		return nil, err
 	}
@@ -444,6 +465,9 @@ func (c *Client) RenameMailFolder(ctx context.Context, folderID, displayName str
 
 // DeleteMailFolder deletes a mail folder.
 func (c *Client) DeleteMailFolder(ctx context.Context, folderID string) error {
+	if err := c.ensureWritable(); err != nil {
+		return err
+	}
 	if err := validateID(folderID, "folder ID"); err != nil {
 		return err
 	}
@@ -549,6 +573,9 @@ func (c *Client) GetAttachments(ctx context.Context, messageID string) ([]Attach
 
 // FlagMessage sets the follow-up flag status on a message
 func (c *Client) FlagMessage(ctx context.Context, messageID, flagStatus string) error {
+	if err := c.ensureWritable(); err != nil {
+		return err
+	}
 	if err := validateID(messageID, "message ID"); err != nil {
 		return err
 	}
@@ -579,6 +606,9 @@ func (c *Client) FlagMessage(ctx context.Context, messageID, flagStatus string) 
 
 // SetImportance sets the importance level on a message
 func (c *Client) SetImportance(ctx context.Context, messageID, importance string) error {
+	if err := c.ensureWritable(); err != nil {
+		return err
+	}
 	if err := validateID(messageID, "message ID"); err != nil {
 		return err
 	}
@@ -607,6 +637,9 @@ func (c *Client) SetImportance(ctx context.Context, messageID, importance string
 
 // CategorizeMessage sets the categories on a message
 func (c *Client) CategorizeMessage(ctx context.Context, messageID string, categories []string) error {
+	if err := c.ensureWritable(); err != nil {
+		return err
+	}
 	if err := validateID(messageID, "message ID"); err != nil {
 		return err
 	}
