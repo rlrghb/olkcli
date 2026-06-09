@@ -26,8 +26,8 @@ func makeHandler(b *toolBinding) mcp.ToolHandler {
 			}
 		}
 
-		// Reject arguments the tool doesn't declare (gog's "unknown fields
-		// rejected" contract) so a model can't smuggle in unvetted flags.
+		// Reject arguments the tool doesn't declare (fixed-schema contract) so a
+		// model can't smuggle in unvetted flags.
 		if err := rejectUnknownArgs(b, args); err != nil {
 			return errorResult(err.Error()), nil
 		}
@@ -93,7 +93,7 @@ func makeHandler(b *toolBinding) mcp.ToolHandler {
 }
 
 // rejectUnknownArgs fails the call if args carries a key the tool's schema does
-// not declare, matching gog's fixed-schema contract.
+// not declare (fixed-schema contract).
 func rejectUnknownArgs(b *toolBinding, args map[string]any) error {
 	if len(args) == 0 {
 		return nil

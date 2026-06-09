@@ -21,6 +21,7 @@ Works with both **personal Microsoft accounts** and **enterprise (Azure AD / Ent
 - **Inbox rules**: list, create, and delete server-side mail rules *(enterprise only)*
 - **Focused Inbox**: filter by `--focused` or `--other` classification
 - **Read receipts**: request read receipts with `--read-receipt`
+- **Sync & threads**: incremental delta sync (`mail delta`), batch-fetch up to 20 messages by id in one request (`mail batch`), and full conversation threads (`mail thread`)
 
 ### Calendar
 - **List events** with configurable date ranges (default: 7 days ahead)
@@ -32,10 +33,12 @@ Works with both **personal Microsoft accounts** and **enterprise (Azure AD / Ent
 - **List calendars** across your account
 - **Check availability** / free-busy lookup for one or more users
 - **Find meeting times** — suggest available slots for multiple attendees *(enterprise only)*
+- **Incremental sync** of event changes (`calendar delta`)
 
 ### Contacts
 - **List, search, create, update, delete** contacts with sorting and pagination
 - Fields: name, multiple emails, phone, company, job title, department, manager, birthday, notes, addresses, categories, and more
+- **Incremental sync** of contact changes (`contacts delta`)
 
 ### Tasks (Microsoft To Do)
 - **Manage task lists**: list, create, delete task lists
@@ -55,6 +58,10 @@ Works with both **personal Microsoft accounts** and **enterprise (Azure AD / Ent
 
 ### People / Directory
 - **Search** people by name — returns name, email, job title, department, company. Personal accounts search known contacts; enterprise accounts also search the organization directory
+
+### Sync
+- **`olk changes`** — one call returns a unified delta digest across mail, calendar, and contacts, each with its own resume token
+- Per-resource delta commands (`mail delta`, `calendar delta`, `contacts delta`) return only what changed since an opaque cursor token; deletions are reported as `removed` items
 
 ### User Profile
 - **`olk whoami`** — display current user info (name, email, job title, department)
@@ -319,11 +326,13 @@ For common workflows, `olk` provides top-level shortcuts:
 | `--json` | `OLK_JSON` | JSON output |
 | `--plain` | `OLK_PLAIN` | TSV output |
 | `--account EMAIL` | `OLK_ACCOUNT` | Account to use |
+| `--mailbox EMAIL` | `OLK_MAILBOX` | Target another user's mailbox via delegated access (requires `Mail.Read.Shared` at login) |
 | `-v, --verbose` | `OLK_VERBOSE` | Verbose output |
 | `--dry-run` | `OLK_DRY_RUN` | Dry run mode |
 | `--force` | `OLK_FORCE` | Skip confirmations |
 | `--color auto\|never\|always` | `OLK_COLOR` | Color mode |
-| `--select FIELDS` | `OLK_SELECT` | Field projection |
+| `--select FIELDS` | `OLK_SELECT` | Field projection (table/plain output) |
+| `--concise` | `OLK_CONCISE` | Drop large free-text (bodies, previews, attendee lists) from JSON output |
 | `--results-only` | `OLK_RESULTS_ONLY` | Unwrap JSON envelope |
 | `--tz TIMEZONE` | `OLK_TIMEZONE` | IANA time zone for display (e.g. `America/New_York`) |
 | `--no-write` | `OLK_NO_WRITE` | Refuse any mutating operation (hard guarantee, all surfaces) |
@@ -340,13 +349,6 @@ These capability guards apply to **every** entry path — the bare CLI, scripts/
 ## MCP Server (AI agents)
 
 `olk mcp` runs a [Model Context Protocol](https://modelcontextprotocol.io) server over **stdio**, exposing a **curated, read-first** set of tools to MCP clients (Claude Desktop, IDEs, agents). It reuses your existing olk login — no separate auth.
-
-**Why this server stands out:**
-- **Read-first with tiered, per-tool opt-in.** Reads work out of the box; every mutation is off by default, and four separate escalating gates (`--allow-write` → `--allow-send` → `--allow-destructive`) mean granting reads or safe edits never silently grants the ability to send mail or delete data.
-- **Guarantees that hold everywhere.** `--no-write`/`--no-send` are enforced once at the API layer, so the same safety promise covers the CLI, scripts, and MCP — a disabled capability is never even advertised as a tool.
-- **Built-in prompt-injection defense.** External free text (subjects, bodies, sender names, file names) is wrapped in per-response, forge-resistant markers with an inline directive telling the agent to treat it as data, not instructions.
-- **Broad and efficient.** Mail, calendar, contacts, tasks, **and** OneDrive files plus directory/people search — with incremental delta sync, `$batch` fetches, conversation threading, a token-saving concise mode, output caps, and structured `{code, message, action}` errors agents can branch on.
-- **Personal *and* enterprise accounts**, a single static binary, and no networked HTTP surface (stdio only).
 
 ```jsonc
 // Claude Desktop / MCP client config
@@ -369,7 +371,7 @@ It's also published to the [MCP Registry](https://registry.modelcontextprotocol.
 
 Either way, run `olk auth login` once first so the server has a token to reuse.
 
-- **Read-only by default.** A curated set of 38 read tools is exposed; destructive and send commands have **no** MCP exposure path at all:
+- **Read-only by default.** Starting the server with no flags exposes a curated set of 38 read tools and nothing else; every mutation is opt-in, per tier (safe writes, then send, then destructive — see below):
   - **Mail:** `mail_list`, `mail_get`, `mail_batch`, `mail_thread`, `mail_search`, `mail_folders_list`, `mail_attachments`, `mail_categories_list`, `mail_rules_list`, `mail_ooo_get`, `mail_delta`
   - **Calendar:** `calendar_events`, `calendar_view`, `calendar_get`, `calendar_calendars`, `calendar_availability`, `calendar_find_times`, `calendar_delta`
   - **Contacts:** `contacts_list`, `contacts_get`, `contacts_search`, `contacts_delta`
@@ -417,6 +419,9 @@ olk auth status                                      Check token validity
 ```
 olk mail list [-n 25] [-f FOLDER] [-u] [--from X] [--after DATE] [--before DATE] [--focused] [--other]
 olk mail get <ID> [--format full|text|html]
+olk mail batch --id <ID> [--id <ID>]...                  Fetch up to 20 messages in one $batch request
+olk mail thread <CONVERSATION_ID> [-n 50]                List all messages in a conversation
+olk mail delta [-f FOLDER] [--token TOKEN] [-n N]        Incremental sync; returns changes + next token
 olk mail send --to X --subject Y [--body Z] [--cc X] [--bcc X] [--html] [--attach FILE] [--importance low|normal|high] [--read-receipt]
 olk mail search <QUERY> [-n 25]
 olk mail reply <ID> --body X [--reply-all]
@@ -454,6 +459,7 @@ olk mail rules delete <ID> --force                   Delete an inbox rule
 ```
 olk calendar events [-d 7] [--after DATE] [--before DATE] [--calendar ID] [-n 25]
 olk calendar view [-d 7] [--after DATE] [--before DATE] [--calendar ID] [-n 50]
+olk calendar delta [-d 30] [--after DATE] [--before DATE] [--token TOKEN] [-n N]  Incremental sync of events
 olk calendar get <ID>
 olk calendar create --subject X --start Y --end Z [--location L] [--attendees A] [--all-day] [--online-meeting] [-r daily|weekdays|weekly|monthly|yearly]
 olk calendar update <ID> [--subject X] [--start Y] [--end Z] [--location L]
@@ -475,6 +481,7 @@ olk people search <QUERY> [-n 25]
 ```
 olk contacts list [-n 25] [--skip N] [--sort displayName|givenName|surname]
 olk contacts get <ID>
+olk contacts delta [--token TOKEN] [-n N]            Incremental sync of contacts
 olk contacts create --first-name X --last-name Y [-e EMAIL]... [-p MOBILE] [--business-phone P] [--home-phone P] [--company C] [--title T] [--department D] [--manager M] [--birthday YYYY-MM-DD] [--notes N] [--middle-name M] [--nickname N] [-g CATEGORY]... [--street S] [--city C] [--state S] [--postal-code P] [--country C] [--address-type business|home|other]
 olk contacts update <ID> [--first-name X] [--last-name Y] [-e EMAIL]... [-p MOBILE] [--business-phone P] [--home-phone P] [--company C] [--title T] [--department D] [--manager M] [--birthday YYYY-MM-DD] [--notes N] [--middle-name M] [--nickname N] [-g CATEGORY]... [--street S] [--city C] [--state S] [--postal-code P] [--country C] [--address-type business|home|other]
 olk contacts delete <ID> [--force]
@@ -528,6 +535,14 @@ olk drive versions <ID> [--drive-id ID]              List version history
 ```
 
 If `--drive-id` is omitted, your primary drive is used.
+
+### Sync (delta)
+
+```
+olk changes [--mail-token T] [--calendar-token T] [--contacts-token T] [--days 30] [-n N]   Unified delta digest across mail, calendar, and contacts (each with its own token)
+```
+
+Per-resource delta commands live under their service: `olk mail delta`, `olk calendar delta`, `olk contacts delta`. Omit a token for a fresh sync, then pass the returned token next time to get only what changed; deletions are reported as `removed` items.
 
 ### Configuration
 

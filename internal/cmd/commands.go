@@ -22,7 +22,7 @@ func selectedCommandPath(kctx *kong.Context) []string {
 }
 
 // commandAllowed reports whether a command path may run under the active
-// allow/deny lists. Semantics mirror gog:
+// allow/deny lists:
 //   - --disable-commands blocks a path or any descendant (overrides allows).
 //   - --enable-commands allows a prefix and its descendants.
 //   - --enable-commands-exact allows only that exact path (no descendants).
@@ -59,8 +59,8 @@ func commandAllowed(flags *RootFlags, path []string) bool {
 	return false
 }
 
-// toolSelectorPredicate compiles gog-style --allow-tool selectors into a
-// predicate over (tool name, readOnly). Selectors narrow the curated set by
+// toolSelectorPredicate compiles --allow-tool selectors into a predicate over
+// (tool name, readOnly). Selectors narrow the curated set by
 // tool name; they never grant a write tool that --allow-write hasn't already
 // enabled. Returns nil when no selectors are given (allow all). Supported
 // forms, matched case-insensitively with '.' treated as '_':

@@ -46,7 +46,7 @@ type RootFlags struct {
 	NoInput       bool `help:"Fail instead of prompting (headless/agent safety)" env:"OLK_NO_INPUT"`
 	WrapUntrusted bool `help:"Wrap external free-text in untrusted-content markers (JSON/plain output)" env:"OLK_WRAP_UNTRUSTED"`
 
-	// Command-scoping (gog-style allow/deny lists, comma-separated dotted paths).
+	// Command-scoping allow/deny lists (comma-separated dotted paths).
 	EnableCommands      string `help:"Allow only these command prefixes (csv; e.g. mail,calendar)" env:"OLK_ENABLE_COMMANDS"`
 	EnableCommandsExact string `help:"Allow only these exact command paths (csv; e.g. mail.list,mail.get)" env:"OLK_ENABLE_COMMANDS_EXACT"`
 	DisableCommands     string `help:"Block these command paths (csv; overrides allows)" env:"OLK_DISABLE_COMMANDS"`
@@ -233,8 +233,8 @@ func Execute() int {
 		Flags: &cli.RootFlags,
 	}
 
-	// Command allow/deny lists gate dispatch (gog-style). Applies to the bare
-	// CLI; the MCP server reuses the same predicate to filter its tool registry.
+	// Command allow/deny lists gate dispatch. Applies to the bare CLI; the MCP
+	// server reuses the same predicate to filter its tool registry.
 	if path := selectedCommandPath(ctx); !commandAllowed(&cli.RootFlags, path) {
 		fmt.Fprintf(os.Stderr, "Error: command %q is not allowed by --enable-commands/--disable-commands\n", strings.Join(path, " "))
 		return 1

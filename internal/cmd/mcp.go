@@ -12,11 +12,10 @@ import (
 )
 
 // MCPCmd runs a stdio MCP server exposing a curated, read-first set of olk
-// commands as tools (mirroring gog's "typed tools, no arbitrary command
-// bridge" model). The server is read-only by default; write tools are exposed
-// only when named explicitly via --allow-write (defense in depth: opting into
-// MCP and naming each write tool are two separate, conscious actions). There is
-// intentionally no HTTP transport.
+// commands as typed tools — there is no arbitrary command bridge. The server is
+// read-only by default; write tools are exposed only when named explicitly via
+// --allow-write (defense in depth: opting into MCP and naming each write tool
+// are two separate, conscious actions). There is intentionally no HTTP transport.
 //
 // Tool calls are executed in-process and serialized (one at a time), because
 // capturing command output requires temporarily redirecting the process stdout.

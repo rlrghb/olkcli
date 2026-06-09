@@ -25,8 +25,8 @@ const (
 )
 
 // curatedTool maps an MCP tool name to the olk leaf command it runs. The set is
-// hand-picked and read-first (gog's model) rather than reflecting the whole CLI,
-// so a new command is never auto-exposed to an agent.
+// hand-picked and read-first rather than reflecting the whole CLI, so a new
+// command is never auto-exposed to an agent.
 type curatedTool struct {
 	name string
 	path []string
@@ -145,8 +145,7 @@ func (cfg mcpConfig) exposes(ct curatedTool) bool {
 }
 
 // defaultMaxOutputBytes bounds a single tool call's returned text so a runaway
-// list can't flood the agent's context or the stdio transport (gog's
-// --max-output-bytes default).
+// list can't flood the agent's context or the stdio transport.
 const defaultMaxOutputBytes = 100_000
 
 // helpFlagName is kong's auto-injected --help flag, skipped when projecting a

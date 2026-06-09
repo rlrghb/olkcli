@@ -142,7 +142,7 @@ func TestRejectUnknownArgs(t *testing.T) {
 	if err := rejectUnknownArgs(b, map[string]any{"top": float64(5)}); err != nil {
 		t.Errorf("declared flag rejected: %v", err)
 	}
-	// An undeclared key is rejected (gog fixed-schema contract).
+	// An undeclared key is rejected (fixed-schema contract).
 	if err := rejectUnknownArgs(b, map[string]any{"bogus": "x"}); err == nil {
 		t.Error("expected error for unknown argument, got nil")
 	}
