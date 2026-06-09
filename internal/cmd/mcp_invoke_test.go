@@ -225,7 +225,7 @@ func TestRejectUnknownArgs_ConciseAllowedForReadOnly(t *testing.T) {
 	if err := rejectUnknownArgs(read, map[string]any{"concise": true}); err != nil {
 		t.Errorf("concise should be accepted on a read tool: %v", err)
 	}
-	write := &toolBinding{name: "mail_drafts_create", path: []string{"mail", "drafts", "create"}, node: leafByPath(t, "mail", "drafts", "create"), readOnly: false}
+	write := &toolBinding{name: "mail_drafts_create", path: []string{"mail", "drafts", "create"}, node: leafByPath(t, "mail", "drafts", "create"), tier: tierSafeWrite}
 	if err := rejectUnknownArgs(write, map[string]any{"concise": true}); err == nil {
 		t.Error("concise should be rejected on a write tool")
 	}
@@ -275,5 +275,22 @@ func TestBuildMCPServer_AllowToolNarrows(t *testing.T) {
 		if !strings.HasPrefix(b.name, "mail_") {
 			t.Errorf("allow-tool mail_* leaked non-mail tool %q", b.name)
 		}
+	}
+}
+
+func TestBuildArgv_DestructiveForcesConfirmation(t *testing.T) {
+	del := &toolBinding{name: "mail_delete", path: []string{"mail", "delete"}, node: leafByPath(t, "mail", "delete"), tier: tierDestructive}
+	argv, err := buildArgv(del, map[string]any{"id": "AAA"})
+	if err != nil {
+		t.Fatalf("buildArgv: %v", err)
+	}
+	if !contains(argv, "--force") {
+		t.Errorf("destructive tool argv must include --force, got %v", argv)
+	}
+	// A send tool must NOT get --force auto-injected.
+	send := &toolBinding{name: "mail_reply", path: []string{"mail", "reply"}, node: leafByPath(t, "mail", "reply"), tier: tierSend}
+	argv2, _ := buildArgv(send, map[string]any{"id": "AAA"})
+	if contains(argv2, "--force") {
+		t.Errorf("send tool argv must not include --force, got %v", argv2)
 	}
 }

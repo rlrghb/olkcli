@@ -108,7 +108,7 @@ func rejectUnknownArgs(b *toolBinding, args map[string]any) error {
 	for _, p := range b.node.Positional {
 		known[p.Name] = true
 	}
-	if b.readOnly {
+	if b.readOnly() {
 		known[conciseArg] = true // synthetic flag injected into read-tool schemas
 	}
 	for k := range args {
@@ -210,10 +210,18 @@ func buildArgv(b *toolBinding, args map[string]any) ([]string, error) {
 
 	// Honor the synthetic concise flag injected into read-tool schemas: it maps
 	// to olk's global --concise rather than a per-command flag.
-	if b.readOnly {
+	if b.readOnly() {
 		if on, _ := asBool(args[conciseArg]); on {
 			argv = append(argv, "--concise")
 		}
+	}
+
+	// Destructive tools require --force at the CLI to confirm; under MCP, naming
+	// the tool via --allow-destructive is itself the deliberate confirmation, so
+	// supply --force here (the --no-write capability guard still vetoes at the API
+	// layer regardless).
+	if b.tier == tierDestructive {
+		argv = append(argv, "--force")
 	}
 
 	// Force structured output.

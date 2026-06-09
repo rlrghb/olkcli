@@ -21,9 +21,30 @@ import (
 // Tool calls are executed in-process and serialized (one at a time), because
 // capturing command output requires temporarily redirecting the process stdout.
 type MCPCmd struct {
-	AllowWrite     []string `help:"Expose these curated write tools by name (e.g. mail_drafts_create, todo_create). Repeatable; default exposes none." name:"allow-write" env:"OLK_MCP_ALLOW_WRITE"`
-	AllowTool      []string `help:"Restrict exposed tools to these selectors: exact name (mail_list), prefix glob (mail_*, mail.*), or category (read, write, all). Repeatable/csv; default exposes all curated tools." name:"allow-tool" env:"OLK_MCP_ALLOW_TOOL"`
-	MaxOutputBytes int      `help:"Cap a single tool call's output text in bytes (truncated past this; 0 uses the built-in default)." name:"max-output-bytes" env:"OLK_MCP_MAX_OUTPUT_BYTES"`
+	AllowWrite       []string `help:"Expose these curated safe-write tools by name (e.g. mail_flag, todo_update). Repeatable; default exposes none." name:"allow-write" env:"OLK_MCP_ALLOW_WRITE"`
+	AllowSend        []string `help:"Expose these curated SEND tools by name (mail_send, mail_reply, mail_forward, calendar_respond, …). Off by default; each transmits to other people and is vetoed by --no-send." name:"allow-send" env:"OLK_MCP_ALLOW_SEND"`
+	AllowDestructive []string `help:"Expose these curated DESTRUCTIVE tools by name (mail_delete, calendar_delete, …). Off by default; each hard-deletes and is vetoed by --no-write." name:"allow-destructive" env:"OLK_MCP_ALLOW_DESTRUCTIVE"`
+	AllowTool        []string `help:"Restrict exposed tools to these selectors: exact name (mail_list), prefix glob (mail_*, mail.*), or category (read, write, all). Repeatable/csv; default exposes all curated tools." name:"allow-tool" env:"OLK_MCP_ALLOW_TOOL"`
+	MaxOutputBytes   int      `help:"Cap a single tool call's output text in bytes (truncated past this; 0 uses the built-in default)." name:"max-output-bytes" env:"OLK_MCP_MAX_OUTPUT_BYTES"`
+}
+
+// resolveAllowList validates the named tools against the set eligible for a
+// flag, warning (to stderr, not stdout) about any that aren't and dropping them.
+func resolveAllowList(names []string, eligible map[string]bool, flagName string) map[string]bool {
+	out := map[string]bool{}
+	for _, name := range names {
+		name = strings.TrimSpace(name)
+		if name == "" {
+			continue
+		}
+		if !eligible[name] {
+			fmt.Fprintf(os.Stderr, "warning: %s %q is not a curated %s tool; ignoring (valid: %s)\n",
+				flagName, name, flagName, strings.Join(sortedKeys(eligible), ", "))
+			continue
+		}
+		out[name] = true
+	}
+	return out
 }
 
 func (c *MCPCmd) Run(ctx *RunContext) error {
@@ -32,26 +53,16 @@ func (c *MCPCmd) Run(ctx *RunContext) error {
 	runCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	allowWrite := map[string]bool{}
-	known := writeToolNames()
-	for _, name := range c.AllowWrite {
-		name = strings.TrimSpace(name)
-		if name == "" {
-			continue
-		}
-		if !known[name] {
-			fmt.Fprintf(os.Stderr, "warning: --allow-write %q is not a curated write tool; ignoring (valid: %s)\n", name, strings.Join(sortedKeys(known), ", "))
-			continue
-		}
-		allowWrite[name] = true
-	}
-
 	flags := ctx.Flags
 	srv, _, err := buildMCPServer(mcpConfig{
-		allowWrite:     allowWrite,
-		allowed:        func(path []string) bool { return commandAllowed(flags, path) },
-		allowTool:      toolSelectorPredicate(c.AllowTool),
-		maxOutputBytes: c.MaxOutputBytes,
+		allowWrite:       resolveAllowList(c.AllowWrite, writeToolNames(), "--allow-write"),
+		allowSend:        resolveAllowList(c.AllowSend, sendToolNames(), "--allow-send"),
+		allowDestructive: resolveAllowList(c.AllowDestructive, destructiveToolNames(), "--allow-destructive"),
+		noWrite:          flags.NoWrite,
+		noSend:           flags.NoSend,
+		allowed:          func(path []string) bool { return commandAllowed(flags, path) },
+		allowTool:        toolSelectorPredicate(c.AllowTool),
+		maxOutputBytes:   c.MaxOutputBytes,
 	})
 	if err != nil {
 		return err

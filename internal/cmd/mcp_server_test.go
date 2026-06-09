@@ -26,18 +26,14 @@ func leafByPath(t *testing.T, path ...string) *kong.Node {
 // testBinding builds a binding for any command path (used by argv tests).
 func testBinding(t *testing.T, path ...string) *toolBinding {
 	t.Helper()
-	return &toolBinding{name: strings.Join(path, "_"), path: path, node: leafByPath(t, path...), readOnly: true}
+	return &toolBinding{name: strings.Join(path, "_"), path: path, node: leafByPath(t, path...), tier: tierRead}
 }
 
-func buildBindings(t *testing.T, writes ...string) map[string]*toolBinding {
+func bindingsMap(t *testing.T, cfg mcpConfig) map[string]*toolBinding {
 	t.Helper()
-	aw := map[string]bool{}
-	for _, w := range writes {
-		aw[w] = true
-	}
-	_, bindings, err := buildMCPServer(mcpConfig{allowWrite: aw})
+	_, bindings, err := buildMCPServer(cfg)
 	if err != nil {
-		t.Fatalf("buildMCPServer(allowWrite=%v): %v", writes, err)
+		t.Fatalf("buildMCPServer(%+v): %v", cfg, err)
 	}
 	m := make(map[string]*toolBinding, len(bindings))
 	for _, b := range bindings {
@@ -47,6 +43,19 @@ func buildBindings(t *testing.T, writes ...string) map[string]*toolBinding {
 		m[b.name] = b
 	}
 	return m
+}
+
+func setOf(names ...string) map[string]bool {
+	m := map[string]bool{}
+	for _, n := range names {
+		m[n] = true
+	}
+	return m
+}
+
+func buildBindings(t *testing.T, writes ...string) map[string]*toolBinding {
+	t.Helper()
+	return bindingsMap(t, mcpConfig{allowWrite: setOf(writes...)})
 }
 
 func TestCuratedRegistry_DefaultIsReadOnly(t *testing.T) {
@@ -64,7 +73,7 @@ func TestCuratedRegistry_DefaultIsReadOnly(t *testing.T) {
 		}
 	}
 	for _, b := range def {
-		if !b.readOnly {
+		if !b.readOnly() {
 			t.Errorf("default registry exposed non-read tool %q", b.name)
 		}
 	}
@@ -92,23 +101,77 @@ func TestCuratedRegistry_AllowWriteIsPerTool(t *testing.T) {
 	}
 }
 
-// TestCuratedRegistry_NoDestructiveOrSend is the guard: the curated set must
-// never include a send or hard-destructive command, even behind --allow-write.
-// "move" is intentionally NOT forbidden — moving a message is reversible (it can
-// be moved back), so it qualifies as a Phase 4 safe write; true deletion
-// (delete/rm) and any form of sending stay structurally barred from MCP.
-func TestCuratedRegistry_NoDestructiveOrSend(t *testing.T) {
-	forbidden := []string{"delete", "rm", "send", "reply", "forward", "logout", "clean"}
-	for _, ct := range curatedTools {
-		for _, tok := range ct.path {
-			for _, f := range forbidden {
-				if tok == f {
-					t.Errorf("curated tool %q includes forbidden verb %q", ct.name, f)
-				}
-			}
+// TestCuratedRegistry_TierGating is the core guard: each tier is exposed only by
+// its own opt-in flag, and lower-tier grants never leak higher-tier tools. In
+// particular a send (mail_send) or destructive (mail_delete) tool never appears
+// by default or under --allow-write.
+func TestCuratedRegistry_TierGating(t *testing.T) {
+	// Default: only reads; no mutation of any kind.
+	def := buildBindings(t)
+	for name, b := range def {
+		if !b.readOnly() {
+			t.Errorf("default registry exposed non-read tool %q", name)
 		}
-		if ct.name == "mail_drafts_send" || ct.name == "auth_login" {
-			t.Errorf("curated tool %q must not be exposed", ct.name)
+	}
+
+	// --allow-write exposes safe writes but never send or destructive tools.
+	w := bindingsMap(t, mcpConfig{allowWrite: writeToolNames()})
+	if _, ok := w["mail_flag"]; !ok {
+		t.Error("--allow-write should expose mail_flag")
+	}
+	for _, leaked := range []string{"mail_send", "mail_reply", "mail_delete", "calendar_delete"} {
+		if _, ok := w[leaked]; ok {
+			t.Errorf("--allow-write must not expose %q (wrong tier)", leaked)
+		}
+	}
+
+	// --allow-send exposes only the named send tool; not safe writes/destructive.
+	s := bindingsMap(t, mcpConfig{allowSend: setOf("mail_send")})
+	if _, ok := s["mail_send"]; !ok {
+		t.Error("--allow-send mail_send should expose mail_send")
+	}
+	for _, absent := range []string{"mail_flag", "mail_delete", "mail_reply"} {
+		if _, ok := s[absent]; ok {
+			t.Errorf("naming one send tool must not expose %q", absent)
+		}
+	}
+
+	// --allow-destructive exposes only the named destructive tool.
+	d := bindingsMap(t, mcpConfig{allowDestructive: setOf("mail_delete")})
+	if _, ok := d["mail_delete"]; !ok {
+		t.Error("--allow-destructive mail_delete should expose mail_delete")
+	}
+	if _, ok := d["mail_flag"]; ok {
+		t.Error("--allow-destructive must not expose a safe write")
+	}
+}
+
+// TestCuratedRegistry_GuardsVetoExposure verifies --no-send / --no-write hide
+// mutating tools even when explicitly named (the capability guard wins).
+func TestCuratedRegistry_GuardsVetoExposure(t *testing.T) {
+	// --no-send hides send tools even if named (safe writes still allowed).
+	ns := bindingsMap(t, mcpConfig{
+		noSend:     true,
+		allowSend:  setOf("mail_send"),
+		allowWrite: setOf("mail_flag"),
+	})
+	if _, ok := ns["mail_send"]; ok {
+		t.Error("--no-send must hide mail_send even when named via --allow-send")
+	}
+	if _, ok := ns["mail_flag"]; !ok {
+		t.Error("--no-send should still allow a named safe write")
+	}
+
+	// --no-write hides every mutating tier even when named.
+	nw := bindingsMap(t, mcpConfig{
+		noWrite:          true,
+		allowWrite:       writeToolNames(),
+		allowSend:        sendToolNames(),
+		allowDestructive: destructiveToolNames(),
+	})
+	for name, b := range nw {
+		if !b.readOnly() {
+			t.Errorf("--no-write must hide mutating tool %q", name)
 		}
 	}
 }
@@ -116,8 +179,12 @@ func TestCuratedRegistry_NoDestructiveOrSend(t *testing.T) {
 // TestCuratedToolsResolve ensures every curated path maps to a real leaf command
 // (catches drift if a command is renamed). buildMCPServer errors otherwise.
 func TestCuratedToolsResolve(t *testing.T) {
-	// Expose every curated tool (all writes named) so resolution covers them all.
-	if _, _, err := buildMCPServer(mcpConfig{allowWrite: writeToolNames()}); err != nil {
+	// Expose every curated tool (all tiers named) so resolution covers them all.
+	if _, _, err := buildMCPServer(mcpConfig{
+		allowWrite:       writeToolNames(),
+		allowSend:        sendToolNames(),
+		allowDestructive: destructiveToolNames(),
+	}); err != nil {
 		t.Fatalf("a curated tool failed to resolve: %v", err)
 	}
 }
@@ -200,11 +267,11 @@ func enumContains(s *jsonschema.Schema, want string) bool {
 }
 
 func TestToolSchema_ConciseInjectedForReadOnly(t *testing.T) {
-	read := &toolBinding{name: "mail_list", path: []string{"mail", "list"}, node: leafByPath(t, "mail", "list"), readOnly: true}
+	read := &toolBinding{name: "mail_list", path: []string{"mail", "list"}, node: leafByPath(t, "mail", "list"), tier: tierRead}
 	if _, ok := toolSchema(read).Properties[conciseArg]; !ok {
 		t.Error("read tool schema should include synthetic concise property")
 	}
-	write := &toolBinding{name: "mail_drafts_create", path: []string{"mail", "drafts", "create"}, node: leafByPath(t, "mail", "drafts", "create"), readOnly: false}
+	write := &toolBinding{name: "mail_drafts_create", path: []string{"mail", "drafts", "create"}, node: leafByPath(t, "mail", "drafts", "create"), tier: tierSafeWrite}
 	if _, ok := toolSchema(write).Properties[conciseArg]; ok {
 		t.Error("write tool schema must not include concise property")
 	}
