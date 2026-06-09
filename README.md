@@ -82,6 +82,18 @@ go install github.com/rlrghb/olkcli/cmd/olk@latest
 brew install rlrghb/tap/olk
 ```
 
+### npm
+
+```bash
+# Install globally (provides the `olk` command)
+npm install -g olkcli
+
+# …or run on demand without installing
+npx olkcli mail list
+```
+
+> The npm package is named **`olkcli`**; the installed binary is **`olk`**.
+
 ### macOS notes
 
 Two macOS-specific things to know:
@@ -337,6 +349,18 @@ These capability guards apply to **every** entry path — the bare CLI, scripts/
   }
 }
 ```
+
+It's also published to the [MCP Registry](https://registry.modelcontextprotocol.io) as **`io.github.rlrghb/outlook`**. To run it without a local install, point the client at npm (`olkcli`) via `npx`:
+
+```jsonc
+{
+  "mcpServers": {
+    "olk": { "command": "npx", "args": ["-y", "olkcli", "mcp"] }
+  }
+}
+```
+
+Either way, run `olk auth login` once first so the server has a token to reuse.
 
 - **Read-only by default.** A curated set of 23 read tools is exposed; destructive and send commands have **no** MCP exposure path at all:
   - **Mail:** `mail_list`, `mail_get`, `mail_search`, `mail_folders_list`
