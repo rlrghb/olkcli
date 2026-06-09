@@ -332,7 +332,13 @@ These capability guards apply to **every** entry path — the bare CLI, scripts/
 }
 ```
 
-- **Read-only by default.** Only safe read tools (`mail_list`, `mail_get`, `mail_search`, `calendar_events`, `contacts_search`, `drive_ls`, …) are exposed. Destructive and send commands have **no** MCP exposure path at all.
+- **Read-only by default.** A curated set of 23 read tools is exposed; destructive and send commands have **no** MCP exposure path at all:
+  - **Mail:** `mail_list`, `mail_get`, `mail_search`, `mail_folders_list`
+  - **Calendar:** `calendar_events`, `calendar_view`, `calendar_get`, `calendar_availability`, `calendar_find_times`
+  - **Contacts:** `contacts_list`, `contacts_get`, `contacts_search`
+  - **OneDrive:** `drive_ls`, `drive_get`, `drive_search`, `drive_recent`, `drive_shared` *(reads only — no upload/download/move/delete/share via MCP)*
+  - **To Do:** `todo_lists_list`, `todo_list`, `todo_get`
+  - **Directory & meta:** `people_search`, `whoami`, `version`
 - **Opt into safe writes per-tool** by naming each one: `olk mcp --allow-write mail_drafts_create` (repeatable, or `OLK_MCP_ALLOW_WRITE=mail_drafts_create,todo_create`). Only the curated, non-send/non-destructive writes — `mail_drafts_create` and `todo_create` — are eligible; nothing is exposed by default. Naming a write is a deliberate action separate from starting the server (defense in depth).
 - **Prompt-injection defense.** Tool output is emitted with `--wrap-untrusted` forced on: externally-controlled fields (email bodies, subjects, sender names, file names…) are wrapped in `‹untrusted›…‹/untrusted›` markers. Instruct your agent to treat marked spans as data, never instructions.
 - **No HTTP transport** is shipped (stdio only) — a deliberate scope choice to avoid running a networked service.
@@ -445,6 +451,28 @@ olk todo links list <TASK_ID> [--list ID]            List linked resources
 olk todo links create <TASK_ID> -n "Name" --url "URL" [--list ID]   Create a linked resource
 olk todo links delete <TASK_ID> <RESOURCE_ID> --force [--list ID]   Delete a linked resource
 ```
+
+### OneDrive
+
+```
+olk drive list                                       List available drives
+olk drive info [--drive-id ID]                       Drive details and quota
+olk drive ls [PATH] [--drive-id ID] [-n 50]          List folder contents
+olk drive get <ID> [--drive-id ID]                   Item details
+olk drive search <QUERY> [--drive-id ID] [-n 25]     Search files
+olk drive recent [--drive-id ID]                     Recently accessed files
+olk drive shared [--drive-id ID]                     Files shared with you
+olk drive download <ID> [--out DIR] [--drive-id ID]  Download a file
+olk drive upload <LOCAL> <REMOTE> [--drive-id ID] [--replace]   Upload a file
+olk drive mkdir <PATH> [--drive-id ID]               Create a folder
+olk drive cp <ID> <DEST> [--name NEW_NAME] [--drive-id ID]      Copy a file or folder
+olk drive mv <ID> <DEST> [--drive-id ID]             Move or rename
+olk drive rm <ID> --force [--drive-id ID]            Delete a file or folder
+olk drive share <ID> [--type view|edit] [--scope anonymous|organization] [--drive-id ID]   Create a sharing link
+olk drive versions <ID> [--drive-id ID]              List version history
+```
+
+If `--drive-id` is omitted, your primary drive is used.
 
 ### Configuration
 
