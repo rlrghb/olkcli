@@ -82,11 +82,15 @@ go install github.com/rlrghb/olkcli/cmd/olk@latest
 brew install rlrghb/tap/olk
 ```
 
-On macOS, if you see "olk can't be opened because Apple cannot verify it", run:
+### macOS notes
 
-```bash
-xattr -d com.apple.quarantine $(brew --prefix)/bin/olk
-```
+Two macOS-specific things to know:
+
+- **Gatekeeper quarantine** — as of **v0.9.1** the Homebrew cask clears this on install automatically. On older versions (or a direct download from the [releases page](https://github.com/rlrghb/olkcli/releases)), if olk won't launch ("olk can't be opened because Apple cannot verify it", or a silent `killed: 9`), run:
+  ```bash
+  xattr -d com.apple.quarantine $(brew --prefix)/bin/olk
+  ```
+- **Keychain prompt after upgrades** — your tokens are stored in the macOS Keychain. The first time you run olk after an upgrade, macOS prompts for Keychain access. Click **"Always Allow"** (not "Allow") so it won't ask again until the next upgrade.
 
 ## Quick Start
 

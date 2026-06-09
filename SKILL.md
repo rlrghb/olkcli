@@ -320,5 +320,6 @@ Notes
 - Destructive commands (`delete`) require `--force` or will prompt for confirmation.
 - Confirm before sending mail or creating/deleting events.
 - If a command fails with an auth error, check `olk auth status` first.
+- **macOS keychain prompt (agents):** the first `olk` command **after an upgrade** can trigger a macOS Keychain dialog. It's a macOS prompt, not olk's — `--no-input` does not suppress it, and the command blocks until a **human** clicks **"Always Allow"**. If an `olk` call hangs or fails right after an update on macOS, surface "approve the Keychain prompt (Always Allow)" to the user rather than retrying.
 - Some features are enterprise-only (work/school accounts): out-of-office, inbox rules, find meeting times, and directory search. These require `olk auth login --enterprise`.
 - OneDrive commands require re-login (`olk auth login`) if you authenticated before OneDrive support was added.
