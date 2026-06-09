@@ -19,12 +19,15 @@ const (
 	FormatPlain // TSV
 )
 
-// Envelope is the JSON output wrapper
+// Envelope is the JSON output wrapper. UntrustedNotice is emitted first (and
+// only when --wrap-untrusted is set) so a consuming LLM reads the security
+// directive before the wrapped, externally-controlled results.
 type Envelope struct {
-	Results  interface{} `json:"results"`
-	Count    int         `json:"count"`
-	NextLink string      `json:"nextLink,omitempty"`
-	Timezone string      `json:"timezone,omitempty"`
+	UntrustedNotice string      `json:"untrustedNotice,omitempty"`
+	Results         interface{} `json:"results"`
+	Count           int         `json:"count"`
+	NextLink        string      `json:"nextLink,omitempty"`
+	Timezone        string      `json:"timezone,omitempty"`
 }
 
 // Printer handles output formatting
@@ -59,19 +62,25 @@ func NewPrinter(jsonFlag, plainFlag, resultsOnly bool, selectFields, timezone st
 // fields tagged `untrusted:"true"` are wrapped with markers so an LLM/agent
 // consumer can distinguish externally-controlled text from trusted output.
 func (p *Printer) PrintJSON(results interface{}, count int, nextLink string) error {
+	notice := ""
 	if p.WrapUntrusted {
-		results = wrapUntrusted(results)
+		id := newUntrustedID()
+		results = wrapUntrusted(results, id)
+		notice = untrustedNotice(id)
 	}
 	enc := json.NewEncoder(p.Writer)
 	enc.SetIndent("", "  ")
 	if p.ResultsOnly {
+		// No envelope to carry the notice; the id-scoped markers remain on the
+		// wrapped fields, but the directive is dropped (advanced opt-out).
 		return enc.Encode(results)
 	}
 	return enc.Encode(Envelope{
-		Results:  results,
-		Count:    count,
-		NextLink: nextLink,
-		Timezone: p.Timezone,
+		UntrustedNotice: notice,
+		Results:         results,
+		Count:           count,
+		NextLink:        nextLink,
+		Timezone:        p.Timezone,
 	})
 }
 

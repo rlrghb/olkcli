@@ -342,7 +342,7 @@ These capability guards apply to **every** entry path — the bare CLI, scripts/
   - **To Do:** `todo_lists_list`, `todo_list`, `todo_get`
   - **Directory & meta:** `people_search`, `whoami`, `version`
 - **Opt into safe writes per-tool** by naming each one: `olk mcp --allow-write mail_drafts_create` (repeatable, or `OLK_MCP_ALLOW_WRITE=mail_drafts_create,todo_create`). Only the curated, non-send/non-destructive writes — `mail_drafts_create` and `todo_create` — are eligible; nothing is exposed by default. Naming a write is a deliberate action separate from starting the server (defense in depth).
-- **Prompt-injection defense.** Tool output is emitted with `--wrap-untrusted` forced on: externally-controlled fields (email bodies, subjects, sender names, file names…) are wrapped in `‹untrusted›…‹/untrusted›` markers. Instruct your agent to treat marked spans as data, never instructions.
+- **Prompt-injection defense.** Tool output is emitted with `--wrap-untrusted` forced on: externally-controlled fields (email bodies, subjects, sender names, file names…) are wrapped in `[UNTRUSTED:<id>]…[/UNTRUSTED:<id>]` markers, and each response carries a self-describing `untrustedNotice` that tells the agent to treat marked content as data, never instructions. The marker `id` is random per response, so malicious content can't forge a closing marker to escape the wrapper. No out-of-band briefing needed — the directive travels in the data.
 - **No HTTP transport** is shipped (stdio only) — a deliberate scope choice to avoid running a networked service.
 
 **Hardening agents that drive the CLI directly** (instead of MCP) — the same guards apply to every entry path, so compose them as env vars in a CI job or agent sandbox:
