@@ -32,7 +32,7 @@
 ## Testing Guidelines
 
 - Unit tests: stdlib `testing` package. Test files go next to the code they test (`*_test.go`).
-- Existing coverage: `internal/outfmt`, `internal/config`, `internal/msauth/scopes`, `internal/graphapi/validate`, and `internal/cmd/paging` (filter builder + mailbox-target validation). Other packages are not yet unit-tested.
+- Existing coverage: `internal/outfmt` (formatting + untrusted-wrapping), `internal/config`, `internal/msauth/scopes`, `internal/graphapi` (validate + capability guards), and `internal/cmd` (paging filters + mailbox-target validation, MCP server/registry, schema generation, argv building, output capture). Coverage is partial — many command and Graph-wrapper paths remain untested.
 - Integration tests require a valid OAuth token + live Graph access — run manually, not in CI.
 - New tests should run cleanly under `go test -race -count=1 ./...` and pass `golangci-lint run`.
 
@@ -59,6 +59,13 @@
 - Follow Conventional Commits (e.g. `feat(mail): add --attach flag to send`).
 - Group related changes; avoid bundling unrelated refactors.
 - PRs should summarize scope, note testing performed, and mention user-facing changes.
+- Attribution: when adapting or reworking someone else's PR/patch, keep them as a `Co-Authored-By:` trailer on the commit even if the code was substantially rewritten.
+
+### Review vs. Land
+
+- **Review mode is read-only.** Inspect with `gh pr view <n>` / `gh pr diff <n>`; don't push to a contributor's branch while reviewing.
+- **Land mode**: never commit directly to `main` — branch, open a PR, and **wait for both CI jobs (`test`, `lint`) to pass** before merging. Merge with **squash** and delete the branch. Sync `main` and prune afterward.
+- Verify behavior before landing user-facing changes (run the binary / a live smoke test), not just unit tests.
 
 ## Security & Configuration
 
