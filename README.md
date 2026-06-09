@@ -130,6 +130,8 @@ olk contacts list
 | `--json` | JSON envelope | Scripting with `jq` |
 | `--plain` | Tab-separated | Piping to `awk`, `cut` |
 
+Results go to **stdout**; errors, prompts, and diagnostics go to **stderr** — so `olk … --json | jq` (or an agent reading stdout) stays clean even when a prompt or warning fires.
+
 ### JSON Envelope
 
 ```bash
@@ -343,6 +345,17 @@ These capability guards apply to **every** entry path — the bare CLI, scripts/
 - **Prompt-injection defense.** Tool output is emitted with `--wrap-untrusted` forced on: externally-controlled fields (email bodies, subjects, sender names, file names…) are wrapped in `‹untrusted›…‹/untrusted›` markers. Instruct your agent to treat marked spans as data, never instructions.
 - **No HTTP transport** is shipped (stdio only) — a deliberate scope choice to avoid running a networked service.
 
+**Hardening agents that drive the CLI directly** (instead of MCP) — the same guards apply to every entry path, so compose them as env vars in a CI job or agent sandbox:
+
+```bash
+# Read-only, injection-wrapped, restricted to a few commands, never blocks on a prompt
+export OLK_NO_WRITE=1 OLK_WRAP_UNTRUSTED=1 OLK_NO_INPUT=1
+export OLK_ENABLE_COMMANDS_EXACT=mail.list,mail.get,mail.search,calendar.events
+olk mail list --json
+```
+
+See [Global Flags](#global-flags) for the full guard list (`--no-write`, `--no-send`, `--no-input`, `--wrap-untrusted`, `--enable-commands[-exact]`, `--disable-commands`), and [AI Agent Integration](#ai-agent-integration) for the skill-based path.
+
 > **Not affiliated with Microsoft.** olk is an independent client for the Microsoft Graph API.
 
 ## Commands Reference
@@ -539,6 +552,8 @@ olk mail list --json --results-only | jq -r '.[] | select(.isRead == false) | "\
 ## AI Agent Integration
 
 `olk` ships with a [`SKILL.md`](SKILL.md) that follows the [Agent Skills](https://agentskills.io) open standard. This lets AI coding assistants discover and use `olk` commands on your behalf — checking mail, scheduling meetings, managing contacts, all from within your AI workflow.
+
+> Two ways to give an agent access: the **skill** below (the agent runs `olk` CLI commands directly), or the **[MCP server](#mcp-server-ai-agents)** (`olk mcp`, a curated read-first tool surface for MCP clients like Claude Desktop). Use the skill for coding-assistant workflows in a terminal; use MCP for tool-calling agents.
 
 ### Supported Platforms
 

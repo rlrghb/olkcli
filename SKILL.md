@@ -298,6 +298,7 @@ Notes
 - Set `OLK_DRIVE_ID=<drive-id>` to avoid repeating `--drive-id` for drive commands.
 - Set `OLK_KEYRING_PASSWORD=<password>` for headless/non-interactive environments (file-backend keyring).
 - For scripting, prefer `--json --results-only` plus `jq`.
+- Results go to stdout; errors, prompts, and diagnostics go to stderr — piped `--json` stays clean. Set `OLK_NO_INPUT=1` so a command fails instead of blocking on a prompt.
 - IDs are opaque Microsoft Graph strings. Always get them from `list` or `search` first — never guess.
 - Dates are ISO 8601: `2025-06-15` or `2025-06-15T09:00`.
 - Mail search uses KQL, not regex. Operators: `from:`, `to:`, `subject:`, `hasAttachment:`, `received>=`.
