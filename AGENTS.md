@@ -44,6 +44,12 @@
 - The `lint` job runs `golangci-lint` v2.5.0 against `.golangci.yml`.
 - Both jobs use pinned action SHAs to match `release.yml` style.
 
+## Release & Distribution
+
+- A `vX.Y.Z` tag triggers `release.yml`, publishing to three channels: **Homebrew** (goreleaser → `rlrghb/tap` cask, with a quarantine-strip postflight), **npm** (the `olkcli` package + six `olk-<os>-<arch>` per-platform packages under `npm/`; `scripts/build-npm.mjs` stamps + publishes), and the **MCP Registry** (`server.json` → `io.github.rlrghb/outlook`, published via `mcp-publisher`).
+- **No publish secrets:** npm uses **Trusted Publishing (OIDC)** (`id-token: write`, npm ≥ 11.5.1, SLSA provenance); the registry uses GitHub OIDC. The npm package is `olkcli`; the binary is `olk`.
+- The official MCP registry has no in-place edit — `server.json` description/version changes apply on the **next release** (versions are CI-stamped from the tag). `npm-publish`/`registry-publish` are gated on the `PUBLISH_NPM` repo variable.
+
 ## Key Design Decisions
 
 - **Raw OAuth2**: Uses `net/http` directly against Microsoft's OAuth2 endpoints (no MSAL dependency). Refresh tokens stored in OS keyring.

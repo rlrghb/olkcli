@@ -80,6 +80,16 @@ Add `untrusted:"true"` to the struct tag of any externally-controlled free-text 
 ### Changing Graph API calls
 Edit files in `internal/graphapi/` — these wrap the verbose SDK calls into simple methods returning plain structs.
 
+## Release & distribution
+
+Pushing a `vX.Y.Z` tag triggers `.github/workflows/release.yml`, which fans out to three channels:
+
+- **Homebrew** — goreleaser builds the binaries and updates the `rlrghb/tap` cask (`homebrew_casks` in `.goreleaser.yaml`); a `hooks.post.install` strips the macOS quarantine xattr so the unsigned binary launches.
+- **npm** — the CLI also ships as an npm package for `npx`/cross-platform installs. `npm/olk/` is the main package **`olkcli`** (an esbuild-style launcher `bin/olk.js` that execs the matching `npm/olk-<os>-<arch>/` per-platform binary via `optionalDependencies`). `scripts/build-npm.mjs` stamps the tag version across all 7 packages and publishes them (idempotent — skips already-published versions). Publishing uses **npm Trusted Publishing (OIDC)** — no stored token: the `npm-publish` job has `id-token: write`, upgrades npm to ≥ 11.5.1, and each package has a trusted publisher configured (this repo + `release.yml`); every package gets a SLSA provenance attestation. The npm package is `olkcli`; the installed binary is `olk`.
+- **MCP Registry** — `server.json` (name `io.github.rlrghb/outlook`, `registryType: npm` → `olkcli`, `packageArguments: [{positional "mcp"}]`) is published by the `registry-publish` job via `mcp-publisher` using GitHub OIDC (no secret). `version` fields are placeholders CI stamps from the tag; the `mcpName` in `npm/olk/package.json` must equal the `server.json` name. The official registry has **no in-place edit**, so `server.json` description/metadata changes only take effect on the **next release**.
+
+Both `npm-publish` and `registry-publish` are gated on the `PUBLISH_NPM` repo variable. There are no long-lived publish secrets — npm and the registry both authenticate via OIDC.
+
 ## Dependencies
 
 The project uses `msgraph-sdk-go` v1.96.0 which has some naming quirks:
