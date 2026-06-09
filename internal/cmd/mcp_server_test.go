@@ -93,9 +93,12 @@ func TestCuratedRegistry_AllowWriteIsPerTool(t *testing.T) {
 }
 
 // TestCuratedRegistry_NoDestructiveOrSend is the guard: the curated set must
-// never include a delete/send/destructive command, even behind --allow-write.
+// never include a send or hard-destructive command, even behind --allow-write.
+// "move" is intentionally NOT forbidden — moving a message is reversible (it can
+// be moved back), so it qualifies as a Phase 4 safe write; true deletion
+// (delete/rm) and any form of sending stay structurally barred from MCP.
 func TestCuratedRegistry_NoDestructiveOrSend(t *testing.T) {
-	forbidden := []string{"delete", "rm", "send", "reply", "forward", "move", "logout", "clean"}
+	forbidden := []string{"delete", "rm", "send", "reply", "forward", "logout", "clean"}
 	for _, ct := range curatedTools {
 		for _, tok := range ct.path {
 			for _, f := range forbidden {
@@ -214,5 +217,31 @@ func TestCuratedReadToolCount(t *testing.T) {
 	const documentedReadTools = 38
 	if got := len(buildBindings(t)); got != documentedReadTools {
 		t.Errorf("default read-only registry has %d tools; expected %d — update README.md and this constant in lockstep", got, documentedReadTools)
+	}
+}
+
+// TestCuratedRegistry_SafeWritesOptIn verifies the Phase 4 safe writes are
+// hidden by default and appear only when named via --allow-write (per-tool).
+func TestCuratedRegistry_SafeWritesOptIn(t *testing.T) {
+	safeWrites := []string{
+		"mail_flag", "mail_categorize", "mail_mark", "mail_move",
+		"mail_folders_create", "mail_folders_rename",
+		"contacts_create", "contacts_update", "todo_update", "todo_complete",
+	}
+	def := buildBindings(t) // no writes named
+	for _, name := range safeWrites {
+		if _, ok := def[name]; ok {
+			t.Errorf("safe write %q must be hidden until named via --allow-write", name)
+		}
+	}
+	// Each is eligible (a known write tool) and appears when named.
+	known := writeToolNames()
+	for _, name := range safeWrites {
+		if !known[name] {
+			t.Errorf("%q should be a curated write tool", name)
+		}
+		if _, ok := buildBindings(t, name)[name]; !ok {
+			t.Errorf("%q should appear when named via --allow-write", name)
+		}
 	}
 }

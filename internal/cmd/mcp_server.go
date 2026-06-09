@@ -68,9 +68,21 @@ var curatedTools = []curatedTool{
 	{"changes", []string{"changes"}, false},
 	{"whoami", []string{"whoami"}, false},
 	{"version", []string{"version"}, false},
-	// Safe writes (opt-in: --allow-write, non-send and non-destructive)
+	// Safe writes (opt-in: --allow-write / --allow-tool write). Every one is
+	// non-send and either non-destructive or reversible — no message/invite is
+	// ever sent and nothing is hard-deleted. Send and delete have no MCP path.
 	{"mail_drafts_create", []string{"mail", "drafts", "create"}, true},
+	{"mail_flag", []string{"mail", "flag"}, true},
+	{"mail_categorize", []string{"mail", "categorize"}, true},
+	{"mail_mark", []string{"mail", "mark"}, true},
+	{"mail_move", []string{"mail", "move"}, true}, // reversible: a move can be moved back
+	{"mail_folders_create", []string{"mail", "folders", "create"}, true},
+	{"mail_folders_rename", []string{"mail", "folders", "rename"}, true},
+	{"contacts_create", []string{"contacts", "create"}, true},
+	{"contacts_update", []string{"contacts", "update"}, true},
 	{"todo_create", []string{"todo", "create"}, true},
+	{"todo_update", []string{"todo", "update"}, true},
+	{"todo_complete", []string{"todo", "complete"}, true}, // reversible: status can be set back
 }
 
 // mcpConfig controls which curated tools a server exposes.
