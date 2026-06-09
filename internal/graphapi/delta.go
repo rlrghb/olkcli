@@ -25,8 +25,8 @@ func maxPageSizeHeaders(top int32) *abs.RequestHeaders {
 
 // Delta sync wraps Microsoft Graph's /delta endpoints for mail, calendar, and
 // contacts. Each call returns the changes since a prior opaque token plus a new
-// token to use next time — stateless, agent-driven, no server state (mirroring
-// outlook-mcp's cursor model). One call returns one page: when Complete is
+// token to use next time — stateless and agent-driven, with no server state
+// (an opaque cursor model). One call returns one page: when Complete is
 // false a nextLink token is returned (more changes available right now); when
 // Complete is true the token is a deltaLink (caught up — store it for the next
 // sync). An item with Removed=true is a deletion (only its ID is populated).

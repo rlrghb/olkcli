@@ -136,8 +136,8 @@ func capText(s string, limit int) string {
 }
 
 // errorResult builds an IsError tool result as a {code, message, action} JSON
-// envelope (outlook-mcp's structured-error shape) so an agent gets a machine
-// classification plus an actionable next step, not just a raw Graph error.
+// envelope so an agent gets a machine classification plus an actionable next
+// step, not just a raw Graph error.
 func errorResult(msg string) *mcp.CallToolResult {
 	code, action := classifyError(msg)
 	env := map[string]string{"code": code, "message": msg}

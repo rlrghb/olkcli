@@ -341,6 +341,13 @@ These capability guards apply to **every** entry path — the bare CLI, scripts/
 
 `olk mcp` runs a [Model Context Protocol](https://modelcontextprotocol.io) server over **stdio**, exposing a **curated, read-first** set of tools to MCP clients (Claude Desktop, IDEs, agents). It reuses your existing olk login — no separate auth.
 
+**Why this server stands out:**
+- **Read-first with tiered, per-tool opt-in.** Reads work out of the box; every mutation is off by default, and four separate escalating gates (`--allow-write` → `--allow-send` → `--allow-destructive`) mean granting reads or safe edits never silently grants the ability to send mail or delete data.
+- **Guarantees that hold everywhere.** `--no-write`/`--no-send` are enforced once at the API layer, so the same safety promise covers the CLI, scripts, and MCP — a disabled capability is never even advertised as a tool.
+- **Built-in prompt-injection defense.** External free text (subjects, bodies, sender names, file names) is wrapped in per-response, forge-resistant markers with an inline directive telling the agent to treat it as data, not instructions.
+- **Broad and efficient.** Mail, calendar, contacts, tasks, **and** OneDrive files plus directory/people search — with incremental delta sync, `$batch` fetches, conversation threading, a token-saving concise mode, output caps, and structured `{code, message, action}` errors agents can branch on.
+- **Personal *and* enterprise accounts**, a single static binary, and no networked HTTP surface (stdio only).
+
 ```jsonc
 // Claude Desktop / MCP client config
 {

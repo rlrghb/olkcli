@@ -17,8 +17,8 @@ type resourceChanges[T any] struct {
 	Complete   bool   `json:"complete"`
 }
 
-// changesDigest is the cross-resource delta snapshot (outlook-mcp's
-// changes_since): mail, calendar, and contacts each with an independent token.
+// changesDigest is the cross-resource delta snapshot: mail, calendar, and
+// contacts changes in one call, each with its own independent token.
 type changesDigest struct {
 	Mail     resourceChanges[graphapi.MailDelta]     `json:"mail"`
 	Calendar resourceChanges[graphapi.CalendarDelta] `json:"calendar"`
