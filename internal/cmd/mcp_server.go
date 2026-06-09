@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"reflect"
+	"sort"
 	"strings"
 
 	"github.com/alecthomas/kong"
@@ -59,8 +60,29 @@ var curatedTools = []curatedTool{
 
 // mcpConfig controls which curated tools a server exposes.
 type mcpConfig struct {
-	allowWrite bool                     // expose write tools too
+	allowWrite map[string]bool          // set of curated write tool names to expose (nil/empty = none)
 	allowed    func(path []string) bool // nil = allow all; else command allow/deny lists
+}
+
+// writeToolNames returns the set of curated write tool names (the only tools
+// eligible to be exposed via --allow-write).
+func writeToolNames() map[string]bool {
+	names := map[string]bool{}
+	for _, ct := range curatedTools {
+		if ct.write {
+			names[ct.name] = true
+		}
+	}
+	return names
+}
+
+func sortedKeys(m map[string]bool) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
 }
 
 // toolBinding ties a generated MCP tool name back to the kong command it runs.
@@ -97,7 +119,7 @@ func buildMCPServer(cfg mcpConfig) (*mcp.Server, []*toolBinding, error) {
 
 	bindings := make([]*toolBinding, 0, len(curatedTools))
 	for _, ct := range curatedTools {
-		if ct.write && !cfg.allowWrite {
+		if ct.write && !cfg.allowWrite[ct.name] {
 			continue
 		}
 		if cfg.allowed != nil && !cfg.allowed(ct.path) {

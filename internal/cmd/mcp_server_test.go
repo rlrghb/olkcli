@@ -29,11 +29,15 @@ func testBinding(t *testing.T, path ...string) *toolBinding {
 	return &toolBinding{name: strings.Join(path, "_"), path: path, node: leafByPath(t, path...), readOnly: true}
 }
 
-func buildBindings(t *testing.T, allowWrite bool) map[string]*toolBinding {
+func buildBindings(t *testing.T, writes ...string) map[string]*toolBinding {
 	t.Helper()
-	_, bindings, err := buildMCPServer(mcpConfig{allowWrite: allowWrite})
+	aw := map[string]bool{}
+	for _, w := range writes {
+		aw[w] = true
+	}
+	_, bindings, err := buildMCPServer(mcpConfig{allowWrite: aw})
 	if err != nil {
-		t.Fatalf("buildMCPServer(allowWrite=%v): %v", allowWrite, err)
+		t.Fatalf("buildMCPServer(allowWrite=%v): %v", writes, err)
 	}
 	m := make(map[string]*toolBinding, len(bindings))
 	for _, b := range bindings {
@@ -46,14 +50,14 @@ func buildBindings(t *testing.T, allowWrite bool) map[string]*toolBinding {
 }
 
 func TestCuratedRegistry_DefaultIsReadOnly(t *testing.T) {
-	def := buildBindings(t, false)
+	def := buildBindings(t) // no writes named
 
 	for _, name := range []string{"mail_list", "mail_get", "mail_search", "calendar_events", "whoami", "version"} {
 		if _, ok := def[name]; !ok {
 			t.Errorf("expected read tool %q in default registry", name)
 		}
 	}
-	// Write tools are absent without --allow-write.
+	// Write tools are absent unless named via --allow-write.
 	for _, name := range []string{"mail_drafts_create", "todo_create"} {
 		if _, ok := def[name]; ok {
 			t.Errorf("write tool %q must not appear without --allow-write", name)
@@ -66,15 +70,25 @@ func TestCuratedRegistry_DefaultIsReadOnly(t *testing.T) {
 	}
 }
 
-func TestCuratedRegistry_AllowWriteAddsSafeWrites(t *testing.T) {
-	full := buildBindings(t, true)
-	for _, name := range []string{"mail_drafts_create", "todo_create"} {
-		if _, ok := full[name]; !ok {
-			t.Errorf("expected %q with --allow-write", name)
-		}
+func TestCuratedRegistry_AllowWriteIsPerTool(t *testing.T) {
+	// Naming one write exposes only that one — not the other.
+	one := buildBindings(t, "mail_drafts_create")
+	if _, ok := one["mail_drafts_create"]; !ok {
+		t.Error("expected mail_drafts_create when named")
 	}
-	if len(full) <= len(buildBindings(t, false)) {
-		t.Error("--allow-write should expose strictly more tools")
+	if _, ok := one["todo_create"]; ok {
+		t.Error("todo_create must NOT appear when only mail_drafts_create is named")
+	}
+	if len(one) <= len(buildBindings(t)) {
+		t.Error("naming a write should expose strictly more tools")
+	}
+
+	// Naming both exposes both.
+	both := buildBindings(t, "mail_drafts_create", "todo_create")
+	for _, name := range []string{"mail_drafts_create", "todo_create"} {
+		if _, ok := both[name]; !ok {
+			t.Errorf("expected %q when named", name)
+		}
 	}
 }
 
@@ -99,7 +113,8 @@ func TestCuratedRegistry_NoDestructiveOrSend(t *testing.T) {
 // TestCuratedToolsResolve ensures every curated path maps to a real leaf command
 // (catches drift if a command is renamed). buildMCPServer errors otherwise.
 func TestCuratedToolsResolve(t *testing.T) {
-	if _, _, err := buildMCPServer(mcpConfig{allowWrite: true}); err != nil {
+	// Expose every curated tool (all writes named) so resolution covers them all.
+	if _, _, err := buildMCPServer(mcpConfig{allowWrite: writeToolNames()}); err != nil {
 		t.Fatalf("a curated tool failed to resolve: %v", err)
 	}
 }

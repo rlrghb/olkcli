@@ -10,11 +10,15 @@ import (
 )
 
 // connectE2E wires an in-memory client session to a freshly built server.
-func connectE2E(t *testing.T, allowWrite bool) *mcp.ClientSession {
+func connectE2E(t *testing.T, writes ...string) *mcp.ClientSession {
 	t.Helper()
 	ctx := context.Background()
 
-	srv, _, err := buildMCPServer(mcpConfig{allowWrite: allowWrite})
+	aw := map[string]bool{}
+	for _, w := range writes {
+		aw[w] = true
+	}
+	srv, _, err := buildMCPServer(mcpConfig{allowWrite: aw})
 	if err != nil {
 		t.Fatalf("buildMCPServer: %v", err)
 	}
@@ -46,7 +50,7 @@ func resultText(res *mcp.CallToolResult) string {
 }
 
 func TestE2E_ListTools(t *testing.T) {
-	cs := connectE2E(t, true)
+	cs := connectE2E(t, "mail_drafts_create", "todo_create")
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -75,7 +79,7 @@ func TestE2E_ListTools(t *testing.T) {
 // TestE2E_CallVersion exercises the whole pipeline (schema -> argv -> kong parse
 // -> run -> capture -> result) with a network-free command.
 func TestE2E_CallVersion(t *testing.T) {
-	cs := connectE2E(t, false)
+	cs := connectE2E(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -101,7 +105,7 @@ func TestE2E_ErrorPath(t *testing.T) {
 	t.Setenv("OLK_CONFIG_DIR", t.TempDir())
 	t.Setenv("OLK_ACCOUNT", "")
 
-	cs := connectE2E(t, false)
+	cs := connectE2E(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 

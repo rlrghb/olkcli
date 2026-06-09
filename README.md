@@ -333,7 +333,7 @@ These capability guards apply to **every** entry path — the bare CLI, scripts/
 ```
 
 - **Read-only by default.** Only safe read tools (`mail_list`, `mail_get`, `mail_search`, `calendar_events`, `contacts_search`, `drive_ls`, …) are exposed. Destructive and send commands have **no** MCP exposure path at all.
-- **Opt into safe writes** with `olk mcp --allow-write`, which adds `mail_drafts_create` and `todo_create` (non-send, non-destructive). Each must also be permitted via `--enable-commands-exact`.
+- **Opt into safe writes per-tool** by naming each one: `olk mcp --allow-write mail_drafts_create` (repeatable, or `OLK_MCP_ALLOW_WRITE=mail_drafts_create,todo_create`). Only the curated, non-send/non-destructive writes — `mail_drafts_create` and `todo_create` — are eligible; nothing is exposed by default. Naming a write is a deliberate action separate from starting the server (defense in depth).
 - **Prompt-injection defense.** Tool output is emitted with `--wrap-untrusted` forced on: externally-controlled fields (email bodies, subjects, sender names, file names…) are wrapped in `‹untrusted›…‹/untrusted›` markers. Instruct your agent to treat marked spans as data, never instructions.
 - **No HTTP transport** is shipped (stdio only) — a deliberate scope choice to avoid running a networked service.
 
