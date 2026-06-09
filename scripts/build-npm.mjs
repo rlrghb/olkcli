@@ -49,8 +49,31 @@ if (!publish) {
   process.exit(0);
 }
 
+function pkgName(pkgDir) {
+  return JSON.parse(readFileSync(path.join(npmDir, pkgDir, "package.json"), "utf8")).name;
+}
+
+// Idempotent: skip a package@version that already exists on npm, so re-running
+// a partially-failed release (e.g. the registry step failed) does not error on
+// "cannot publish over previously published version".
+function alreadyPublished(name) {
+  try {
+    return execFileSync("npm", ["view", `${name}@${version}`, "version"], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim() === version;
+  } catch {
+    return false;
+  }
+}
+
 function npmPublish(pkgDir) {
-  console.log(`publishing ${pkgDir}@${version} ...`);
+  const name = pkgName(pkgDir);
+  if (alreadyPublished(name)) {
+    console.log(`skip ${name}@${version} (already published)`);
+    return;
+  }
+  console.log(`publishing ${name}@${version} ...`);
   execFileSync("npm", ["publish", "--access", "public"], {
     cwd: path.join(npmDir, pkgDir),
     stdio: "inherit",

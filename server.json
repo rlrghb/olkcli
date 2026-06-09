@@ -11,7 +11,7 @@
     {
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
-      "identifier": "olk",
+      "identifier": "olkcli",
       "version": "0.9.1",
       "transport": {
         "type": "stdio"
