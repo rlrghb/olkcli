@@ -59,6 +59,56 @@ func commandAllowed(flags *RootFlags, path []string) bool {
 	return false
 }
 
+// toolSelectorPredicate compiles gog-style --allow-tool selectors into a
+// predicate over (tool name, readOnly). Selectors narrow the curated set by
+// tool name; they never grant a write tool that --allow-write hasn't already
+// enabled. Returns nil when no selectors are given (allow all). Supported
+// forms, matched case-insensitively with '.' treated as '_':
+//   - "all" / "*"          → every tool
+//   - "read" / "write"     → by category
+//   - "mail_*" / "mail.*"  → name prefix (glob, trailing '*')
+//   - "mail_list"          → exact name
+func toolSelectorPredicate(selectors []string) func(name string, readOnly bool) bool {
+	sels := make([]string, 0, len(selectors))
+	for _, s := range selectors {
+		for _, part := range strings.Split(s, ",") {
+			if part = strings.TrimSpace(part); part != "" {
+				sels = append(sels, part)
+			}
+		}
+	}
+	if len(sels) == 0 {
+		return nil
+	}
+	norm := func(s string) string { return strings.ReplaceAll(strings.ToLower(s), ".", "_") }
+	return func(name string, readOnly bool) bool {
+		n := norm(name)
+		for _, sel := range sels {
+			switch s := norm(sel); {
+			case s == "all" || s == "*":
+				return true
+			case s == "read":
+				if readOnly {
+					return true
+				}
+			case s == "write":
+				if !readOnly {
+					return true
+				}
+			case strings.HasSuffix(s, "*"):
+				if strings.HasPrefix(n, strings.TrimSuffix(s, "*")) {
+					return true
+				}
+			default:
+				if n == s {
+					return true
+				}
+			}
+		}
+		return false
+	}
+}
+
 // splitCSV splits a comma-separated list, trimming whitespace and dropping empties.
 func splitCSV(s string) []string {
 	if strings.TrimSpace(s) == "" {

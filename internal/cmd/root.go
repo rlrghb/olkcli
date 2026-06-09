@@ -34,6 +34,7 @@ type RootFlags struct {
 	Color       string `help:"Color mode: auto|never|always" default:"auto" env:"OLK_COLOR" enum:"auto,never,always"`
 	Select      string `help:"Comma-separated fields to output" env:"OLK_SELECT"`
 	ResultsOnly bool   `help:"Output only the results array (no envelope)" env:"OLK_RESULTS_ONLY"`
+	Concise     bool   `help:"Drop large free-text fields (message/event/task bodies, previews, attendee lists) from JSON output to reduce size" env:"OLK_CONCISE"`
 	Timeout     int    `help:"Request timeout in seconds" default:"60" env:"OLK_TIMEOUT"`
 	TimeZone    string `help:"IANA time zone for display (e.g. America/New_York, Local, UTC)" name:"tz" env:"OLK_TIMEZONE"`
 
@@ -173,7 +174,7 @@ func (r *RunContext) Printer() *outfmt.Printer {
 	if loc, err := r.Timezone(); err == nil {
 		tzName = loc.String()
 	}
-	return outfmt.NewPrinter(r.Flags.JSON, r.Flags.Plain, r.Flags.ResultsOnly, r.Flags.Select, tzName, r.Flags.WrapUntrusted)
+	return outfmt.NewPrinter(r.Flags.JSON, r.Flags.Plain, r.Flags.ResultsOnly, r.Flags.Select, tzName, r.Flags.WrapUntrusted, r.Flags.Concise)
 }
 
 type CLI struct {

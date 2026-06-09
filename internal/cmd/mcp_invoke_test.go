@@ -203,3 +203,77 @@ func TestCapText(t *testing.T) {
 		t.Errorf("expected truncation notice; len=%d", len(got))
 	}
 }
+
+func TestBuildArgv_ConciseReadTool(t *testing.T) {
+	b := testBinding(t, "mail", "list") // testBinding sets readOnly:true
+	argv, err := buildArgv(b, map[string]any{"concise": true})
+	if err != nil {
+		t.Fatalf("buildArgv: %v", err)
+	}
+	if !contains(argv, "--concise") {
+		t.Errorf("expected --concise in argv for read tool, got %v", argv)
+	}
+	// concise:false must not emit the flag.
+	argv, _ = buildArgv(b, map[string]any{"concise": false})
+	if contains(argv, "--concise") {
+		t.Errorf("concise=false should omit --concise, got %v", argv)
+	}
+}
+
+func TestRejectUnknownArgs_ConciseAllowedForReadOnly(t *testing.T) {
+	read := testBinding(t, "mail", "list") // readOnly:true
+	if err := rejectUnknownArgs(read, map[string]any{"concise": true}); err != nil {
+		t.Errorf("concise should be accepted on a read tool: %v", err)
+	}
+	write := &toolBinding{name: "mail_drafts_create", path: []string{"mail", "drafts", "create"}, node: leafByPath(t, "mail", "drafts", "create"), readOnly: false}
+	if err := rejectUnknownArgs(write, map[string]any{"concise": true}); err == nil {
+		t.Error("concise should be rejected on a write tool")
+	}
+}
+
+func TestToolSelectorPredicate(t *testing.T) {
+	// nil when empty → caller treats as allow-all.
+	if toolSelectorPredicate(nil) != nil {
+		t.Error("no selectors should yield a nil predicate")
+	}
+	cases := []struct {
+		sels     []string
+		name     string
+		readOnly bool
+		want     bool
+	}{
+		{[]string{"all"}, "mail_list", true, true},
+		{[]string{"*"}, "todo_create", false, true},
+		{[]string{"read"}, "mail_list", true, true},
+		{[]string{"read"}, "todo_create", false, false},
+		{[]string{"write"}, "todo_create", false, true},
+		{[]string{"write"}, "mail_list", true, false},
+		{[]string{"mail_*"}, "mail_get", true, true},
+		{[]string{"mail.*"}, "mail_get", true, true}, // dot normalized to underscore
+		{[]string{"mail_*"}, "calendar_get", true, false},
+		{[]string{"mail_list"}, "mail_list", true, true},
+		{[]string{"mail_list"}, "mail_get", true, false},
+		{[]string{"calendar_*", "todo_get"}, "todo_get", true, true}, // any-match
+	}
+	for _, tc := range cases {
+		pred := toolSelectorPredicate(tc.sels)
+		if got := pred(tc.name, tc.readOnly); got != tc.want {
+			t.Errorf("selectors %v on (%q,ro=%v) = %v, want %v", tc.sels, tc.name, tc.readOnly, got, tc.want)
+		}
+	}
+}
+
+func TestBuildMCPServer_AllowToolNarrows(t *testing.T) {
+	_, bindings, err := buildMCPServer(mcpConfig{allowTool: toolSelectorPredicate([]string{"mail_*"})})
+	if err != nil {
+		t.Fatalf("buildMCPServer: %v", err)
+	}
+	if len(bindings) == 0 {
+		t.Fatal("expected some mail_* tools")
+	}
+	for _, b := range bindings {
+		if !strings.HasPrefix(b.name, "mail_") {
+			t.Errorf("allow-tool mail_* leaked non-mail tool %q", b.name)
+		}
+	}
+}

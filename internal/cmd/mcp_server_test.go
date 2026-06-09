@@ -195,3 +195,14 @@ func enumContains(s *jsonschema.Schema, want string) bool {
 	}
 	return false
 }
+
+func TestToolSchema_ConciseInjectedForReadOnly(t *testing.T) {
+	read := &toolBinding{name: "mail_list", path: []string{"mail", "list"}, node: leafByPath(t, "mail", "list"), readOnly: true}
+	if _, ok := toolSchema(read).Properties[conciseArg]; !ok {
+		t.Error("read tool schema should include synthetic concise property")
+	}
+	write := &toolBinding{name: "mail_drafts_create", path: []string{"mail", "drafts", "create"}, node: leafByPath(t, "mail", "drafts", "create"), readOnly: false}
+	if _, ok := toolSchema(write).Properties[conciseArg]; ok {
+		t.Error("write tool schema must not include concise property")
+	}
+}

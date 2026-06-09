@@ -23,14 +23,14 @@ type CalendarEvent struct {
 	End         string   `json:"end"`
 	Location    string   `json:"location" untrusted:"true"`
 	Organizer   string   `json:"organizer" untrusted:"true"`
-	Attendees   []string `json:"attendees,omitempty" untrusted:"true"`
+	Attendees   []string `json:"attendees,omitempty" untrusted:"true" concise:"omit"`
 	IsAllDay    bool     `json:"isAllDay"`
 	IsOnline    bool     `json:"isOnlineMeeting"`
 	OnlineURL   string   `json:"onlineMeetingUrl,omitempty"`
 	Status      string   `json:"showAs"`
 	Recurrence  string   `json:"recurrence,omitempty"`
-	BodyPreview string   `json:"bodyPreview" untrusted:"true"`
-	Body        string   `json:"body,omitempty" untrusted:"true"`
+	BodyPreview string   `json:"bodyPreview,omitempty" untrusted:"true" concise:"omit"`
+	Body        string   `json:"body,omitempty" untrusted:"true" concise:"omit"`
 }
 
 // CalendarInfo is a simplified calendar representation

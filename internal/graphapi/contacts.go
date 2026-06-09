@@ -76,14 +76,14 @@ type Contact struct {
 	Manager          string   `json:"manager,omitempty" untrusted:"true"`
 	AssistantName    string   `json:"assistantName,omitempty" untrusted:"true"`
 	Birthday         string   `json:"birthday,omitempty"`
-	PersonalNotes    string   `json:"personalNotes,omitempty" untrusted:"true"`
+	PersonalNotes    string   `json:"personalNotes,omitempty" untrusted:"true" concise:"omit"`
 	SpouseName       string   `json:"spouseName,omitempty" untrusted:"true"`
 	Children         []string `json:"children,omitempty" untrusted:"true"`
 	Categories       []string `json:"categories,omitempty"`
 	BusinessHomePage string   `json:"businessHomePage,omitempty" untrusted:"true"`
-	BusinessAddress  *Address `json:"businessAddress,omitempty"`
-	HomeAddress      *Address `json:"homeAddress,omitempty"`
-	OtherAddress     *Address `json:"otherAddress,omitempty"`
+	BusinessAddress  *Address `json:"businessAddress,omitempty" concise:"omit"`
+	HomeAddress      *Address `json:"homeAddress,omitempty" concise:"omit"`
+	OtherAddress     *Address `json:"otherAddress,omitempty" concise:"omit"`
 }
 
 // ListContacts returns contacts from the target mailbox, or the signed-in

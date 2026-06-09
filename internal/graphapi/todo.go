@@ -34,7 +34,7 @@ type TodoTask struct {
 	DueDate        string   `json:"dueDateTime,omitempty"`
 	CreatedAt      string   `json:"createdDateTime"`
 	CompletedAt    string   `json:"completedDateTime,omitempty"`
-	Body           string   `json:"body,omitempty" untrusted:"true"`
+	Body           string   `json:"body,omitempty" untrusted:"true" concise:"omit"`
 	StartDate      string   `json:"startDateTime,omitempty"`
 	IsReminderOn   bool     `json:"isReminderOn"`
 	ReminderDate   string   `json:"reminderDateTime,omitempty"`
