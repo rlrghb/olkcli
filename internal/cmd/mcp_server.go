@@ -29,10 +29,15 @@ var curatedTools = []curatedTool{
 	{"mail_get", []string{"mail", "get"}, false},
 	{"mail_search", []string{"mail", "search"}, false},
 	{"mail_folders_list", []string{"mail", "folders", "list"}, false},
+	{"mail_attachments", []string{"mail", "attachments"}, false},
+	{"mail_categories_list", []string{"mail", "categories", "list"}, false},
+	{"mail_rules_list", []string{"mail", "rules", "list"}, false},
+	{"mail_ooo_get", []string{"mail", "ooo", "get"}, false},
 	// Calendar (read)
 	{"calendar_events", []string{"calendar", "events"}, false},
 	{"calendar_view", []string{"calendar", "view"}, false},
 	{"calendar_get", []string{"calendar", "get"}, false},
+	{"calendar_calendars", []string{"calendar", "calendars"}, false},
 	{"calendar_availability", []string{"calendar", "availability"}, false},
 	{"calendar_find_times", []string{"calendar", "find-times"}, false},
 	// Contacts (read)
@@ -42,13 +47,17 @@ var curatedTools = []curatedTool{
 	// Drive (read)
 	{"drive_ls", []string{"drive", "ls"}, false},
 	{"drive_get", []string{"drive", "get"}, false},
+	{"drive_info", []string{"drive", "info"}, false},
 	{"drive_search", []string{"drive", "search"}, false},
 	{"drive_recent", []string{"drive", "recent"}, false},
 	{"drive_shared", []string{"drive", "shared"}, false},
+	{"drive_versions", []string{"drive", "versions"}, false},
 	// To Do (read)
 	{"todo_lists_list", []string{"todo", "lists", "list"}, false},
 	{"todo_list", []string{"todo", "list"}, false},
 	{"todo_get", []string{"todo", "get"}, false},
+	{"todo_checklist_list", []string{"todo", "checklist", "list"}, false},
+	{"todo_links_list", []string{"todo", "links", "list"}, false},
 	// Directory + meta (read)
 	{"people_search", []string{"people", "search"}, false},
 	{"whoami", []string{"whoami"}, false},
@@ -60,9 +69,19 @@ var curatedTools = []curatedTool{
 
 // mcpConfig controls which curated tools a server exposes.
 type mcpConfig struct {
-	allowWrite map[string]bool          // set of curated write tool names to expose (nil/empty = none)
-	allowed    func(path []string) bool // nil = allow all; else command allow/deny lists
+	allowWrite     map[string]bool          // set of curated write tool names to expose (nil/empty = none)
+	allowed        func(path []string) bool // nil = allow all; else command allow/deny lists
+	maxOutputBytes int                      // cap on a single tool call's output text (<=0 = defaultMaxOutputBytes)
 }
+
+// defaultMaxOutputBytes bounds a single tool call's returned text so a runaway
+// list can't flood the agent's context or the stdio transport (gog's
+// --max-output-bytes default).
+const defaultMaxOutputBytes = 100_000
+
+// helpFlagName is kong's auto-injected --help flag, skipped when projecting a
+// command's flags into an MCP schema or argv.
+const helpFlagName = "help"
 
 // writeToolNames returns the set of curated write tool names (the only tools
 // eligible to be exposed via --allow-write).
@@ -87,10 +106,11 @@ func sortedKeys(m map[string]bool) []string {
 
 // toolBinding ties a generated MCP tool name back to the kong command it runs.
 type toolBinding struct {
-	name     string
-	path     []string
-	node     *kong.Node
-	readOnly bool
+	name           string
+	path           []string
+	node           *kong.Node
+	readOnly       bool
+	maxOutputBytes int
 }
 
 // newKongParser builds a kong parser over the full CLI grammar, mirroring the
@@ -117,6 +137,11 @@ func buildMCPServer(cfg mcpConfig) (*mcp.Server, []*toolBinding, error) {
 
 	srv := mcp.NewServer(&mcp.Implementation{Name: "olk", Version: Version}, nil)
 
+	maxOut := cfg.maxOutputBytes
+	if maxOut <= 0 {
+		maxOut = defaultMaxOutputBytes
+	}
+
 	bindings := make([]*toolBinding, 0, len(curatedTools))
 	for _, ct := range curatedTools {
 		if ct.write && !cfg.allowWrite[ct.name] {
@@ -129,7 +154,7 @@ func buildMCPServer(cfg mcpConfig) (*mcp.Server, []*toolBinding, error) {
 		if !ok {
 			return nil, nil, fmt.Errorf("curated MCP tool %q maps to unknown command %q", ct.name, strings.Join(ct.path, " "))
 		}
-		b := &toolBinding{name: ct.name, path: ct.path, node: node, readOnly: !ct.write}
+		b := &toolBinding{name: ct.name, path: ct.path, node: node, readOnly: !ct.write, maxOutputBytes: maxOut}
 		registerTool(srv, b)
 		bindings = append(bindings, b)
 	}
@@ -189,7 +214,7 @@ func flagSchema(node *kong.Node) *jsonschema.Schema {
 	var required []string
 
 	for _, f := range node.Flags {
-		if f.Hidden || f.Name == "help" {
+		if f.Hidden || f.Name == helpFlagName {
 			continue
 		}
 		s.Properties[f.Name] = valueSchema(f.Value)

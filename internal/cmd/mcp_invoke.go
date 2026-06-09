@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/alecthomas/kong"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -23,6 +24,12 @@ func makeHandler(b *toolBinding) mcp.ToolHandler {
 			if err := json.Unmarshal(req.Params.Arguments, &args); err != nil {
 				return errorResult(fmt.Sprintf("invalid arguments: %v", err)), nil
 			}
+		}
+
+		// Reject arguments the tool doesn't declare (gog's "unknown fields
+		// rejected" contract) so a model can't smuggle in unvetted flags.
+		if err := rejectUnknownArgs(b, args); err != nil {
+			return errorResult(err.Error()), nil
 		}
 
 		argv, err := buildArgv(b, args)
@@ -78,36 +85,103 @@ func makeHandler(b *toolBinding) mcp.ToolHandler {
 		if s := strings.TrimSpace(stderr); s != "" {
 			text = strings.TrimRight(stdout, "\n") + "\n[stderr]\n" + s
 		}
+		text = capText(text, b.maxOutputBytes)
 		return &mcp.CallToolResult{
 			Content: []mcp.Content{&mcp.TextContent{Text: text}},
 		}, nil
 	}
 }
 
+// rejectUnknownArgs fails the call if args carries a key the tool's schema does
+// not declare, matching gog's fixed-schema contract.
+func rejectUnknownArgs(b *toolBinding, args map[string]any) error {
+	if len(args) == 0 {
+		return nil
+	}
+	known := map[string]bool{}
+	for _, f := range b.node.Flags {
+		if f.Hidden || f.Name == helpFlagName {
+			continue
+		}
+		known[f.Name] = true
+	}
+	for _, p := range b.node.Positional {
+		known[p.Name] = true
+	}
+	for k := range args {
+		if !known[k] {
+			return fmt.Errorf("unknown argument %q for tool %q", k, b.name)
+		}
+	}
+	return nil
+}
+
+// capText truncates s to at most limit bytes (on a UTF-8 boundary), appending a
+// notice so the agent knows output was clipped rather than silently complete.
+func capText(s string, limit int) string {
+	if limit <= 0 {
+		limit = defaultMaxOutputBytes
+	}
+	if len(s) <= limit {
+		return s
+	}
+	cut := limit
+	for cut > 0 && !utf8.RuneStart(s[cut]) {
+		cut--
+	}
+	return s[:cut] + fmt.Sprintf("\n[output truncated at %d bytes; refine the query or raise --max-output-bytes]", limit)
+}
+
+// errorResult builds an IsError tool result as a {code, message, action} JSON
+// envelope (outlook-mcp's structured-error shape) so an agent gets a machine
+// classification plus an actionable next step, not just a raw Graph error.
 func errorResult(msg string) *mcp.CallToolResult {
-	if h := hintFor(msg); h != "" {
-		msg = msg + "\nhint: " + h
+	code, action := classifyError(msg)
+	env := map[string]string{"code": code, "message": msg}
+	if action != "" {
+		env["action"] = action
+	}
+	body, err := json.MarshalIndent(env, "", "  ")
+	if err != nil {
+		body = []byte(msg)
 	}
 	return &mcp.CallToolResult{
 		IsError: true,
-		Content: []mcp.Content{&mcp.TextContent{Text: msg}},
+		Content: []mcp.Content{&mcp.TextContent{Text: string(body)}},
 	}
 }
 
-// hintFor returns a short recovery action for common failure modes, so an agent
-// gets an actionable next step rather than a bare Graph error (a lightweight
-// take on outlook-mcp's {code,message,action} envelopes).
-func hintFor(msg string) string {
+// classifyError maps a free-text error into a stable code and a recovery action.
+// Codes mirror common Graph failure modes (auth/scope/not-found/throttling) so
+// agents can branch on `code` instead of pattern-matching prose.
+func classifyError(msg string) (code, action string) {
 	switch {
-	case strings.Contains(msg, "no account configured"):
-		return "run `olk auth login` first"
+	case strings.Contains(msg, "no account configured"),
+		strings.Contains(msg, "no account"),
+		strings.Contains(msg, "InvalidAuthenticationToken"),
+		strings.Contains(msg, "401"):
+		return "unauthenticated", "run `olk auth login` first (or re-run it if the token expired)"
 	case strings.Contains(msg, "Read.Shared"),
 		strings.Contains(msg, "InsufficientScope"),
 		strings.Contains(msg, "ErrorAccessDenied"),
-		strings.Contains(msg, "Forbidden"):
-		return "the signed-in token may lack a required scope; re-run `olk auth login --scope <Scope>`"
+		strings.Contains(msg, "Forbidden"),
+		strings.Contains(msg, "403"):
+		return "forbidden", "the signed-in token may lack a required scope; re-run `olk auth login --scope <Scope>` (add --enterprise for work/school-only scopes)"
+	case strings.Contains(msg, "ErrorItemNotFound"),
+		strings.Contains(msg, "ResourceNotFound"),
+		strings.Contains(msg, "404"):
+		return "not_found", "the id may be stale; re-list to get a current id"
+	case strings.Contains(msg, "TooManyRequests"),
+		strings.Contains(msg, "throttl"),
+		strings.Contains(msg, "429"):
+		return "rate_limited", "back off and retry after a short delay"
+	case strings.Contains(msg, "unknown argument"),
+		strings.Contains(msg, "invalid arguments"),
+		strings.Contains(msg, "parse error"),
+		strings.Contains(msg, "missing required argument"):
+		return "invalid_input", "check the tool's input schema and retry with valid arguments"
 	}
-	return ""
+	return "error", ""
 }
 
 // buildArgv reconstructs a CLI argv from a tool's arguments. Ordering is
@@ -117,7 +191,7 @@ func buildArgv(b *toolBinding, args map[string]any) ([]string, error) {
 	argv := append([]string{}, b.path...)
 
 	for _, f := range b.node.Flags {
-		if f.Hidden || f.Name == "help" {
+		if f.Hidden || f.Name == helpFlagName {
 			continue
 		}
 		v, ok := args[f.Name]

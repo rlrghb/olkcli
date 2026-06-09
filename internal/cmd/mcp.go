@@ -21,7 +21,8 @@ import (
 // Tool calls are executed in-process and serialized (one at a time), because
 // capturing command output requires temporarily redirecting the process stdout.
 type MCPCmd struct {
-	AllowWrite []string `help:"Expose these curated write tools by name (e.g. mail_drafts_create, todo_create). Repeatable; default exposes none." name:"allow-write" env:"OLK_MCP_ALLOW_WRITE"`
+	AllowWrite     []string `help:"Expose these curated write tools by name (e.g. mail_drafts_create, todo_create). Repeatable; default exposes none." name:"allow-write" env:"OLK_MCP_ALLOW_WRITE"`
+	MaxOutputBytes int      `help:"Cap a single tool call's output text in bytes (truncated past this; 0 uses the built-in default)." name:"max-output-bytes" env:"OLK_MCP_MAX_OUTPUT_BYTES"`
 }
 
 func (c *MCPCmd) Run(ctx *RunContext) error {
@@ -46,8 +47,9 @@ func (c *MCPCmd) Run(ctx *RunContext) error {
 
 	flags := ctx.Flags
 	srv, _, err := buildMCPServer(mcpConfig{
-		allowWrite: allowWrite,
-		allowed:    func(path []string) bool { return commandAllowed(flags, path) },
+		allowWrite:     allowWrite,
+		allowed:        func(path []string) bool { return commandAllowed(flags, path) },
+		maxOutputBytes: c.MaxOutputBytes,
 	})
 	if err != nil {
 		return err

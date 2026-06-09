@@ -362,12 +362,12 @@ It's also published to the [MCP Registry](https://registry.modelcontextprotocol.
 
 Either way, run `olk auth login` once first so the server has a token to reuse.
 
-- **Read-only by default.** A curated set of 23 read tools is exposed; destructive and send commands have **no** MCP exposure path at all:
-  - **Mail:** `mail_list`, `mail_get`, `mail_search`, `mail_folders_list`
-  - **Calendar:** `calendar_events`, `calendar_view`, `calendar_get`, `calendar_availability`, `calendar_find_times`
+- **Read-only by default.** A curated set of 30 read tools is exposed; destructive and send commands have **no** MCP exposure path at all:
+  - **Mail:** `mail_list`, `mail_get`, `mail_search`, `mail_folders_list`, `mail_attachments`, `mail_categories_list`, `mail_rules_list`, `mail_ooo_get`
+  - **Calendar:** `calendar_events`, `calendar_view`, `calendar_get`, `calendar_calendars`, `calendar_availability`, `calendar_find_times`
   - **Contacts:** `contacts_list`, `contacts_get`, `contacts_search`
-  - **OneDrive:** `drive_ls`, `drive_get`, `drive_search`, `drive_recent`, `drive_shared` *(reads only — no upload/download/move/delete/share via MCP)*
-  - **To Do:** `todo_lists_list`, `todo_list`, `todo_get`
+  - **OneDrive:** `drive_ls`, `drive_get`, `drive_info`, `drive_search`, `drive_recent`, `drive_shared`, `drive_versions` *(reads only — no upload/move/delete/share via MCP)*
+  - **To Do:** `todo_lists_list`, `todo_list`, `todo_get`, `todo_checklist_list`, `todo_links_list`
   - **Directory & meta:** `people_search`, `whoami`, `version`
 - **Opt into safe writes per-tool** by naming each one: `olk mcp --allow-write mail_drafts_create` (repeatable, or `OLK_MCP_ALLOW_WRITE=mail_drafts_create,todo_create`). Only the curated, non-send/non-destructive writes — `mail_drafts_create` and `todo_create` — are eligible; nothing is exposed by default. Naming a write is a deliberate action separate from starting the server (defense in depth).
 - **Prompt-injection defense.** Tool output is emitted with `--wrap-untrusted` forced on: externally-controlled fields (email bodies, subjects, sender names, file names…) are wrapped in `[UNTRUSTED:<id>]…[/UNTRUSTED:<id>]` markers, and each response carries a self-describing `untrustedNotice` that tells the agent to treat marked content as data, never instructions. The marker `id` is random per response, so malicious content can't forge a closing marker to escape the wrapper. No out-of-band briefing needed — the directive travels in the data.

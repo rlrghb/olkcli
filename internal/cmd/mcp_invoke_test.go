@@ -1,6 +1,12 @@
 package cmd
 
-import "testing"
+import (
+	"encoding/json"
+	"strings"
+	"testing"
+
+	"github.com/modelcontextprotocol/go-sdk/mcp"
+)
 
 func TestBuildArgv_AlwaysAppendsJSON(t *testing.T) {
 	b := testBinding(t, "mail", "list")
@@ -128,4 +134,72 @@ func indexOf(ss []string, s string) int {
 		}
 	}
 	return -1
+}
+
+func TestRejectUnknownArgs(t *testing.T) {
+	b := testBinding(t, "mail", "list")
+	// A declared flag is accepted.
+	if err := rejectUnknownArgs(b, map[string]any{"top": float64(5)}); err != nil {
+		t.Errorf("declared flag rejected: %v", err)
+	}
+	// An undeclared key is rejected (gog fixed-schema contract).
+	if err := rejectUnknownArgs(b, map[string]any{"bogus": "x"}); err == nil {
+		t.Error("expected error for unknown argument, got nil")
+	}
+	// A declared positional is accepted.
+	get := testBinding(t, "mail", "get")
+	if err := rejectUnknownArgs(get, map[string]any{"id": "AAA"}); err != nil {
+		t.Errorf("declared positional rejected: %v", err)
+	}
+}
+
+func TestClassifyError(t *testing.T) {
+	cases := []struct {
+		msg      string
+		wantCode string
+	}{
+		{"no account configured", "unauthenticated"},
+		{"error: InsufficientScope: Read.Shared required", "forbidden"},
+		{"ErrorItemNotFound", "not_found"},
+		{"TooManyRequests", "rate_limited"},
+		{"unknown argument \"x\"", "invalid_input"},
+		{"some other failure", "error"},
+	}
+	for _, tc := range cases {
+		if code, _ := classifyError(tc.msg); code != tc.wantCode {
+			t.Errorf("classifyError(%q) code = %q, want %q", tc.msg, code, tc.wantCode)
+		}
+	}
+}
+
+func TestErrorResult_StructuredEnvelope(t *testing.T) {
+	res := errorResult("no account configured")
+	if !res.IsError {
+		t.Fatal("expected IsError")
+	}
+	tc, ok := res.Content[0].(*mcp.TextContent)
+	if !ok {
+		t.Fatalf("expected TextContent, got %T", res.Content[0])
+	}
+	var env map[string]string
+	if err := json.Unmarshal([]byte(tc.Text), &env); err != nil {
+		t.Fatalf("error body is not JSON: %v\n%s", err, tc.Text)
+	}
+	if env["code"] != "unauthenticated" {
+		t.Errorf("code = %q, want unauthenticated", env["code"])
+	}
+	if env["action"] == "" {
+		t.Error("expected a non-empty action")
+	}
+}
+
+func TestCapText(t *testing.T) {
+	if got := capText("short", 100); got != "short" {
+		t.Errorf("under-cap text mutated: %q", got)
+	}
+	long := strings.Repeat("a", 500)
+	got := capText(long, 100)
+	if len(got) <= 100 || !strings.Contains(got, "truncated") {
+		t.Errorf("expected truncation notice; len=%d", len(got))
+	}
 }
