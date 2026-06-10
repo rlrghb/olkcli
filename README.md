@@ -371,6 +371,8 @@ It's also published to the [MCP Registry](https://registry.modelcontextprotocol.
 
 Either way, run `olk auth login` once first so the server has a token to reuse.
 
+The curated surface is **61 tools across 4 tiers** — 38 read · 12 safe-write · 7 send · 4 destructive — but only the 38 reads are exposed by default; each mutation tier is a separate, explicit opt-in (see below).
+
 - **Read-only by default.** Starting the server with no flags exposes a curated set of 38 read tools and nothing else; every mutation is opt-in, per tier (safe writes, then send, then destructive — see below):
   - **Mail:** `mail_list`, `mail_get`, `mail_batch`, `mail_thread`, `mail_search`, `mail_folders_list`, `mail_attachments`, `mail_categories_list`, `mail_rules_list`, `mail_ooo_get`, `mail_delta`
   - **Calendar:** `calendar_events`, `calendar_view`, `calendar_get`, `calendar_calendars`, `calendar_availability`, `calendar_find_times`, `calendar_delta`

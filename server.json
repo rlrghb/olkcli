@@ -1,7 +1,7 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.rlrghb/outlook",
-  "description": "Read-first Outlook & OneDrive MCP: personal & enterprise mail, calendar, contacts, tasks, files",
+  "description": "Outlook & OneDrive MCP: personal & enterprise tools for mail, calendar, contacts, tasks, files",
   "version": "0.9.5",
   "repository": {
     "url": "https://github.com/rlrghb/olkcli",
