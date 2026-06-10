@@ -104,7 +104,7 @@ func (c *DriveDownloadCmd) Run(ctx *RunContext) error {
 		return fmt.Errorf("creating download request failed")
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := hardenedDownloadClient().Do(req)
 	if err != nil {
 		cleanupFile()
 		return fmt.Errorf("downloading file failed (check network connectivity)")

@@ -88,6 +88,8 @@ func (c *DriveUploadCmd) Run(ctx *RunContext) error {
 	buf := make([]byte, uploadChunkSize)
 	var offset int64
 
+	httpClient := hardenedDownloadClient() // re-validates redirects + denies internal IPs at dial time
+
 	for offset < totalSize {
 		n, err := f.Read(buf)
 		if err != nil && !errors.Is(err, io.EOF) {
@@ -107,7 +109,7 @@ func (c *DriveUploadCmd) Run(ctx *RunContext) error {
 		req.Header.Set("Content-Range", contentRange)
 		req.ContentLength = int64(n)
 
-		resp, err := http.DefaultClient.Do(req)
+		resp, err := httpClient.Do(req)
 		if err != nil {
 			return fmt.Errorf("uploading chunk: %w", err)
 		}

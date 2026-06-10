@@ -3,8 +3,11 @@ package cmd
 import (
 	"fmt"
 	"net"
+	"net/http"
 	"net/url"
 	"strings"
+	"syscall"
+	"time"
 
 	"github.com/rlrghb/olkcli/internal/graphapi"
 	"github.com/rlrghb/olkcli/internal/outfmt"
@@ -43,11 +46,9 @@ func validateGraphURL(rawURL string) error {
 	if host == "" {
 		return fmt.Errorf("URL has no host")
 	}
-	// Reject literal IP targets that are loopback/private
-	if ip := net.ParseIP(host); ip != nil {
-		if ip.IsLoopback() || ip.IsPrivate() || ip.IsUnspecified() {
-			return fmt.Errorf("refusing request to private/loopback address")
-		}
+	// Reject literal IP targets in a denied range.
+	if ip := net.ParseIP(host); ip != nil && isDeniedIP(ip) {
+		return fmt.Errorf("refusing request to private/loopback address")
 	}
 	// Check host against allowlist
 	allowed := false
@@ -67,16 +68,64 @@ func validateGraphURL(rawURL string) error {
 			return fmt.Errorf("cannot resolve host %q", host)
 		}
 		for _, addr := range addrs {
-			ip := net.ParseIP(addr)
-			if ip == nil {
-				continue
-			}
-			if ip.IsLoopback() || ip.IsPrivate() || ip.IsUnspecified() || ip.IsLinkLocalUnicast() {
+			if ip := net.ParseIP(addr); isDeniedIP(ip) {
 				return fmt.Errorf("host %q resolves to private/loopback address", host)
 			}
 		}
 	}
 	return nil
+}
+
+// isDeniedIP reports whether ip must never be the target of a request built from
+// a Graph-supplied or model-supplied URL: loopback, private (RFC 1918), CGNAT
+// (100.64.0.0/10), link-local (incl. the cloud-metadata 169.254.169.254), and
+// the unspecified address. Used both at validation time and — to defeat DNS
+// rebinding — at connect time via the dialer Control hook below.
+func isDeniedIP(ip net.IP) bool {
+	if ip == nil {
+		return false
+	}
+	if ip.IsLoopback() || ip.IsPrivate() || ip.IsUnspecified() ||
+		ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
+		return true
+	}
+	if ip4 := ip.To4(); ip4 != nil && ip4[0] == 100 && ip4[1] >= 64 && ip4[1] <= 127 {
+		return true // 100.64.0.0/10 (carrier-grade NAT)
+	}
+	return false
+}
+
+// hardenedDownloadClient returns an http.Client for fetching/uploading to a
+// Graph pre-authenticated URL that (1) re-validates every redirect hop with
+// validateGraphURL — http.DefaultClient would follow a 302 to an internal host
+// unchecked — and (2) re-checks the actually-dialed IP against isDeniedIP at
+// connect time, closing the DNS-resolve-then-dial (rebinding) TOCTOU that a
+// validation-time lookup alone cannot.
+func hardenedDownloadClient() *http.Client {
+	dialer := &net.Dialer{Timeout: 30 * time.Second}
+	dialer.Control = func(_, address string, _ syscall.RawConn) error {
+		host, _, err := net.SplitHostPort(address)
+		if err != nil {
+			return err
+		}
+		if isDeniedIP(net.ParseIP(host)) {
+			return fmt.Errorf("refusing connection to disallowed address %s", host)
+		}
+		return nil
+	}
+	return &http.Client{
+		Transport: &http.Transport{
+			DialContext:         dialer.DialContext,
+			TLSHandshakeTimeout: 15 * time.Second,
+			ForceAttemptHTTP2:   true,
+		},
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if len(via) >= 10 {
+				return fmt.Errorf("stopped after 10 redirects")
+			}
+			return validateGraphURL(req.URL.String())
+		},
+	}
 }
 
 // DriveCmd is the top-level command group for OneDrive file operations.

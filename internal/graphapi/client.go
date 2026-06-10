@@ -121,11 +121,7 @@ func (m *loggingMiddleware) Intercept(pipeline khttp.Pipeline, middlewareIndex i
 	// Log request
 	fmt.Fprintf(w, "[verbose] --> %s %s\n", req.Method, req.URL.String())
 	for k, vs := range req.Header {
-		if strings.EqualFold(k, "authorization") {
-			fmt.Fprintf(w, "[verbose]     %s: <redacted>\n", k)
-			continue
-		}
-		fmt.Fprintf(w, "[verbose]     %s: %s\n", k, strings.Join(vs, ", "))
+		fmt.Fprintf(w, "[verbose]     %s: %s\n", k, redactHeader(k, vs))
 	}
 
 	resp, err := pipeline.Next(req, middlewareIndex)
@@ -136,20 +132,49 @@ func (m *loggingMiddleware) Intercept(pipeline khttp.Pipeline, middlewareIndex i
 
 	fmt.Fprintf(w, "[verbose] <-- %s\n", resp.Status)
 	for k, vs := range resp.Header {
-		fmt.Fprintf(w, "[verbose]     %s: %s\n", k, strings.Join(vs, ", "))
+		fmt.Fprintf(w, "[verbose]     %s: %s\n", k, redactHeader(k, vs))
 	}
 
-	// Always capture body, but only fully dump it on non-2xx
+	// Always capture body, but only dump (bounded) on non-2xx.
 	if resp.Body != nil {
-		body, readErr := io.ReadAll(resp.Body)
+		body, readErr := io.ReadAll(io.LimitReader(resp.Body, verboseBodyLimit))
+		rest, _ := io.ReadAll(resp.Body)
 		resp.Body.Close()
-		resp.Body = io.NopCloser(bytes.NewReader(body))
+		resp.Body = io.NopCloser(bytes.NewReader(append(body, rest...)))
 		if readErr == nil && (resp.StatusCode < 200 || resp.StatusCode >= 300) {
-			fmt.Fprintf(w, "[verbose]     body: %s\n", string(body))
+			suffix := ""
+			if len(rest) > 0 {
+				suffix = " …(truncated)"
+			}
+			fmt.Fprintf(w, "[verbose]     body: %s%s\n", string(body), suffix)
 		}
 	}
 
 	return resp, nil
+}
+
+// verboseBodyLimit bounds how much of a response body the verbose dump prints,
+// so a large/hostile response can't amplify memory or flood the log.
+const verboseBodyLimit = 64 << 10
+
+// sensitiveHeaders are redacted in verbose logs because they can carry tokens,
+// session cookies, or pre-authenticated redirect targets with embedded secrets.
+var sensitiveHeaders = map[string]bool{
+	"authorization":       true,
+	"set-cookie":          true,
+	"cookie":              true,
+	"www-authenticate":    true,
+	"proxy-authorization": true,
+	"location":            true,
+}
+
+// redactHeader returns the printable value for a header, replacing the values of
+// sensitive headers with <redacted>.
+func redactHeader(key string, values []string) string {
+	if sensitiveHeaders[strings.ToLower(key)] {
+		return "<redacted>"
+	}
+	return strings.Join(values, ", ")
 }
 
 // Inner returns the underlying Graph SDK client
