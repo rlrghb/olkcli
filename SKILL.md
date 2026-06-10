@@ -1,6 +1,6 @@
 ---
 name: olk
-description: Microsoft Outlook and OneDrive CLI and MCP for email, calendar, contacts, tasks, and files.
+description: Microsoft Outlook and OneDrive CLI and MCP for email, calendar, contacts, tasks, and files, for personal and enterprise accounts.
 homepage: https://github.com/rlrghb/olkcli
 metadata:
   {

@@ -90,6 +90,25 @@ Pushing a `vX.Y.Z` tag triggers `.github/workflows/release.yml`, which fans out 
 
 Both `npm-publish` and `registry-publish` are gated on the `PUBLISH_NPM` repo variable. There are no long-lived publish secrets — npm and the registry both authenticate via OIDC.
 
+### ClawHub (OpenClaw skill) — manual publish
+
+olk is also listed on **ClawHub** (for the OpenClaw assistant) as a **skill** built from `SKILL.md`. This is a **separate, manual** step — it is **not** part of the tag-triggered `release.yml` pipeline. Update it after a release so the skill tracks the binary.
+
+- **CLI / auth:** `clawhub` (installed via Homebrew). Publisher is `rlrghb`; check `clawhub whoami` (run `clawhub login` if the token is missing — interactive browser login).
+- **Always publish from a folder containing only `SKILL.md`** (never the repo root):
+  ```bash
+  mkdir -p /tmp/olk-skill && cp SKILL.md /tmp/olk-skill/
+  clawhub skill publish /tmp/olk-skill --slug olk --name Outlook --version <X.Y.Z> \
+    --tags calendar,contacts,drive,latest,mail,microsoft,onedrive,outlook,tasks \
+    --changelog '<summary of changes>'
+  ```
+- **slug** is `olk`; **display name** is `Outlook` — pass `--name Outlook` explicitly. (`SKILL.md`'s `name: olk` is only the slug; omitting `--name` would *rename* the live entry from "Outlook" to "olk".)
+- The skill **version is independent** of the binary/git tag — align it to the released binary version (e.g. `1.9.6`).
+- **Re-publish all tags** (the 9 above) so every topic tag moves to the new version; the default `--tags latest` leaves the others stale on the old version.
+- The clawhub **summary** is the `SKILL.md` frontmatter `description:` — keep it in sync and commit description edits to the repo.
+- **Category** (e.g. "DATA & APIS") is set in the clawhub **web UI** only — there is no `--category` flag/field, and `clawhub inspect` doesn't show it.
+- There is **no `--dry-run`** for `skill publish` (that's `package publish` only) — the run is the real publish and `latest` moves immediately. **Verify the live entry first with `clawhub inspect olk`, confirm the exact command before running, then re-inspect to confirm.**
+
 ## Dependencies
 
 The project uses `msgraph-sdk-go` v1.96.0 which has some naming quirks:
