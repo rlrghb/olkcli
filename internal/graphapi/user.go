@@ -10,12 +10,12 @@ import (
 
 // UserProfile is a simplified user profile for output
 type UserProfile struct {
-	DisplayName string `json:"displayName"`
+	DisplayName string `json:"displayName" untrusted:"true"`
 	Email       string `json:"mail"`
 	UPN         string `json:"userPrincipalName"`
-	JobTitle    string `json:"jobTitle,omitempty"`
-	Department  string `json:"department,omitempty"`
-	Office      string `json:"officeLocation,omitempty"`
+	JobTitle    string `json:"jobTitle,omitempty" untrusted:"true"`
+	Department  string `json:"department,omitempty" untrusted:"true"`
+	Office      string `json:"officeLocation,omitempty" untrusted:"true"`
 	Phone       string `json:"businessPhones,omitempty"`
 }
 

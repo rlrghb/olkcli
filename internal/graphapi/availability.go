@@ -21,7 +21,7 @@ type ScheduleItem struct {
 	Status  string `json:"status"`
 	Start   string `json:"start"`
 	End     string `json:"end"`
-	Subject string `json:"subject,omitempty"`
+	Subject string `json:"subject,omitempty" untrusted:"true"`
 }
 
 // GetSchedule retrieves free/busy availability for the specified email addresses

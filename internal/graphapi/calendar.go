@@ -26,7 +26,7 @@ type CalendarEvent struct {
 	Attendees   []string `json:"attendees,omitempty" untrusted:"true" concise:"omit"`
 	IsAllDay    bool     `json:"isAllDay"`
 	IsOnline    bool     `json:"isOnlineMeeting"`
-	OnlineURL   string   `json:"onlineMeetingUrl,omitempty"`
+	OnlineURL   string   `json:"onlineMeetingUrl,omitempty" untrusted:"true"`
 	Status      string   `json:"showAs"`
 	Recurrence  string   `json:"recurrence,omitempty"`
 	BodyPreview string   `json:"bodyPreview,omitempty" untrusted:"true" concise:"omit"`
@@ -36,9 +36,9 @@ type CalendarEvent struct {
 // CalendarInfo is a simplified calendar representation
 type CalendarInfo struct {
 	ID    string `json:"id"`
-	Name  string `json:"name"`
+	Name  string `json:"name" untrusted:"true"`
 	Color string `json:"color"`
-	Owner string `json:"owner"`
+	Owner string `json:"owner" untrusted:"true"`
 }
 
 // ListEvents returns calendar events in [startTime, endTime] from the target

@@ -15,11 +15,11 @@ var safePeopleQuery = regexp.MustCompile(`^[\p{L}\p{N} @._-]+$`)
 
 // Person is a simplified person for output
 type Person struct {
-	DisplayName string `json:"displayName"`
-	Email       string `json:"email"`
-	JobTitle    string `json:"jobTitle,omitempty"`
-	Department  string `json:"department,omitempty"`
-	Company     string `json:"companyName,omitempty"`
+	DisplayName string `json:"displayName" untrusted:"true"`
+	Email       string `json:"email" untrusted:"true"`
+	JobTitle    string `json:"jobTitle,omitempty" untrusted:"true"`
+	Department  string `json:"department,omitempty" untrusted:"true"`
+	Company     string `json:"companyName,omitempty" untrusted:"true"`
 }
 
 func (c *Client) SearchPeople(ctx context.Context, query string, top int32) ([]Person, error) {

@@ -17,7 +17,7 @@ const (
 // MailRule is a simplified message rule for output
 type MailRule struct {
 	ID          string `json:"id"`
-	DisplayName string `json:"displayName"`
+	DisplayName string `json:"displayName" untrusted:"true"`
 	Sequence    int32  `json:"sequence"`
 	IsEnabled   bool   `json:"isEnabled"`
 	Conditions  string `json:"conditions"`

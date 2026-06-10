@@ -21,7 +21,7 @@ func parseDate(s string) (time.Time, error) {
 // TodoList is a simplified task list for output
 type TodoList struct {
 	ID          string `json:"id"`
-	DisplayName string `json:"displayName"`
+	DisplayName string `json:"displayName" untrusted:"true"`
 	IsOwner     bool   `json:"isOwner"`
 }
 
@@ -46,7 +46,7 @@ type TodoTask struct {
 // TodoChecklistItem is a simplified checklist item for output
 type TodoChecklistItem struct {
 	ID          string `json:"id"`
-	DisplayName string `json:"displayName"`
+	DisplayName string `json:"displayName" untrusted:"true"`
 	IsChecked   bool   `json:"isChecked"`
 	CreatedAt   string `json:"createdDateTime,omitempty"`
 }
@@ -54,7 +54,7 @@ type TodoChecklistItem struct {
 // TodoAttachment is a simplified attachment for output
 type TodoAttachment struct {
 	ID          string `json:"id"`
-	Name        string `json:"name"`
+	Name        string `json:"name" untrusted:"true"`
 	ContentType string `json:"contentType"`
 	Size        int32  `json:"size"`
 }
@@ -62,7 +62,7 @@ type TodoAttachment struct {
 // TodoLinkedResource is a simplified linked resource for output
 type TodoLinkedResource struct {
 	ID              string `json:"id"`
-	DisplayName     string `json:"displayName"`
+	DisplayName     string `json:"displayName" untrusted:"true"`
 	ApplicationName string `json:"applicationName"`
 	ExternalID      string `json:"externalId"`
 	WebURL          string `json:"webUrl"`
@@ -620,6 +620,9 @@ func (c *Client) DeleteChecklistItem(ctx context.Context, listID, taskID, itemID
 
 // ToggleChecklistItem toggles the IsChecked state of a checklist item.
 func (c *Client) ToggleChecklistItem(ctx context.Context, listID, taskID, itemID string) (*TodoChecklistItem, error) {
+	if err := c.ensureWritable(); err != nil {
+		return nil, err
+	}
 	if err := validateID(listID, "list ID"); err != nil {
 		return nil, err
 	}

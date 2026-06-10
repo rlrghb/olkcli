@@ -19,7 +19,7 @@ var safeDriveSearchQuery = regexp.MustCompile(`^[\p{L}\p{N} @._-]+$`)
 // DriveInfo is a simplified drive for output.
 type DriveInfo struct {
 	ID             string `json:"id"`
-	Name           string `json:"name"`
+	Name           string `json:"name" untrusted:"true"`
 	DriveType      string `json:"driveType"`
 	QuotaTotal     int64  `json:"quotaTotal"`
 	QuotaUsed      int64  `json:"quotaUsed"`
@@ -511,6 +511,9 @@ func (c *Client) CreateFolder(ctx context.Context, driveID, parentItemID, folder
 
 // CopyDriveItem initiates an async copy of an item to a new parent.
 func (c *Client) CopyDriveItem(ctx context.Context, driveID, itemID, destParentID, newName string) error {
+	if err := c.ensureWritable(); err != nil {
+		return err
+	}
 	if err := validateID(driveID, "drive ID"); err != nil {
 		return err
 	}

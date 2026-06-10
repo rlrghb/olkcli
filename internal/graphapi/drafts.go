@@ -11,9 +11,9 @@ import (
 // DraftMessage is a simplified draft message for output
 type DraftMessage struct {
 	ID      string   `json:"id"`
-	Subject string   `json:"subject"`
-	To      []string `json:"to"`
-	Body    string   `json:"body,omitempty"`
+	Subject string   `json:"subject" untrusted:"true"`
+	To      []string `json:"to" untrusted:"true"`
+	Body    string   `json:"body,omitempty" untrusted:"true"`
 	Created string   `json:"createdDateTime"`
 }
 

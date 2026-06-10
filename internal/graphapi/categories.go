@@ -10,7 +10,7 @@ import (
 // Category is a simplified outlook category for output
 type Category struct {
 	ID          string `json:"id"`
-	DisplayName string `json:"displayName"`
+	DisplayName string `json:"displayName" untrusted:"true"`
 	Color       string `json:"color"`
 }
 

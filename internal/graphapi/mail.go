@@ -45,7 +45,7 @@ type MailMessage struct {
 	ID             string   `json:"id"`
 	Subject        string   `json:"subject" untrusted:"true"`
 	From           string   `json:"from" untrusted:"true"`
-	To             []string `json:"to"`
+	To             []string `json:"to" untrusted:"true"`
 	ReceivedAt     string   `json:"receivedDateTime"`
 	IsRead         bool     `json:"isRead"`
 	HasAttachments bool     `json:"hasAttachments"`
@@ -66,7 +66,7 @@ var messageDetailSelect = []string{
 // MailFolder is a simplified folder representation
 type MailFolder struct {
 	ID             string `json:"id"`
-	DisplayName    string `json:"displayName"`
+	DisplayName    string `json:"displayName" untrusted:"true"`
 	TotalCount     int32  `json:"totalItemCount"`
 	UnreadCount    int32  `json:"unreadItemCount"`
 	ParentFolderID string `json:"parentFolderId,omitempty"`
@@ -363,6 +363,9 @@ func (c *Client) DeleteMessage(ctx context.Context, messageID string) error {
 }
 
 func (c *Client) MarkMessage(ctx context.Context, messageID string, isRead bool) error {
+	if err := c.ensureWritable(); err != nil {
+		return err
+	}
 	if err := validateID(messageID, "message ID"); err != nil {
 		return err
 	}
@@ -497,7 +500,7 @@ func (c *Client) SearchMessages(ctx context.Context, target, query string, top i
 // Attachment represents a mail attachment
 type Attachment struct {
 	ID          string `json:"id"`
-	Name        string `json:"name"`
+	Name        string `json:"name" untrusted:"true"`
 	ContentType string `json:"contentType"`
 	Size        int32  `json:"size"`
 	Content     []byte `json:"-"`
