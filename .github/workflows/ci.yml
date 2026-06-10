@@ -53,4 +53,6 @@ jobs:
       - name: golangci-lint
         uses: golangci/golangci-lint-action@82606bf257cbaff209d206a39f5134f0cfbfd2ee # v9.2.1
         with:
-          version: v2.5.0
+          # Built with Go >= 1.26 so it can lint a module targeting go 1.26.x
+          # (golangci-lint refuses a target newer than its own build toolchain).
+          version: v2.11.4
