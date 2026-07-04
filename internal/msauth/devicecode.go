@@ -51,6 +51,11 @@ func validateClientID(clientID string) error {
 // httpClient is a shared HTTP client with a sensible timeout for auth operations.
 var httpClient = &http.Client{Timeout: 30 * time.Second}
 
+// authorityBase is the Microsoft identity platform base URL. It is a var
+// (not a const) so in-package tests can point token exchanges at a local
+// httptest server.
+var authorityBase = "https://login.microsoftonline.com"
+
 // DeviceCodeResponse holds the response from the device code authorization request.
 type DeviceCodeResponse struct {
 	DeviceCode      string `json:"device_code"`
@@ -81,12 +86,12 @@ type ErrorResponse struct {
 
 // deviceCodeURL returns the device code endpoint for the given tenant.
 func deviceCodeURL(tenantID string) string {
-	return fmt.Sprintf("https://login.microsoftonline.com/%s/oauth2/v2.0/devicecode", tenantID)
+	return fmt.Sprintf("%s/%s/oauth2/v2.0/devicecode", authorityBase, tenantID)
 }
 
 // tokenURL returns the token endpoint for the given tenant.
 func tokenURL(tenantID string) string {
-	return fmt.Sprintf("https://login.microsoftonline.com/%s/oauth2/v2.0/token", tenantID)
+	return fmt.Sprintf("%s/%s/oauth2/v2.0/token", authorityBase, tenantID)
 }
 
 // RequestDeviceCode initiates the device code flow by requesting a device code
@@ -237,7 +242,14 @@ func PollForToken(ctx context.Context, clientID, tenantID, deviceCode string, in
 					}
 					continue
 				default:
-					return nil, fmt.Errorf("token request failed: %s: %s", sanitizeStr(errResp.Error), sanitizeStr(errResp.ErrorDescription))
+					// Conditional Access blocks on device code flow surface as
+					// access_denied or invalid_grant (e.g. AADSTS53003,
+					// AADSTS530003); the browser flow can satisfy them.
+					hint := ""
+					if errResp.Error == "access_denied" || errResp.Error == "invalid_grant" {
+						hint = " (if your organization blocks device code flow or requires a compliant device, retry with --browser)"
+					}
+					return nil, fmt.Errorf("token request failed: %s: %s%s", sanitizeStr(errResp.Error), sanitizeStr(errResp.ErrorDescription), hint)
 				}
 			}
 			return nil, fmt.Errorf("token request failed with status %d", resp.StatusCode)

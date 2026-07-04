@@ -197,6 +197,16 @@ Uses an embedded public client ID with device-code flow. The `--enterprise` flag
 
 > **Note:** If you upgrade to a version that adds new features (e.g. OneDrive support), you may need to re-run `olk auth login` to grant the new permissions. If you see "access denied" errors, re-login to refresh your token scopes.
 
+### Browser Sign-In (Auth-Code + PKCE)
+
+```bash
+olk auth login --browser [--client-id YOUR_CLIENT_ID --tenant-id YOUR_TENANT_ID]
+```
+
+`--browser` signs in through your system browser using the OAuth2 authorization-code flow with PKCE and a loopback redirect, instead of device code. Use it when your tenant's Conditional Access policies require a compliant/managed device or block device code flow: the browser session can carry device identity (via Platform SSO or Windows SSO on managed devices), so sign-in satisfies device-based policies that device code flow cannot.
+
+This flow requires the app registration to have a loopback redirect URI (see [Custom App Registration](#custom-app-registration) step 4). If the browser shows error **AADSTS50011** ("redirect URI mismatch") and the CLI times out, the app registration is missing the redirect URI — use `--client-id` with your own registration.
+
 ### Custom App Registration
 
 If your organization blocks the default client ID, or your admin requires apps to be registered under your tenant, you'll need to create your own app registration:
@@ -204,8 +214,11 @@ If your organization blocks the default client ID, or your admin requires apps t
 1. Go to [Azure Portal > App registrations](https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade) and click **New registration**
 2. Set **Supported account types** to match your needs — use **"Personal Microsoft accounts only"** for outlook.com/hotmail.com, **"Accounts in any organizational directory and personal Microsoft accounts"** for both, or single-tenant for org-only
 3. Under **Authentication > Advanced settings**, set **Allow public client flows** to **Yes** (required for device-code flow)
-4. Under **API permissions**, add **Microsoft Graph** delegated permissions: `Mail.ReadWrite`, `Mail.Send`, `Calendars.ReadWrite`, `Contacts.ReadWrite`, `Tasks.ReadWrite`, `Files.ReadWrite`, `People.Read`, `User.Read`, `User.ReadBasic.All`, `MailboxSettings.ReadWrite`, `offline_access` (use `Files.Read` instead of `Files.ReadWrite` for read-only access)
-5. Copy the **Application (client) ID** from the app's Overview page
+4. For browser sign-in (`--browser`), register the loopback redirect URI: under **Authentication > Add a platform > Mobile and desktop applications**, add `http://localhost/callback`. Entra ignores the port when matching `http://localhost` redirect URIs, so no port is needed — `olk` picks a free port at login time. Device-code flow needs only step 3.
+5. Under **API permissions**, add **Microsoft Graph** delegated permissions: `Mail.ReadWrite`, `Mail.Send`, `Calendars.ReadWrite`, `Contacts.ReadWrite`, `Tasks.ReadWrite`, `Files.ReadWrite`, `People.Read`, `User.Read`, `User.ReadBasic.All`, `MailboxSettings.ReadWrite`, `offline_access` (use `Files.Read` instead of `Files.ReadWrite` for read-only access)
+6. Copy the **Application (client) ID** from the app's Overview page
+
+Tenant admins who prefer to script the whole thing — registration, permission GUIDs, admin consent, user/group assignment — can use [`contrib/create-entra-app.sh`](contrib/create-entra-app.sh); [docs/enterprise-setup.md](docs/enterprise-setup.md) walks through what it does and the roles each step needs.
 
 Then use it:
 
@@ -409,7 +422,7 @@ See [Global Flags](#global-flags) for the full guard list (`--no-write`, `--no-s
 ### Auth
 
 ```
-olk auth login [--enterprise] [--client-id ID] [--tenant-id ID]  Login via device code
+olk auth login [--browser] [--enterprise] [--client-id ID] [--tenant-id ID]  Login via device code (or browser PKCE)
 olk auth logout [EMAIL]                              Remove stored credentials
 olk auth clean --force                               Remove ALL accounts and tokens
 olk auth list                                        List authenticated accounts
@@ -561,10 +574,10 @@ olk whoami                                           Display current user info
 
 ## Configuration
 
-Config is stored at `~/.config/olk/`:
+Config is stored in your OS's user-config directory: `~/.config/olk/` on Linux, `~/Library/Application Support/olk/` on macOS, `%AppData%\olk\` on Windows:
 
 ```
-~/.config/olk/
+<config-dir>/
 ├── config.json          # Default account, client IDs
 └── accounts/            # Account metadata (email, display name)
     └── user@example.com.json

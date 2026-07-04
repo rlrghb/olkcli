@@ -50,6 +50,7 @@ Always get IDs from a `list` / `search` first — never invent them.
 
 ```bash
 olk auth login                                  # device-code OAuth2 (personal; opens browser)
+olk auth login --browser                        # browser auth-code+PKCE; use when Conditional Access requires a compliant device or blocks device code
 olk auth login --enterprise                     # enterprise scopes (OOO, inbox rules, directory search)
 olk auth login --client-id ID --tenant-id ID    # enterprise custom app registration
 olk auth login --scope Mail.Read.Shared --scope Calendars.Read.Shared --scope Contacts.Read.Shared

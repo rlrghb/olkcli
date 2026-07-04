@@ -26,6 +26,7 @@ type AuthLoginCmd struct {
 	TenantID   string   `help:"Azure AD tenant ID" env:"OLK_TENANT_ID" default:"common"`
 	ReadOnly   bool     `help:"Request read-only permissions"`
 	Enterprise bool     `help:"Request enterprise scopes (work/school accounts)" env:"OLK_ENTERPRISE"`
+	Browser    bool     `help:"Sign in via the system browser (auth-code + PKCE) instead of device code" env:"OLK_BROWSER"`
 	Scope      []string `help:"Additional OAuth scopes to request (repeatable, e.g. --scope Mail.Read.Shared)" name:"scope"`
 }
 
@@ -66,7 +67,12 @@ func (c *AuthLoginCmd) Run(ctx *RunContext) error {
 	// open a browser and enter the code.
 	loginCtx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
 	defer cancel()
-	info, err := auth.LoginDeviceCode(loginCtx, scopes, ctx.Flags.Verbose)
+	var info *msauth.AccountInfo
+	if c.Browser {
+		info, err = auth.LoginAuthCode(loginCtx, scopes, ctx.Flags.Verbose)
+	} else {
+		info, err = auth.LoginDeviceCode(loginCtx, scopes, ctx.Flags.Verbose)
+	}
 	if err != nil {
 		return err
 	}

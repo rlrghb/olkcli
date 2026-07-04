@@ -20,6 +20,9 @@ import (
 	"github.com/rlrghb/olkcli/internal/secrets"
 )
 
+// windowsOS is the runtime.GOOS value for Windows.
+const windowsOS = "windows"
+
 // refreshMu guards per-email token refresh to prevent concurrent refreshes
 // from racing on the same keyring entry.
 var (
@@ -114,13 +117,27 @@ func (a *Authenticator) LoginDeviceCode(ctx context.Context, scopes []string, ve
 	// Clear any stray escape sequences that accumulated during polling.
 	fmt.Fprint(os.Stderr, "\r\033[K")
 
-	// Step 4: Fetch user profile from Microsoft Graph.
+	return a.finishLogin(ctx, tokenResp)
+}
+
+// finishLogin completes a login flow after tokens have been obtained: it
+// fetches the user profile and persists the token and account info. This is
+// the shared tail of every login flow.
+func (a *Authenticator) finishLogin(ctx context.Context, tokenResp *TokenResponse) (*AccountInfo, error) {
+	// Only the refresh token is persisted (StoreToken), and LoadToken rejects
+	// an empty one — a login without it would appear to succeed and then fail
+	// on first use, so reject it up front.
+	if tokenResp.RefreshToken == "" {
+		return nil, fmt.Errorf("no refresh token returned — ensure the offline_access scope was granted")
+	}
+
+	// Fetch user profile from Microsoft Graph.
 	email, displayName, err := fetchUserProfile(ctx, tokenResp.AccessToken)
 	if err != nil {
 		return nil, fmt.Errorf("fetching user profile: %w", err)
 	}
 
-	// Step 5: Store refresh token in keyring.
+	// Store refresh token in keyring.
 	expiresAt := time.Now().Add(time.Duration(safeExpiresIn(tokenResp.ExpiresIn)) * time.Second)
 	tokenData := &TokenData{
 		AccessToken:  tokenResp.AccessToken,
@@ -132,7 +149,7 @@ func (a *Authenticator) LoginDeviceCode(ctx context.Context, scopes []string, ve
 		return nil, fmt.Errorf("storing token: %w", err)
 	}
 
-	// Step 6: Save AccountInfo to disk.
+	// Save AccountInfo to disk.
 	acctInfo := &AccountInfo{
 		Email:       email,
 		DisplayName: displayName,
@@ -216,7 +233,7 @@ func (a *Authenticator) ListAccounts() ([]AccountInfo, error) {
 
 	// Harden directory permissions on every read — fixes drift from
 	// umask changes or manual edits.
-	if runtime.GOOS != "windows" {
+	if runtime.GOOS != windowsOS {
 		_ = os.Chmod(acctDir, 0o700)
 	}
 
@@ -229,7 +246,7 @@ func (a *Authenticator) ListAccounts() ([]AccountInfo, error) {
 		filePath := filepath.Join(acctDir, entry.Name())
 
 		// Harden file permissions if too open.
-		if runtime.GOOS != "windows" {
+		if runtime.GOOS != windowsOS {
 			if info, err := entry.Info(); err == nil && info.Mode().Perm()&0o077 != 0 {
 				fmt.Fprintf(os.Stderr, "warning: fixing permissions on %q (was %o)\n", entry.Name(), info.Mode().Perm())
 				_ = os.Chmod(filePath, 0o600)
@@ -253,10 +270,15 @@ func (a *Authenticator) ListAccounts() ([]AccountInfo, error) {
 	return accounts, nil
 }
 
+// graphMeURL is the Microsoft Graph profile endpoint. It is a var (not a
+// const) so in-package tests can point the profile fetch at a local httptest
+// server.
+var graphMeURL = "https://graph.microsoft.com/v1.0/me"
+
 // fetchUserProfile retrieves the email and display name from the Microsoft
 // Graph /me endpoint.
 func fetchUserProfile(ctx context.Context, accessToken string) (email, displayName string, err error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://graph.microsoft.com/v1.0/me", http.NoBody)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, graphMeURL, http.NoBody)
 	if err != nil {
 		return "", "", fmt.Errorf("creating profile request: %w", err)
 	}

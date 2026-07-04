@@ -20,7 +20,7 @@ go mod tidy         # After changing dependencies
 ## Architecture
 
 - **CLI framework**: `github.com/alecthomas/kong` — commands are Go structs with `Run(ctx *RunContext) error`
-- **Auth**: Raw OAuth2 device code flow with PKCE (RFC 7636) against `login.microsoftonline.com` — no MSAL. Scopes defined in `internal/msauth/scopes.go`. Enterprise-only scopes (`MailboxSettings.ReadWrite`, `User.ReadBasic.All`) are only requested with `--enterprise` flag — personal accounts cannot consent to them. Token refresh is serialized per-email via `sync.Map` of mutexes to prevent race conditions
+- **Auth**: Raw OAuth2 against `login.microsoftonline.com` — no MSAL. Two flows: device code (default) and authorization-code + PKCE via system browser with a loopback listener (`--browser`, in `internal/msauth/authcode.go`) for tenants whose Conditional Access requires a compliant device or blocks device code. Both use PKCE (RFC 7636). Scopes defined in `internal/msauth/scopes.go`. Enterprise-only scopes (`MailboxSettings.ReadWrite`, `User.ReadBasic.All`) are only requested with `--enterprise` flag — personal accounts cannot consent to them. Token refresh is serialized per-email via `sync.Map` of mutexes to prevent race conditions
 - **API**: Official `msgraph-sdk-go` wrapped in `internal/graphapi/` for ergonomic access
 - **Secrets**: OS keyring via `github.com/99designs/keyring` (macOS Keychain, Linux Secret Service, Windows WinCred). File-backend password prompt writes to stderr (not stdout) to avoid corrupting piped output. Set `OLK_KEYRING_PASSWORD` for headless/non-interactive use
 - **Output**: JSON envelope (`--json`), aligned table (default), TSV (`--plain`)
@@ -34,7 +34,7 @@ go mod tidy         # After changing dependencies
 - Graph SDK uses pointer types everywhere — always nil-check: `if x.GetFoo() != nil { *x.GetFoo() }`
 - Each command is in its own file: `mail_list.go`, `mail_get.go`, etc.
 - Desire paths in `desire_paths.go` delegate to real commands (e.g. `SendCmd` creates `MailSendCmd`)
-- Config lives at `~/.config/olk/`, tokens in OS keyring keyed by `olk:token:<email>`
+- Config lives under `os.UserConfigDir()` (`~/.config/olk/` on Linux, `~/Library/Application Support/olk/` on macOS), tokens in OS keyring keyed by `olk:token:<email>`
 
 ## Common Tasks
 

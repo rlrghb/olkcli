@@ -4,12 +4,14 @@
 
 - `cmd/olk/`: CLI entrypoint — minimal, delegates to `internal/cmd.Execute()`.
 - `internal/cmd/`: Command implementations using kong structs. Each command group has its own file(s): `mail_*.go`, `calendar*.go`, `todo.go`, `todo_checklist.go`, `todo_attachments.go`, `todo_links.go`, `whoami.go`, etc.
-- `internal/msauth/`: Microsoft OAuth2 implementation — device code flow, token refresh, credential bridge.
+- `internal/msauth/`: Microsoft OAuth2 implementation — device code flow, authorization-code + PKCE browser flow (loopback listener), token refresh, credential bridge.
 - `internal/graphapi/`: Microsoft Graph API wrapper — mail, calendar, contacts, todo (tasks, checklist items, attachments, linked resources), availability, mailbox settings, mail rules, people. Includes the `targetUser` helper that routes reads to `/me` or `/users/{id}` for delegated mailbox access, and error-shaping helpers (`graphErrorMessage`, `enterpriseError`, `scopeUpgradeError`) in `validate.go`.
-- `internal/config/`: Configuration and XDG paths (`~/.config/olk/`).
+- `internal/config/`: Configuration paths via `os.UserConfigDir` (`~/.config/olk/` on Linux, `~/Library/Application Support/olk/` on macOS, `%AppData%\olk\` on Windows).
 - `internal/secrets/`: OS keyring integration via `99designs/keyring`.
 - `internal/outfmt/`: Output formatting — JSON envelope, aligned tables, TSV, timezone conversion via `ConvertTime()`.
 - `SKILL.md`: [Agent Skills](https://agentskills.io) standard file — teaches AI assistants (Claude Code, OpenClaw, etc.) how to use `olk` commands.
+- `docs/`: user-facing guides — `enterprise-setup.md` walks tenant admins through creating an Entra app registration for `--browser`.
+- `contrib/`: helper scripts — `create-entra-app.sh` automates the Entra app registration, admin consent, and assignment via the `az` CLI.
 - `bin/`: build outputs (gitignored).
 
 ## Build, Test, and Development Commands
@@ -79,8 +81,9 @@
 
 - Never commit OAuth tokens or client secrets.
 - Prefer OS keychain backends; the file fallback is for headless environments only. Set `OLK_KEYRING_PASSWORD` for non-interactive file-backend access.
-- Config dir (`~/.config/olk/`) uses 0700 permissions; token files use 0600.
+- Config dir (`os.UserConfigDir()` + `/olk` — `~/.config/olk/` on Linux, `~/Library/Application Support/olk/` on macOS) uses 0700 permissions; token files use 0600.
 - Device code flow uses PKCE (RFC 7636) — `code_challenge` sent with device code request, `code_verifier` sent during token polling.
+- Browser flow (`--browser`) uses authorization-code + PKCE with a `state` CSRF token; the redirect URI is `http://localhost:{port}` (port-ignored matching is documented for localhost only), the listener binds both loopback families (`127.0.0.1` required, `::1` best-effort) on a dynamic port, validates `state` before accepting any result, and serves generic HTML pages that never echo server-provided strings.
 - Token refresh is serialized per-email via `sync.Map` of mutexes in `internal/msauth/auth.go` to prevent race conditions.
 - KQL search queries are always wrapped in double quotes (Graph `$search` parameter requirement). Property restrictions (`from:`, `subject:`, etc.) and boolean operators work inside the quotes. Literal double-quote characters are stripped from user input to prevent breaking the wrapper. See `internal/graphapi/mail.go`.
 - See `SECURITY.md` for vulnerability disclosure policy.
