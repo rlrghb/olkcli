@@ -48,7 +48,21 @@ Role requirements:
 Everything below is automated in [`contrib/create-entra-app.sh`](../contrib/create-entra-app.sh):
 
 ```bash
-TENANT_ID=<your-tenant-id> ./contrib/create-entra-app.sh
+# Recommended: restrict the app to a group
+TENANT_ID=<your-tenant-id> GROUP_OBJECT_ID=<group-object-id> \
+  ./contrib/create-entra-app.sh
+
+# Or restrict it to individual users
+TENANT_ID=<your-tenant-id> ASSIGN_USERS="alice@example.com bob@example.com" \
+  ./contrib/create-entra-app.sh
+```
+
+The script refuses to create an unrestricted app by accident. To intentionally
+allow every tenant user to sign in, explicitly set `ALLOW_ALL_TENANT_USERS=1`:
+
+```bash
+TENANT_ID=<your-tenant-id> ALLOW_ALL_TENANT_USERS=1 \
+  ./contrib/create-entra-app.sh
 ```
 
 What it does, step by step (so you can audit or cherry-pick):
@@ -123,9 +137,11 @@ What it does, step by step (so you can audit or cherry-pick):
    az ad group list --query "[].{name:displayName,id:id}" -o table
    ```
 
-   If you provide neither, assignment is not required and any tenant user can
-   sign in through the app (CA policies still apply). Per-user is fine to start;
-   switch to a group later without recreating anything.
+   If you provide neither assignment variable, the script exits before creating
+   any resources unless `ALLOW_ALL_TENANT_USERS=1` explicitly opts into an
+   unrestricted app. In that mode, any tenant user can sign in (CA policies still
+   apply). Per-user is fine to start; switch to a group later without recreating
+   anything.
 
 ## 3. Verify and test
 

@@ -13,8 +13,10 @@ set -euo pipefail
 #   SCOPES           space-separated scopes   (default: full olk --enterprise set)
 #   GROUP_OBJECT_ID  group object ID to assign
 #   ASSIGN_USERS     space-separated user UPNs (or object IDs) to assign
+#   ALLOW_ALL_TENANT_USERS=1 to intentionally allow any tenant user to sign in
 # Providing either assignment variable also sets appRoleAssignmentRequired=true,
-# so ONLY the assigned principals can sign in through the app.
+# so ONLY the assigned principals can sign in through the app. Without an
+# assignment, ALLOW_ALL_TENANT_USERS=1 is required as an explicit opt-in.
 #
 # Finding IDs:
 #   your own UPN:      az ad signed-in-user show --query userPrincipalName -o tsv
@@ -28,6 +30,15 @@ TENANT_ID="${TENANT_ID:?Set TENANT_ID=<your directory (tenant) ID>}"
 APP_NAME="${APP_NAME:-olk CLI}"
 SCOPES="${SCOPES:-offline_access User.Read Mail.ReadWrite Mail.Send Calendars.ReadWrite Contacts.ReadWrite Tasks.ReadWrite Files.ReadWrite People.Read User.ReadBasic.All MailboxSettings.ReadWrite}"
 GRAPH_SP="00000003-0000-0000-c000-000000000000"
+
+if [ -z "${GROUP_OBJECT_ID:-}" ] &&
+  [ -z "${ASSIGN_USERS:-}" ] &&
+  [ "${ALLOW_ALL_TENANT_USERS:-}" != "1" ]; then
+  echo "error: no user or group assignment configured." >&2
+  echo "Set GROUP_OBJECT_ID or ASSIGN_USERS to restrict access." >&2
+  echo "To intentionally allow every tenant user, set ALLOW_ALL_TENANT_USERS=1." >&2
+  exit 1
+fi
 
 current_tenant=$(az account show --query tenantId -o tsv 2>/dev/null || true)
 if [ "$current_tenant" != "$TENANT_ID" ]; then
@@ -103,7 +114,7 @@ if [ -n "${GROUP_OBJECT_ID:-}" ] || [ -n "${ASSIGN_USERS:-}" ]; then
     assign_principal "$user_id"
   done
 else
-  echo "==> Skipping assignment: any tenant user can sign in through this app."
+  echo "==> Explicitly allowing any tenant user to sign in through this app."
   echo "    Restrict later with GROUP_OBJECT_ID=<guid> or ASSIGN_USERS=\"a@x.com b@x.com\","
   echo "    or in one line per user:"
   echo "    az ad sp update --id $APP_ID --set appRoleAssignmentRequired=true"
