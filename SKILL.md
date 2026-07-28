@@ -64,7 +64,7 @@ olk auth clean --force                          # remove ALL stored accounts and
 ## Mail
 
 ```bash
-olk mail list [-n 25] [-f FOLDER] [-u] [--from SENDER] [--after DATE] [--before DATE] [--focused] [--other]
+olk mail list [-n 25] [-f FOLDER] [-u] [--from SENDER] [--after DATE] [--before DATE] [--focused] [--other] [--order newest|oldest] [--select FIELDS]
 olk mail get <ID> [--format full|text|html]
 olk mail send --to a@b.com --subject "Hi" --body "Hello"                  # plain
 olk mail send --to a@b.com --subject "Hi" --body "<p>Hello</p>" --html    # HTML
@@ -87,6 +87,28 @@ olk mail attachments <ID>                                                 # list
 olk mail attachments <ID> --save [--out DIR]                             # download all
 olk mail attachments <ID> --attachment-id <ATT_ID> [--out DIR]           # download one
 ```
+
+For a bounded mail inventory, use:
+
+```bash
+olk mail list --folder inbox --top 1000 --order oldest --json --results-only
+```
+
+`--order` accepts `newest` (the default) or `oldest`. `--top` bounds the total
+result, not each provider page. `olk` follows pages internally until it reaches
+the bound or Graph returns a terminal page; reaching the terminal page early is
+a successful short result containing all available matches. Provider
+continuations stay opaque and are never returned for callers to replay.
+Traversal fails closed: an unsafe, unexpected, non-progressing, or repeated
+continuation, duplicate or missing message ID, cancellation, or request error
+returns no partial list.
+
+With `mail list --json`, `--select` projects both the Graph request and the JSON
+result. Supported fields are `id`, `subject`, `from`, `toRecipients` (rendered
+as `to`), `receivedDateTime`, `isRead`, `hasAttachments`, `bodyPreview`,
+`categories`, and `conversationId`. Empty, duplicate, unknown, or unrenderable
+fields fail locally before Graph is called. A completed JSON envelope has an
+empty `nextLink`; raw provider continuations are not exposed.
 
 Well-known folder names: `inbox`, `sentitems`, `drafts`, `deleteditems`, `junkemail`, `archive`.
 
@@ -318,7 +340,7 @@ export OLK_MAILBOX=boss@example.com
 | `--json` | JSON envelope `{ results, count, nextLink }` | Scripting |
 | `--json --results-only` | Bare JSON array | Best for scripting |
 | `--plain` | Tab-separated values | Piping to `awk`, `cut` |
-| `--select from,subject` | Field projection | Trim output |
+| `--select from,subject` | Command-specific field projection | Trim supported output fields |
 
 ## Global Flags
 
@@ -329,7 +351,7 @@ export OLK_MAILBOX=boss@example.com
 | `--account EMAIL` | `OLK_ACCOUNT` | Use a specific account |
 | `--mailbox EMAIL` | `OLK_MAILBOX` | Target another user's mailbox (delegated read; mail/calendar/contacts). Needs the matching `.Shared` scope + Exchange Full Access |
 | `--results-only` | `OLK_RESULTS_ONLY` | Unwrap JSON envelope |
-| `--select FIELDS` | `OLK_SELECT` | Field projection |
+| `--select FIELDS` | `OLK_SELECT` | Command-specific field projection; `mail list --json` projects both the Graph request and JSON result |
 | `--force` | `OLK_FORCE` | Skip confirmations |
 | `--dry-run` | `OLK_DRY_RUN` | Preview without executing |
 | `-v, --verbose` | `OLK_VERBOSE` | Verbose output |

@@ -178,8 +178,34 @@ olk mail list --json --results-only | jq '.[0].subject'
 ### Field Selection
 
 ```bash
-olk mail list --select from,subject
+olk mail list --json --select id,from,subject,receivedDateTime
 ```
+
+For `mail list --json`, `--select` is both a Microsoft Graph projection and a
+JSON output projection: each result contains only the requested fields.
+Supported fields are `id`, `subject`, `from`, `toRecipients` (rendered as
+`to`), `receivedDateTime`, `isRead`, `hasAttachments`, `bodyPreview`,
+`categories`, and `conversationId`. Empty, duplicate, unknown, or
+unrenderable fields are rejected before any Graph request.
+
+### Bounded Mail Lists
+
+```bash
+# Return at most 1,000 inbox messages, oldest first
+olk mail list --folder inbox --top 1000 --order oldest --json --results-only
+```
+
+`--order` accepts `newest` (the default) or `oldest`. `--top` is the total
+result bound for the command, not a per-page size: `olk` follows provider pages
+internally until it reaches that bound or Microsoft Graph returns a terminal
+page. A terminal page before the bound is a successful short result containing
+every available matching message.
+
+Provider continuation URLs remain opaque and internal. A completed `mail list`
+JSON envelope therefore has an empty `nextLink`; raw continuations are never
+exposed for callers to replay. Traversal fails closed: an invalid, unexpected,
+non-progressing, or repeated continuation, a duplicate or missing message ID,
+cancellation, or a request failure returns an error and no partial list.
 
 ## Authentication
 
@@ -344,7 +370,7 @@ For common workflows, `olk` provides top-level shortcuts:
 | `--dry-run` | `OLK_DRY_RUN` | Dry run mode |
 | `--force` | `OLK_FORCE` | Skip confirmations |
 | `--color auto\|never\|always` | `OLK_COLOR` | Color mode |
-| `--select FIELDS` | `OLK_SELECT` | Field projection (table/plain output) |
+| `--select FIELDS` | `OLK_SELECT` | Command-specific field projection; `mail list --json` projects both the Graph request and JSON result |
 | `--concise` | `OLK_CONCISE` | Drop large free-text (bodies, previews, attendee lists) from JSON output |
 | `--results-only` | `OLK_RESULTS_ONLY` | Unwrap JSON envelope |
 | `--tz TIMEZONE` | `OLK_TIMEZONE` | IANA time zone for display (e.g. `America/New_York`) |
@@ -432,7 +458,7 @@ olk auth status                                      Check token validity
 ### Mail
 
 ```
-olk mail list [-n 25] [-f FOLDER] [-u] [--from X] [--after DATE] [--before DATE] [--focused] [--other]
+olk mail list [-n 25] [-f FOLDER] [-u] [--from X] [--after DATE] [--before DATE] [--focused] [--other] [--order newest|oldest] [--select FIELDS]
 olk mail get <ID> [--format full|text|html]
 olk mail batch --id <ID> [--id <ID>]...                  Fetch up to 20 messages in one $batch request
 olk mail thread <CONVERSATION_ID> [-n 50]                List all messages in a conversation
