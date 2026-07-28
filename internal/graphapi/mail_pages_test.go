@@ -86,6 +86,39 @@ func TestListMessagesRejectsExplicitOrderWithInferenceClassificationWithoutReque
 	}
 }
 
+func TestListMessagesDoesNotMutateAbsentOrderAcrossClassificationReuse(t *testing.T) {
+	var queries []url.Values
+	client := testGraphClient(t, func(req *http.Request) *http.Response {
+		queries = append(queries, req.URL.Query())
+		return graphJSONResponse(req, `{"value":[]}`)
+	})
+	opts := &ListMessagesOptions{Top: 25}
+
+	if _, err := client.ListMessages(context.Background(), "", opts); err != nil {
+		t.Fatalf("first ListMessages() error = %v", err)
+	}
+	if opts.OrderBy != "" {
+		t.Fatalf("first ListMessages() mutated OrderBy = %q, want empty", opts.OrderBy)
+	}
+
+	opts.Filter = "inferenceClassification eq 'focused'"
+	if _, err := client.ListMessages(context.Background(), "", opts); err != nil {
+		t.Fatalf("reused ListMessages() error = %v", err)
+	}
+	if opts.OrderBy != "" {
+		t.Fatalf("reused ListMessages() mutated OrderBy = %q, want empty", opts.OrderBy)
+	}
+	if len(queries) != 2 {
+		t.Fatalf("request count = %d, want 2", len(queries))
+	}
+	if got := queries[0].Get("$orderby"); got != "receivedDateTime desc" {
+		t.Errorf("first $orderby = %q, want newest-first default", got)
+	}
+	if got := queries[1].Get("$orderby"); got != "" {
+		t.Errorf("classification $orderby = %q, want provider order", got)
+	}
+}
+
 func TestListMessagesCollectsRootPages(t *testing.T) {
 	for _, tc := range []struct {
 		name             string

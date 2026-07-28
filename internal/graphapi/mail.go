@@ -100,15 +100,15 @@ func (c *Client) ListMessages(ctx context.Context, target string, opts *ListMess
 	if opts.OrderBy != "" && hasInferenceClassification {
 		return nil, fmt.Errorf("cannot combine orderBy with inferenceClassification filter")
 	}
-	if opts.OrderBy == "" {
-		opts.OrderBy = "receivedDateTime desc"
+	orderBy := opts.OrderBy
+	if orderBy == "" {
+		orderBy = "receivedDateTime desc"
 	}
-	if !allowedOrderBy[opts.OrderBy] {
-		return nil, fmt.Errorf("invalid orderBy value: %q", opts.OrderBy)
+	if !allowedOrderBy[orderBy] {
+		return nil, fmt.Errorf("invalid orderBy value: %q", orderBy)
 	}
 
 	top := opts.Top
-	orderBy := opts.OrderBy
 
 	queryParams := &users.ItemMessagesRequestBuilderGetQueryParameters{
 		Top: &top,
