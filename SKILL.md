@@ -65,6 +65,7 @@ olk auth clean --force                          # remove ALL stored accounts and
 
 ```bash
 olk mail list [-n 25] [-f FOLDER] [-u] [--from SENDER] [--after DATE] [--before DATE] [--focused] [--other] [--order newest|oldest] [--select FIELDS]
+# --order cannot be combined with --focused or --other
 olk mail get <ID> [--format full|text|html]
 olk mail send --to a@b.com --subject "Hi" --body "Hello"                  # plain
 olk mail send --to a@b.com --subject "Hi" --body "<p>Hello</p>" --html    # HTML
@@ -102,6 +103,11 @@ continuations stay opaque and are never returned for callers to replay.
 Traversal fails closed: an unsafe, unexpected, non-progressing, or repeated
 continuation, duplicate or missing message ID, cancellation, or request error
 returns no partial list.
+
+`--order` cannot be combined with `--focused` or `--other`. Those
+classification filters use Graph's provider order; `olk` does not fall back to
+client-side sorting, expose a raw Graph response, or return a partial or
+guessed ordering.
 
 With `mail list --json`, `--select` projects both the Graph request and the JSON
 result. Supported fields are `id`, `subject`, `from`, `toRecipients` (rendered
@@ -163,6 +169,9 @@ olk mail list --focused                                                  # focus
 olk mail list --other                                                    # other messages
 olk mail list --focused --unread                                         # combine with filters
 ```
+
+Focused/other filters use provider order and cannot be combined with
+`--order`.
 
 ## Calendar
 

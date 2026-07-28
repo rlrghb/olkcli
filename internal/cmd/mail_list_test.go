@@ -34,6 +34,42 @@ func TestMailListAcceptsOldestOrder(t *testing.T) {
 	}
 }
 
+func TestMailListClassificationFiltersUseProviderOrderWhenOrderOmitted(t *testing.T) {
+	for _, classification := range []struct {
+		flag       string
+		wantFilter string
+	}{
+		{"--focused", "inferenceClassification eq 'focused'"},
+		{"--other", "inferenceClassification eq 'other'"},
+	} {
+		t.Run(classification.flag, func(t *testing.T) {
+			query, _ := runMailList(t, "--json", classification.flag)
+			if got := query.Get("$orderby"); got != "" {
+				t.Errorf("$orderby = %q, want provider default", got)
+			}
+			if got := query.Get("$filter"); got != classification.wantFilter {
+				t.Errorf("$filter = %q, want %q", got, classification.wantFilter)
+			}
+		})
+	}
+}
+
+func TestMailListRejectsExplicitOrderWithClassificationWithoutRequest(t *testing.T) {
+	for _, classification := range []string{"--focused", "--other"} {
+		for _, order := range []string{"newest", "oldest"} {
+			t.Run(classification+"/"+order, func(t *testing.T) {
+				_, _, calls, err := runMailListResultWithCalls(t, "--json", classification, "--order", order)
+				if err == nil || !strings.Contains(err.Error(), "--order cannot be combined with --focused or --other") {
+					t.Fatalf("mail list error = %v, want incompatible-order rejection", err)
+				}
+				if calls != 0 {
+					t.Errorf("Graph handler calls = %d, want 0", calls)
+				}
+			})
+		}
+	}
+}
+
 func TestMailListRejectsInvalidOrder(t *testing.T) {
 	cli := &CLI{}
 	parser, err := newKongParser(cli)

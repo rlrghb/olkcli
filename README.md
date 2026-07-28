@@ -201,6 +201,11 @@ internally until it reaches that bound or Microsoft Graph returns a terminal
 page. A terminal page before the bound is a successful short result containing
 every available matching message.
 
+`--order` cannot be combined with `--focused` or `--other`. Those
+classification filters use Microsoft Graph's provider order; `olk` does not
+fall back to client-side sorting, expose a raw Graph response, or return a
+partial or guessed ordering.
+
 Provider continuation URLs remain opaque and internal. A completed `mail list`
 JSON envelope therefore has an empty `nextLink`; raw continuations are never
 exposed for callers to replay. Traversal fails closed: an invalid, unexpected,
@@ -459,6 +464,7 @@ olk auth status                                      Check token validity
 
 ```
 olk mail list [-n 25] [-f FOLDER] [-u] [--from X] [--after DATE] [--before DATE] [--focused] [--other] [--order newest|oldest] [--select FIELDS]
+# --order cannot be combined with --focused or --other
 olk mail get <ID> [--format full|text|html]
 olk mail batch --id <ID> [--id <ID>]...                  Fetch up to 20 messages in one $batch request
 olk mail thread <CONVERSATION_ID> [-n 50]                List all messages in a conversation

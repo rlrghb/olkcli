@@ -63,6 +63,29 @@ func TestListMessagesCollectsPagesWithRequestedShape(t *testing.T) {
 	}
 }
 
+func TestListMessagesRejectsExplicitOrderWithInferenceClassificationWithoutRequest(t *testing.T) {
+	requests := 0
+	client := testGraphClient(t, func(req *http.Request) *http.Response {
+		requests++
+		return graphJSONResponse(req, `{"value":[]}`)
+	})
+
+	messages, err := client.ListMessages(context.Background(), "", &ListMessagesOptions{
+		Top:     25,
+		Filter:  "inferenceClassification eq 'focused'",
+		OrderBy: "receivedDateTime asc",
+	})
+	if err == nil || !strings.Contains(err.Error(), "cannot combine orderBy with inferenceClassification") {
+		t.Fatalf("ListMessages() error = %v, want incompatible-order rejection", err)
+	}
+	if messages != nil {
+		t.Fatalf("ListMessages() messages = %v, want nil", messages)
+	}
+	if requests != 0 {
+		t.Errorf("request count = %d, want 0", requests)
+	}
+}
+
 func TestListMessagesCollectsRootPages(t *testing.T) {
 	for _, tc := range []struct {
 		name             string

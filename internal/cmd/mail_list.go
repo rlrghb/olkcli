@@ -9,15 +9,15 @@ import (
 )
 
 type MailListCmd struct {
-	Folder  string `help:"Mail folder ID or well-known name" short:"f" env:"OLK_MAIL_FOLDER"`
-	Top     int32  `help:"Number of messages to return" default:"25" short:"n"`
-	Unread  bool   `help:"Show only unread messages" short:"u"`
-	From    string `help:"Filter by sender email"`
-	After   string `help:"Filter messages after date (ISO 8601)"`
-	Before  string `help:"Filter messages before date (ISO 8601)"`
-	Focused bool   `help:"Show only Focused Inbox messages"`
-	Other   bool   `help:"Show only Other Inbox messages"`
-	Order   string `help:"Message order: newest|oldest" default:"newest" enum:"newest,oldest"`
+	Folder  string  `help:"Mail folder ID or well-known name" short:"f" env:"OLK_MAIL_FOLDER"`
+	Top     int32   `help:"Number of messages to return" default:"25" short:"n"`
+	Unread  bool    `help:"Show only unread messages" short:"u"`
+	From    string  `help:"Filter by sender email"`
+	After   string  `help:"Filter messages after date (ISO 8601)"`
+	Before  string  `help:"Filter messages before date (ISO 8601)"`
+	Focused bool    `help:"Show only Focused Inbox messages"`
+	Other   bool    `help:"Show only Other Inbox messages"`
+	Order   *string `help:"Message order: newest|oldest (default newest)" enum:"newest,oldest"`
 }
 
 // mailListSelectableFields is the Graph selector set that ListMessages converts
@@ -76,13 +76,16 @@ func (c *MailListCmd) Run(ctx *RunContext) error {
 		return err
 	}
 
+	if c.Focused && c.Other {
+		return fmt.Errorf("cannot use both --focused and --other")
+	}
+	if (c.Focused || c.Other) && c.Order != nil {
+		return fmt.Errorf("--order cannot be combined with --focused or --other")
+	}
+
 	client, err := ctx.GraphClient()
 	if err != nil {
 		return err
-	}
-
-	if c.Focused && c.Other {
-		return fmt.Errorf("cannot use both --focused and --other")
 	}
 
 	filter, err := buildMailFilter(c.Unread, c.From, c.After, c.Before)
@@ -107,11 +110,19 @@ func (c *MailListCmd) Run(ctx *RunContext) error {
 		return err
 	}
 
+	order := ""
+	if c.Order != nil {
+		order = *c.Order
+	}
+	orderBy := mailListOrderBy(order)
+	if c.Focused || c.Other {
+		orderBy = ""
+	}
 	opts := graphapi.ListMessagesOptions{
 		FolderID: c.Folder,
 		Top:      c.Top,
 		Filter:   filter,
-		OrderBy:  mailListOrderBy(c.Order),
+		OrderBy:  orderBy,
 		Select:   selected,
 	}
 

@@ -96,6 +96,10 @@ func (c *Client) ListMessages(ctx context.Context, target string, opts *ListMess
 	}
 	opts.Top = clampTop(opts.Top)
 
+	hasInferenceClassification := strings.Contains(opts.Filter, "inferenceClassification")
+	if opts.OrderBy != "" && hasInferenceClassification {
+		return nil, fmt.Errorf("cannot combine orderBy with inferenceClassification filter")
+	}
 	if opts.OrderBy == "" {
 		opts.OrderBy = "receivedDateTime desc"
 	}
@@ -111,9 +115,9 @@ func (c *Client) ListMessages(ctx context.Context, target string, opts *ListMess
 	}
 	// Microsoft Graph does not support $orderBy combined with $search, an
 	// inferenceClassification filter, or a conversationId filter ("restriction or
-	// sort order is too complex"). Callers that need ordering in those cases sort
-	// client-side.
-	skipOrderBy := opts.Search != "" || strings.Contains(opts.Filter, "inferenceClassification") || strings.Contains(opts.Filter, "conversationId")
+	// sort order is too complex"). Explicit classification ordering is rejected
+	// above; search and conversation callers retain their existing semantics.
+	skipOrderBy := opts.Search != "" || hasInferenceClassification || strings.Contains(opts.Filter, "conversationId")
 	if !skipOrderBy {
 		queryParams.Orderby = []string{orderBy}
 	}
