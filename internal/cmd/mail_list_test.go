@@ -64,7 +64,104 @@ func TestMailListWithoutSelectKeepsDefaultJSON(t *testing.T) {
 	}
 }
 
+func TestMailListSelectPreservesUntrustedWrapping(t *testing.T) {
+	_, output := runMailList(t, "--json", "--select", "subject", "--wrap-untrusted")
+	var envelope struct {
+		UntrustedNotice string           `json:"untrustedNotice"`
+		Results         []map[string]any `json:"results"`
+	}
+	if err := json.Unmarshal([]byte(output), &envelope); err != nil {
+		t.Fatalf("decode JSON output: %v\n%s", err, output)
+	}
+	if envelope.UntrustedNotice == "" {
+		t.Fatal("selected JSON omitted the untrusted-content notice")
+	}
+	if got, _ := envelope.Results[0]["subject"].(string); !strings.HasPrefix(got, "[UNTRUSTED:") {
+		t.Errorf("selected subject = %q, want untrusted-content marker", got)
+	}
+}
+
+func TestMailListSelectPreservesConciseOutput(t *testing.T) {
+	_, output := runMailList(t, "--json", "--select", "bodyPreview", "--concise")
+	message := firstJSONMessage(t, output)
+	if _, found := message["bodyPreview"]; found {
+		t.Errorf("--concise retained selected bodyPreview: %v", message)
+	}
+}
+
+func TestMailListSelectMapsToRecipientsToCanonicalJSONKey(t *testing.T) {
+	query, output := runMailList(t, "--json", "--select", "toRecipients")
+	if got := query.Get("$select"); got != "toRecipients" {
+		t.Errorf("$select = %q, want toRecipients", got)
+	}
+	message := firstJSONMessage(t, output)
+	if got, want := sortedJSONKeys(message), []string{"to"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("toRecipients JSON keys = %v, want %v", got, want)
+	}
+	if got, want := message["to"], []any{"recipient@example.com"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("toRecipients JSON value = %v, want %v", got, want)
+	}
+}
+
+func TestMailListTrimsSelectorWhitespace(t *testing.T) {
+	query, output := runMailList(t, "--json", "--select", " id , subject ")
+	if got := query.Get("$select"); got != "id,subject" {
+		t.Errorf("trimmed $select = %q, want id,subject", got)
+	}
+	if got, want := sortedJSONKeys(firstJSONMessage(t, output)), []string{"id", "subject"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("trimmed selector JSON keys = %v, want %v", got, want)
+	}
+}
+
+func TestMailListRejectsUnserializableGraphSelector(t *testing.T) {
+	_, _, err := runMailListResult(t, "--json", "--select", "importance")
+	if err == nil || !strings.Contains(err.Error(), "not available in mail list output") {
+		t.Fatalf("importance selector error = %v, want serializable-output rejection", err)
+	}
+}
+
+func TestMailListRejectsUnknownSelector(t *testing.T) {
+	_, _, err := runMailListResult(t, "--json", "--select", "notAField")
+	if err == nil || !strings.Contains(err.Error(), "invalid --select field") {
+		t.Fatalf("unknown selector error = %v, want --select validation error", err)
+	}
+}
+
+func TestMailListRejectsEmptyAndDuplicateSelectors(t *testing.T) {
+	for _, selectFields := range []string{" ", "id, ,subject", "id,id"} {
+		t.Run(selectFields, func(t *testing.T) {
+			_, _, err := runMailListResult(t, "--json", "--select", selectFields)
+			if err == nil || !strings.Contains(err.Error(), "--select") {
+				t.Fatalf("selector %q error = %v, want local --select validation error", selectFields, err)
+			}
+		})
+	}
+}
+
+func TestPrintMessageListKeepsJSONUnprojectedForOtherMailCommands(t *testing.T) {
+	ctx := &RunContext{Flags: &RootFlags{JSON: true, Select: "subject"}}
+	output, _, err := captureStd(func() error {
+		return printMessageList(ctx, []graphapi.MailMessage{{ID: "message-id", Subject: "Hello"}})
+	})
+	if err != nil {
+		t.Fatalf("printMessageList: %v", err)
+	}
+	message := firstJSONMessage(t, output)
+	if _, found := message["id"]; !found {
+		t.Errorf("shared formatter applied mail-list projection: %v", message)
+	}
+}
+
 func runMailList(t *testing.T, args ...string) (url.Values, string) {
+	t.Helper()
+	query, output, err := runMailListResult(t, args...)
+	if err != nil {
+		t.Fatalf("run mail list: %v", err)
+	}
+	return query, output
+}
+
+func runMailListResult(t *testing.T, args ...string) (url.Values, string, error) {
 	t.Helper()
 	var query url.Values
 	client := testMailListClient(t, func(req *http.Request) *http.Response {
@@ -74,6 +171,7 @@ func runMailList(t *testing.T, args ...string) (url.Values, string) {
 				"id": "message-id",
 				"subject": "Hello",
 				"from": {"emailAddress": {"address": "sender@example.com"}},
+				"toRecipients": [{"emailAddress": {"address": "recipient@example.com"}}],
 				"receivedDateTime": "2026-07-28T10:30:00Z",
 				"isRead": false,
 				"hasAttachments": true,
@@ -94,11 +192,11 @@ func runMailList(t *testing.T, args ...string) (url.Values, string) {
 	cli := &CLI{}
 	parser, err := newKongParser(cli)
 	if err != nil {
-		t.Fatalf("newKongParser: %v", err)
+		return nil, "", err
 	}
 	kctx, err := parser.Parse(append([]string{"mail", "list"}, args...))
 	if err != nil {
-		t.Fatalf("parse mail list: %v", err)
+		return nil, "", err
 	}
 
 	output, _, err := captureStd(func() error {
@@ -108,10 +206,7 @@ func runMailList(t *testing.T, args ...string) (url.Values, string) {
 			client: client,
 		})
 	})
-	if err != nil {
-		t.Fatalf("run mail list: %v", err)
-	}
-	return query, output
+	return query, output, err
 }
 
 func testMailListClient(t *testing.T, handler func(*http.Request) *http.Response) *graphapi.Client {
