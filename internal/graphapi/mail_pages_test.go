@@ -3,10 +3,95 @@ package graphapi
 import (
 	"context"
 	"errors"
+	"io"
+	"net/http"
+	"strings"
 	"testing"
 
+	absauth "github.com/microsoft/kiota-abstractions-go/authentication"
+	msgraphsdk "github.com/microsoftgraph/msgraph-sdk-go"
 	"github.com/microsoftgraph/msgraph-sdk-go/models"
 )
+
+func TestListMessagesCollectsPagesWithRequestedShape(t *testing.T) {
+	requests := 0
+	client := testGraphClient(t, func(req *http.Request) *http.Response {
+		requests++
+		switch requests {
+		case 1:
+			if req.URL.Path != "/v1.0/users/shared@example.com/mailFolders/inbox/messages" {
+				t.Errorf("first request path = %q, want inbox messages", req.URL.Path)
+			}
+			query := req.URL.Query()
+			if got := query.Get("$orderby"); got != "receivedDateTime asc" {
+				t.Errorf("first request $orderby = %q, want oldest-first", got)
+			}
+			if got := query.Get("$select"); got != "id,subject,receivedDateTime" {
+				t.Errorf("first request $select = %q, want exact projection", got)
+			}
+			if got := query.Get("$top"); got != "3" {
+				t.Errorf("first request $top = %q, want 3", got)
+			}
+			return graphJSONResponse(req, `{"value":[{"id":"one","subject":"first"},{"id":"two","subject":"second"}],"@odata.nextLink":"https://graph.microsoft.com/v1.0/users/shared@example.com/mailFolders/inbox/messages?$skiptoken=second"}`)
+		case 2:
+			if got := req.URL.String(); got != "https://graph.microsoft.com/v1.0/users/shared@example.com/mailFolders/inbox/messages?$skiptoken=second" {
+				t.Errorf("continuation request URL = %q, want opaque nextLink", got)
+			}
+			return graphJSONResponse(req, `{"value":[{"id":"three","subject":"third"},{"id":"four","subject":"fourth"}]}`)
+		default:
+			t.Fatalf("unexpected request %d: %s", requests, req.URL)
+			return nil
+		}
+	})
+
+	messages, err := client.ListMessages(context.Background(), "shared@example.com", &ListMessagesOptions{
+		FolderID: "inbox",
+		Top:      3,
+		OrderBy:  "receivedDateTime asc",
+		Select:   []string{"id", "subject", "receivedDateTime"},
+	})
+	if err != nil {
+		t.Fatalf("ListMessages() error = %v", err)
+	}
+	if requests != 2 {
+		t.Fatalf("request count = %d, want 2", requests)
+	}
+	if len(messages) != 3 {
+		t.Fatalf("message count = %d, want 3", len(messages))
+	}
+	for index, want := range []string{"one", "two", "three"} {
+		if got := messages[index].ID; got != want {
+			t.Errorf("message %d ID = %q, want %q", index, got, want)
+		}
+	}
+}
+
+type roundTripFunc func(*http.Request) *http.Response
+
+func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req), nil
+}
+
+func testGraphClient(t *testing.T, responder roundTripFunc) *Client {
+	t.Helper()
+	adapter, err := msgraphsdk.NewGraphRequestAdapterWithParseNodeFactoryAndSerializationWriterFactoryAndHttpClient(
+		&absauth.AnonymousAuthenticationProvider{}, nil, nil, &http.Client{Transport: responder},
+	)
+	if err != nil {
+		t.Fatalf("creating Graph request adapter: %v", err)
+	}
+	return &Client{inner: msgraphsdk.NewGraphServiceClient(adapter)}
+}
+
+func graphJSONResponse(req *http.Request, body string) *http.Response {
+	return &http.Response{
+		StatusCode:    http.StatusOK,
+		Header:        http.Header{"Content-Type": []string{"application/json"}},
+		Body:          io.NopCloser(strings.NewReader(body)),
+		Request:       req,
+		ContentLength: int64(len(body)),
+	}
+}
 
 func TestCollectMessagePagesCompletesTwoPages(t *testing.T) {
 	first := func(_ context.Context, top int32) (messagePage, error) {

@@ -3,6 +3,7 @@ package graphapi
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"regexp"
 	"strings"
 
@@ -99,8 +100,6 @@ func (c *Client) ListMessages(ctx context.Context, target string, opts *ListMess
 		return nil, fmt.Errorf("invalid orderBy value: %q", opts.OrderBy)
 	}
 
-	var config *users.ItemMessagesRequestBuilderGetRequestConfiguration
-
 	top := opts.Top
 	orderBy := opts.OrderBy
 
@@ -132,10 +131,6 @@ func (c *Client) ListMessages(ctx context.Context, target string, opts *ListMess
 		queryParams.Select = []string{"id", "subject", "from", "toRecipients", "receivedDateTime", "isRead", "hasAttachments", "bodyPreview", "categories", "conversationId"}
 	}
 
-	config = &users.ItemMessagesRequestBuilderGetRequestConfiguration{
-		QueryParameters: queryParams,
-	}
-
 	if opts.FolderID != "" {
 		if err := validateID(opts.FolderID, "folder ID"); err != nil {
 			return nil, err
@@ -153,25 +148,71 @@ func (c *Client) ListMessages(ctx context.Context, target string, opts *ListMess
 		if opts.Search != "" {
 			folderQueryParams.Search = &opts.Search
 		}
-		resp, err := c.targetUser(target).MailFolders().ByMailFolderId(opts.FolderID).Messages().Get(ctx, &users.ItemMailFoldersItemMessagesRequestBuilderGetRequestConfiguration{
-			QueryParameters: folderQueryParams,
-		})
+		messages, err := collectMessagePages(ctx, top,
+			func(ctx context.Context, pageTop int32) (messagePage, error) {
+				folderQueryParams.Top = &pageTop
+				resp, err := c.targetUser(target).MailFolders().ByMailFolderId(opts.FolderID).Messages().Get(ctx, &users.ItemMailFoldersItemMessagesRequestBuilderGetRequestConfiguration{
+					QueryParameters: folderQueryParams,
+				})
+				if err != nil {
+					return messagePage{}, err
+				}
+				return messagePage{Values: resp.GetValue(), NextLink: derefStr(resp.GetOdataNextLink())}, nil
+			},
+			func(ctx context.Context, nextLink string, _ int32) (messagePage, error) {
+				if err := validateGraphContinuation(nextLink, graphContinuationScope{
+					host:           defaultGraphAPIHost,
+					collectionPath: graphUserCollectionPath(target, "mailFolders/"+url.PathEscape(opts.FolderID)+"/messages"),
+				}); err != nil {
+					return messagePage{}, err
+				}
+				resp, err := users.NewItemMailFoldersItemMessagesRequestBuilder(nextLink, c.inner.GetAdapter()).Get(ctx, nil)
+				if err != nil {
+					return messagePage{}, err
+				}
+				return messagePage{Values: resp.GetValue(), NextLink: derefStr(resp.GetOdataNextLink())}, nil
+			},
+		)
 		if err != nil {
 			return nil, fmt.Errorf("listing messages: %w", err)
 		}
-		result := make([]MailMessage, 0, len(resp.GetValue()))
-		for _, msg := range resp.GetValue() {
+		result := make([]MailMessage, 0, len(messages))
+		for _, msg := range messages {
 			result = append(result, convertMessage(msg))
 		}
 		return result, nil
 	}
 
-	resp, err := c.targetUser(target).Messages().Get(ctx, config)
+	messages, err := collectMessagePages(ctx, top,
+		func(ctx context.Context, pageTop int32) (messagePage, error) {
+			queryParams.Top = &pageTop
+			resp, err := c.targetUser(target).Messages().Get(ctx, &users.ItemMessagesRequestBuilderGetRequestConfiguration{
+				QueryParameters: queryParams,
+			})
+			if err != nil {
+				return messagePage{}, err
+			}
+			return messagePage{Values: resp.GetValue(), NextLink: derefStr(resp.GetOdataNextLink())}, nil
+		},
+		func(ctx context.Context, nextLink string, _ int32) (messagePage, error) {
+			if err := validateGraphContinuation(nextLink, graphContinuationScope{
+				host:           defaultGraphAPIHost,
+				collectionPath: graphUserCollectionPath(target, "messages"),
+			}); err != nil {
+				return messagePage{}, err
+			}
+			resp, err := users.NewItemMessagesRequestBuilder(nextLink, c.inner.GetAdapter()).Get(ctx, nil)
+			if err != nil {
+				return messagePage{}, err
+			}
+			return messagePage{Values: resp.GetValue(), NextLink: derefStr(resp.GetOdataNextLink())}, nil
+		},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("listing messages: %w", err)
 	}
-	result := make([]MailMessage, 0, len(resp.GetValue()))
-	for _, msg := range resp.GetValue() {
+	result := make([]MailMessage, 0, len(messages))
+	for _, msg := range messages {
 		result = append(result, convertMessage(msg))
 	}
 	return result, nil
