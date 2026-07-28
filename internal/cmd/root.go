@@ -24,19 +24,19 @@ var (
 )
 
 type RootFlags struct {
-	JSON        bool   `help:"Output as JSON" env:"OLK_JSON"`
-	Plain       bool   `help:"Output as plain TSV" env:"OLK_PLAIN"`
-	Account     string `help:"Account email to use" env:"OLK_ACCOUNT"`
-	Mailbox     string `help:"Target a different user's mailbox via delegated access (requires Mail.Read.Shared at login)" env:"OLK_MAILBOX"`
-	Verbose     bool   `help:"Verbose output" short:"v" env:"OLK_VERBOSE"`
-	DryRun      bool   `help:"Dry run mode" env:"OLK_DRY_RUN"`
-	Force       bool   `help:"Force operation" env:"OLK_FORCE"`
-	Color       string `help:"Color mode: auto|never|always" default:"auto" env:"OLK_COLOR" enum:"auto,never,always"`
-	Select      string `help:"Comma-separated fields to output" env:"OLK_SELECT"`
-	ResultsOnly bool   `help:"Output only the results array (no envelope)" env:"OLK_RESULTS_ONLY"`
-	Concise     bool   `help:"Drop large free-text fields (message/event/task bodies, previews, attendee lists) from JSON output to reduce size" env:"OLK_CONCISE"`
-	Timeout     int    `help:"Request timeout in seconds" default:"60" env:"OLK_TIMEOUT"`
-	TimeZone    string `help:"IANA time zone for display (e.g. America/New_York, Local, UTC)" name:"tz" env:"OLK_TIMEZONE"`
+	JSON        bool         `help:"Output as JSON" env:"OLK_JSON"`
+	Plain       bool         `help:"Output as plain TSV" env:"OLK_PLAIN"`
+	Account     string       `help:"Account email to use" env:"OLK_ACCOUNT"`
+	Mailbox     string       `help:"Target a different user's mailbox via delegated access (requires Mail.Read.Shared at login)" env:"OLK_MAILBOX"`
+	Verbose     bool         `help:"Verbose output" short:"v" env:"OLK_VERBOSE"`
+	DryRun      bool         `help:"Dry run mode" env:"OLK_DRY_RUN"`
+	Force       bool         `help:"Force operation" env:"OLK_FORCE"`
+	Color       string       `help:"Color mode: auto|never|always" default:"auto" env:"OLK_COLOR" enum:"auto,never,always"`
+	Select      SelectFields `help:"Comma-separated fields to output" env:"OLK_SELECT"`
+	ResultsOnly bool         `help:"Output only the results array (no envelope)" env:"OLK_RESULTS_ONLY"`
+	Concise     bool         `help:"Drop large free-text fields (message/event/task bodies, previews, attendee lists) from JSON output to reduce size" env:"OLK_CONCISE"`
+	Timeout     int          `help:"Request timeout in seconds" default:"60" env:"OLK_TIMEOUT"`
+	TimeZone    string       `help:"IANA time zone for display (e.g. America/New_York, Local, UTC)" name:"tz" env:"OLK_TIMEZONE"`
 
 	// Capability guards (enforced for CLI, MCP, scripts, and --mailbox alike).
 	// Named --no-write rather than --read-only because `auth login --read-only`
@@ -50,6 +50,19 @@ type RootFlags struct {
 	EnableCommands      string `help:"Allow only these command prefixes (csv; e.g. mail,calendar)" env:"OLK_ENABLE_COMMANDS"`
 	EnableCommandsExact string `help:"Allow only these exact command paths (csv; e.g. mail.list,mail.get)" env:"OLK_ENABLE_COMMANDS_EXACT"`
 	DisableCommands     string `help:"Block these command paths (csv; overrides allows)" env:"OLK_DISABLE_COMMANDS"`
+}
+
+// SelectFields records whether --select was supplied so an explicit empty
+// value can be rejected instead of being confused with an absent selection.
+type SelectFields struct {
+	Value string
+	Set   bool
+}
+
+func (s *SelectFields) UnmarshalText(value []byte) error {
+	s.Value = string(value)
+	s.Set = true
+	return nil
 }
 
 type RunContext struct {
@@ -174,7 +187,7 @@ func (r *RunContext) Printer() *outfmt.Printer {
 	if loc, err := r.Timezone(); err == nil {
 		tzName = loc.String()
 	}
-	return outfmt.NewPrinter(r.Flags.JSON, r.Flags.Plain, r.Flags.ResultsOnly, r.Flags.Select, tzName, r.Flags.WrapUntrusted, r.Flags.Concise)
+	return outfmt.NewPrinter(r.Flags.JSON, r.Flags.Plain, r.Flags.ResultsOnly, r.Flags.Select.Value, tzName, r.Flags.WrapUntrusted, r.Flags.Concise)
 }
 
 type CLI struct {

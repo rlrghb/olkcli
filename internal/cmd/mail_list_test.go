@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"io"
@@ -52,6 +54,40 @@ func TestMailListSelectDrivesGraphProjectionAndJSONKeys(t *testing.T) {
 	message := firstJSONMessage(t, output)
 	if got, want := sortedJSONKeys(message), []string{"id", "receivedDateTime", "subject"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("selected JSON keys = %v, want %v", got, want)
+	}
+}
+
+func TestMailListAdmittedSelectorsSerialize(t *testing.T) {
+	cases := []struct {
+		selector string
+		jsonKey  string
+		want     any
+	}{
+		{"id", "id", "message-id"},
+		{"subject", "subject", "Hello"},
+		{"from", "from", "sender@example.com"},
+		{"receivedDateTime", "receivedDateTime", "2026-07-28T10:30:00Z"},
+		{"isRead", "isRead", false},
+		{"hasAttachments", "hasAttachments", true},
+		{"bodyPreview", "bodyPreview", "Preview"},
+		{"categories", "categories", []any{"green"}},
+		{"conversationId", "conversationId", "conversation-id"},
+		{"toRecipients", "to", []any{"recipient@example.com"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.selector, func(t *testing.T) {
+			query, output := runMailList(t, "--json", "--select", tc.selector)
+			if got := query.Get("$select"); got != tc.selector {
+				t.Errorf("$select = %q, want %q", got, tc.selector)
+			}
+			message := firstJSONMessage(t, output)
+			if got, want := sortedJSONKeys(message), []string{tc.jsonKey}; !reflect.DeepEqual(got, want) {
+				t.Errorf("JSON keys = %v, want %v", got, want)
+			}
+			if got := message[tc.jsonKey]; !reflect.DeepEqual(got, tc.want) {
+				t.Errorf("JSON %q = %v, want %v", tc.jsonKey, got, tc.want)
+			}
+		})
 	}
 }
 
@@ -113,42 +149,90 @@ func TestMailListTrimsSelectorWhitespace(t *testing.T) {
 	}
 }
 
+func TestMailListRejectsExplicitEmptySelect(t *testing.T) {
+	_, _, calls, err := runMailListResultWithCalls(t, "--json", "--select=")
+	if err == nil {
+		t.Fatal("mail list accepted explicit empty --select")
+	}
+	if calls != 0 {
+		t.Errorf("Graph handler calls = %d, want 0", calls)
+	}
+}
+
 func TestMailListRejectsUnserializableGraphSelector(t *testing.T) {
-	_, _, err := runMailListResult(t, "--json", "--select", "importance")
+	_, _, calls, err := runMailListResultWithCalls(t, "--json", "--select", "importance")
 	if err == nil || !strings.Contains(err.Error(), "not available in mail list output") {
 		t.Fatalf("importance selector error = %v, want serializable-output rejection", err)
+	}
+	if calls != 0 {
+		t.Errorf("Graph handler calls = %d, want 0", calls)
 	}
 }
 
 func TestMailListRejectsUnknownSelector(t *testing.T) {
-	_, _, err := runMailListResult(t, "--json", "--select", "notAField")
+	_, _, calls, err := runMailListResultWithCalls(t, "--json", "--select", "notAField")
 	if err == nil || !strings.Contains(err.Error(), "invalid --select field") {
 		t.Fatalf("unknown selector error = %v, want --select validation error", err)
+	}
+	if calls != 0 {
+		t.Errorf("Graph handler calls = %d, want 0", calls)
 	}
 }
 
 func TestMailListRejectsEmptyAndDuplicateSelectors(t *testing.T) {
 	for _, selectFields := range []string{" ", "id, ,subject", "id,id"} {
 		t.Run(selectFields, func(t *testing.T) {
-			_, _, err := runMailListResult(t, "--json", "--select", selectFields)
+			_, _, calls, err := runMailListResultWithCalls(t, "--json", "--select", selectFields)
 			if err == nil || !strings.Contains(err.Error(), "--select") {
 				t.Fatalf("selector %q error = %v, want local --select validation error", selectFields, err)
+			}
+			if calls != 0 {
+				t.Errorf("Graph handler calls = %d, want 0", calls)
 			}
 		})
 	}
 }
 
-func TestPrintMessageListKeepsJSONUnprojectedForOtherMailCommands(t *testing.T) {
-	ctx := &RunContext{Flags: &RootFlags{JSON: true, Select: "subject"}}
-	output, _, err := captureStd(func() error {
-		return printMessageList(ctx, []graphapi.MailMessage{{ID: "message-id", Subject: "Hello"}})
+func TestMailBatchJSONIgnoresGlobalSelect(t *testing.T) {
+	output, calls, err := runMailCommand(t, []string{"mail", "batch"}, []string{"--json", "--select", "subject", "--id", "message-id"}, func(req *http.Request) *http.Response {
+		var batch struct {
+			Requests []struct {
+				ID string `json:"id"`
+			} `json:"requests"`
+		}
+		if err := decodeGraphJSON(req.Body, &batch); err != nil {
+			t.Fatalf("decode batch request: %v", err)
+		}
+		if len(batch.Requests) != 1 {
+			t.Fatalf("batch request count = %d, want 1", len(batch.Requests))
+		}
+		return graphBatchResponse(req, batch.Requests[0].ID)
 	})
 	if err != nil {
-		t.Fatalf("printMessageList: %v", err)
+		t.Fatalf("run mail batch: %v", err)
+	}
+	if calls != 1 {
+		t.Fatalf("Graph handler calls = %d, want 1", calls)
 	}
 	message := firstJSONMessage(t, output)
 	if _, found := message["id"]; !found {
-		t.Errorf("shared formatter applied mail-list projection: %v", message)
+		t.Errorf("mail batch applied mail-list projection: %v", message)
+	}
+}
+
+func TestMailThreadJSONIgnoresGlobalSelect(t *testing.T) {
+	output, calls, err := runMailCommand(t, []string{"mail", "thread"}, []string{"--json", "--select", "subject", "conversation-id"}, func(req *http.Request) *http.Response {
+		return graphMessageListResponse(req)
+	})
+	if err != nil {
+		t.Fatalf("run mail thread: %v", err)
+	}
+	if calls != 1 {
+		t.Fatalf("Graph handler calls = %d, want 1", calls)
+	}
+	message := firstJSONMessage(t, output)
+	if _, found := message["id"]; !found {
+		t.Errorf("mail thread applied mail-list projection: %v", message)
 	}
 }
 
@@ -162,41 +246,28 @@ func runMailList(t *testing.T, args ...string) (url.Values, string) {
 }
 
 func runMailListResult(t *testing.T, args ...string) (url.Values, string, error) {
+	query, output, _, err := runMailListResultWithCalls(t, args...)
+	return query, output, err
+}
+
+func runMailListResultWithCalls(t *testing.T, args ...string) (url.Values, string, int, error) {
 	t.Helper()
 	var query url.Values
+	calls := 0
 	client := testMailListClient(t, func(req *http.Request) *http.Response {
+		calls++
 		query = req.URL.Query()
-		body := `{
-			"value": [{
-				"id": "message-id",
-				"subject": "Hello",
-				"from": {"emailAddress": {"address": "sender@example.com"}},
-				"toRecipients": [{"emailAddress": {"address": "recipient@example.com"}}],
-				"receivedDateTime": "2026-07-28T10:30:00Z",
-				"isRead": false,
-				"hasAttachments": true,
-				"bodyPreview": "Preview",
-				"categories": ["green"],
-				"conversationId": "conversation-id"
-			}]
-		}`
-		return &http.Response{
-			StatusCode:    http.StatusOK,
-			Header:        http.Header{"Content-Type": []string{"application/json"}},
-			Body:          io.NopCloser(strings.NewReader(body)),
-			Request:       req,
-			ContentLength: int64(len(body)),
-		}
+		return graphMessageListResponse(req)
 	})
 
 	cli := &CLI{}
 	parser, err := newKongParser(cli)
 	if err != nil {
-		return nil, "", err
+		return nil, "", calls, err
 	}
 	kctx, err := parser.Parse(append([]string{"mail", "list"}, args...))
 	if err != nil {
-		return nil, "", err
+		return nil, "", calls, err
 	}
 
 	output, _, err := captureStd(func() error {
@@ -206,7 +277,94 @@ func runMailListResult(t *testing.T, args ...string) (url.Values, string, error)
 			client: client,
 		})
 	})
-	return query, output, err
+	return query, output, calls, err
+}
+
+func runMailCommand(t *testing.T, path, args []string, responder func(*http.Request) *http.Response) (string, int, error) {
+	t.Helper()
+	calls := 0
+	client := testMailListClient(t, func(req *http.Request) *http.Response {
+		calls++
+		return responder(req)
+	})
+	cli := &CLI{}
+	parser, err := newKongParser(cli)
+	if err != nil {
+		return "", calls, err
+	}
+	kctx, err := parser.Parse(append(path, args...))
+	if err != nil {
+		return "", calls, err
+	}
+	output, _, err := captureStd(func() error {
+		return kctx.Run(&RunContext{Ctx: context.Background(), Flags: &cli.RootFlags, client: client})
+	})
+	return output, calls, err
+}
+
+func graphMessageListResponse(req *http.Request) *http.Response {
+	body := `{
+		"value": [{
+			"id": "message-id",
+			"subject": "Hello",
+			"from": {"emailAddress": {"address": "sender@example.com"}},
+			"toRecipients": [{"emailAddress": {"address": "recipient@example.com"}}],
+			"receivedDateTime": "2026-07-28T10:30:00Z",
+			"isRead": false,
+			"hasAttachments": true,
+			"bodyPreview": "Preview",
+			"categories": ["green"],
+			"conversationId": "conversation-id"
+		}]
+	}`
+	return graphJSONResponse(req, body)
+}
+
+func graphBatchResponse(req *http.Request, stepID string) *http.Response {
+	body := `{
+		"responses": [{
+			"id": "` + stepID + `",
+			"status": 200,
+			"headers": {"Content-Type": "application/json"},
+			"body": {
+				"id": "message-id",
+				"subject": "Hello",
+				"from": {"emailAddress": {"address": "sender@example.com"}},
+				"receivedDateTime": "2026-07-28T10:30:00Z",
+				"isRead": false,
+				"hasAttachments": true,
+				"bodyPreview": "Preview",
+				"conversationId": "conversation-id"
+			}
+		}]
+	}`
+	return graphJSONResponse(req, body)
+}
+
+func graphJSONResponse(req *http.Request, body string) *http.Response {
+	return &http.Response{
+		StatusCode:    http.StatusOK,
+		Header:        http.Header{"Content-Type": []string{"application/json"}},
+		Body:          io.NopCloser(strings.NewReader(body)),
+		Request:       req,
+		ContentLength: int64(len(body)),
+	}
+}
+
+func decodeGraphJSON(reader io.Reader, target any) error {
+	body, err := io.ReadAll(reader)
+	if err != nil {
+		return err
+	}
+	if len(body) >= 2 && body[0] == 0x1f && body[1] == 0x8b {
+		gzipReader, err := gzip.NewReader(bytes.NewReader(body))
+		if err != nil {
+			return err
+		}
+		defer gzipReader.Close()
+		return json.NewDecoder(gzipReader).Decode(target)
+	}
+	return json.Unmarshal(body, target)
 }
 
 func testMailListClient(t *testing.T, handler func(*http.Request) *http.Response) *graphapi.Client {

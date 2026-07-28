@@ -135,13 +135,17 @@ func mailListOrderBy(order string) string {
 	return "receivedDateTime desc"
 }
 
-func parseMailSelect(selectFields string) ([]string, error) {
-	if selectFields == "" {
+func parseMailSelect(selectFields SelectFields) ([]string, error) {
+	if !selectFields.Set {
 		return nil, nil
 	}
-	fields := make([]string, 0, strings.Count(selectFields, ",")+1)
+	if selectFields.Value == "" {
+		return nil, fmt.Errorf("--select cannot be empty")
+	}
+	selectValue := selectFields.Value
+	fields := make([]string, 0, strings.Count(selectValue, ",")+1)
 	seen := make(map[string]bool, cap(fields))
-	for _, rawField := range strings.Split(selectFields, ",") {
+	for _, rawField := range strings.Split(selectValue, ",") {
 		field := strings.TrimSpace(rawField)
 		if field == "" {
 			return nil, fmt.Errorf("--select cannot contain empty fields")
