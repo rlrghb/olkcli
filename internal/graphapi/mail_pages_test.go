@@ -92,10 +92,13 @@ func TestListMessagesDoesNotMutateAbsentOrderAcrossClassificationReuse(t *testin
 		queries = append(queries, req.URL.Query())
 		return graphJSONResponse(req, `{"value":[]}`)
 	})
-	opts := &ListMessagesOptions{Top: 25}
+	opts := &ListMessagesOptions{}
 
 	if _, err := client.ListMessages(context.Background(), "", opts); err != nil {
 		t.Fatalf("first ListMessages() error = %v", err)
+	}
+	if opts.Top != 0 {
+		t.Fatalf("first ListMessages() mutated Top = %d, want 0", opts.Top)
 	}
 	if opts.OrderBy != "" {
 		t.Fatalf("first ListMessages() mutated OrderBy = %q, want empty", opts.OrderBy)
@@ -104,6 +107,9 @@ func TestListMessagesDoesNotMutateAbsentOrderAcrossClassificationReuse(t *testin
 	opts.Filter = "inferenceClassification eq 'focused'"
 	if _, err := client.ListMessages(context.Background(), "", opts); err != nil {
 		t.Fatalf("reused ListMessages() error = %v", err)
+	}
+	if opts.Top != 0 {
+		t.Fatalf("reused ListMessages() mutated Top = %d, want 0", opts.Top)
 	}
 	if opts.OrderBy != "" {
 		t.Fatalf("reused ListMessages() mutated OrderBy = %q, want empty", opts.OrderBy)
@@ -114,8 +120,14 @@ func TestListMessagesDoesNotMutateAbsentOrderAcrossClassificationReuse(t *testin
 	if got := queries[0].Get("$orderby"); got != "receivedDateTime desc" {
 		t.Errorf("first $orderby = %q, want newest-first default", got)
 	}
+	if got := queries[0].Get("$top"); got != "25" {
+		t.Errorf("first $top = %q, want clamped default 25", got)
+	}
 	if got := queries[1].Get("$orderby"); got != "" {
 		t.Errorf("classification $orderby = %q, want provider order", got)
+	}
+	if got := queries[1].Get("$top"); got != "25" {
+		t.Errorf("classification $top = %q, want clamped default 25", got)
 	}
 }
 

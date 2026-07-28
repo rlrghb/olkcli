@@ -94,7 +94,7 @@ func (c *Client) ListMessages(ctx context.Context, target string, opts *ListMess
 	if opts == nil {
 		opts = &ListMessagesOptions{}
 	}
-	opts.Top = clampTop(opts.Top)
+	top := clampTop(opts.Top)
 
 	hasInferenceClassification := strings.Contains(opts.Filter, "inferenceClassification")
 	if opts.OrderBy != "" && hasInferenceClassification {
@@ -107,8 +107,6 @@ func (c *Client) ListMessages(ctx context.Context, target string, opts *ListMess
 	if !allowedOrderBy[orderBy] {
 		return nil, fmt.Errorf("invalid orderBy value: %q", orderBy)
 	}
-
-	top := opts.Top
 
 	queryParams := &users.ItemMessagesRequestBuilderGetQueryParameters{
 		Top: &top,
