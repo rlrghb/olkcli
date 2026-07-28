@@ -13,11 +13,11 @@ func TestValidateDeltaContinuation(t *testing.T) {
 		},
 		{
 			url:   "https://graph.microsoft.us/v1.0/me/contacts/delta?$skiptoken=xyz",
-			scope: contactsDeltaScope(""),
+			scope: continuationScope("graph.microsoft.us", "/v1.0/me/contacts/delta"),
 		},
 		{
 			url:   "https://microsoftgraph.chinacloudapi.cn/v1.0/me/calendarView/delta?$deltatoken=q",
-			scope: calendarViewDeltaScope(""),
+			scope: continuationScope("microsoftgraph.chinacloudapi.cn", "/v1.0/me/calendarView/delta"),
 		},
 	}
 	for _, tc := range tests {

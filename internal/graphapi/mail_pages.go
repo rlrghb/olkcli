@@ -81,10 +81,13 @@ func collectMessagePages(
 	}
 }
 
-// graphContinuationScope limits a Graph continuation to one collection path.
-// A continuation is replayed through the authenticated SDK adapter, so both
-// its Graph host and operation path must be verified before the request.
+const defaultGraphAPIHost = "graph.microsoft.com"
+
+// graphContinuationScope limits a Graph continuation to one host and
+// collection. A continuation is replayed through the authenticated SDK
+// adapter, so both must be verified before the request.
 type graphContinuationScope struct {
+	host           string
 	collectionPath string
 }
 
@@ -107,13 +110,138 @@ func validateGraphContinuation(raw string, expected graphContinuationScope) erro
 	if port := u.Port(); port != "" && port != "443" {
 		return fmt.Errorf("refusing Graph continuation on port %q", port)
 	}
-	if !graphAPIHosts[strings.ToLower(u.Hostname())] {
-		return fmt.Errorf("refusing Graph continuation for untrusted host %q", u.Hostname())
+	expectedHost := strings.ToLower(expected.host)
+	if expectedHost == "" || !graphAPIHosts[expectedHost] {
+		return fmt.Errorf("refusing Graph continuation with invalid expected host")
 	}
-	if expected.collectionPath == "" || u.EscapedPath() != expected.collectionPath {
+	if actualHost := strings.ToLower(u.Hostname()); actualHost != expectedHost {
+		return fmt.Errorf("refusing Graph continuation for unexpected host %q", u.Hostname())
+	}
+	if !sameGraphCollection(u.EscapedPath(), expected.collectionPath) {
 		return fmt.Errorf("refusing Graph continuation outside expected collection")
 	}
 	return nil
+}
+
+type graphCollectionOperation uint8
+
+const (
+	graphMessageCollection graphCollectionOperation = iota + 1
+	graphMessageDeltaCollection
+	graphCalendarViewDeltaCollection
+	graphContactsDeltaCollection
+)
+
+type graphCollectionRoute struct {
+	isMe      bool
+	userID    string
+	folderID  string
+	operation graphCollectionOperation
+}
+
+func sameGraphCollection(actualPath, expectedPath string) bool {
+	actual, ok := parseGraphCollectionRoute(actualPath)
+	if !ok {
+		return false
+	}
+	expected, ok := parseGraphCollectionRoute(expectedPath)
+	return ok && actual == expected
+}
+
+func parseGraphCollectionRoute(path string) (graphCollectionRoute, bool) {
+	if !strings.HasPrefix(path, "/") || strings.HasSuffix(path, "/") {
+		return graphCollectionRoute{}, false
+	}
+	segments := strings.Split(path[1:], "/")
+	if len(segments) < 3 || !strings.EqualFold(segments[0], "v1.0") {
+		return graphCollectionRoute{}, false
+	}
+
+	route := graphCollectionRoute{}
+	var collection []string
+	switch {
+	case strings.EqualFold(segments[1], "me"):
+		route.isMe = true
+		collection = segments[2:]
+	case strings.EqualFold(segments[1], "users") && len(segments) >= 4:
+		userID, ok := graphPathSegment(segments[2])
+		if !ok || userID == "" {
+			return graphCollectionRoute{}, false
+		}
+		route.userID = userID
+		collection = segments[3:]
+	default:
+		return graphCollectionRoute{}, false
+	}
+
+	if folderID, consumed, ok := graphMailFolderRoute(collection); ok {
+		route.folderID = folderID
+		collection = collection[consumed:]
+		if len(collection) == 1 && strings.EqualFold(collection[0], "messages") {
+			route.operation = graphMessageCollection
+			return route, true
+		}
+		if len(collection) == 2 && strings.EqualFold(collection[0], "messages") && strings.EqualFold(collection[1], "delta") {
+			route.operation = graphMessageDeltaCollection
+			return route, true
+		}
+		return graphCollectionRoute{}, false
+	}
+
+	if len(collection) == 2 && strings.EqualFold(collection[0], "calendarView") && strings.EqualFold(collection[1], "delta") {
+		route.operation = graphCalendarViewDeltaCollection
+		return route, true
+	}
+	if len(collection) == 2 && strings.EqualFold(collection[0], "contacts") && strings.EqualFold(collection[1], "delta") {
+		route.operation = graphContactsDeltaCollection
+		return route, true
+	}
+	return graphCollectionRoute{}, false
+}
+
+func graphMailFolderRoute(segments []string) (string, int, bool) {
+	if len(segments) == 0 {
+		return "", 0, false
+	}
+	folder, ok := graphPathSegment(segments[0])
+	if !ok {
+		return "", 0, false
+	}
+	if strings.EqualFold(folder, "mailfolders") {
+		if len(segments) < 2 {
+			return "", 0, false
+		}
+		folderID, ok := graphPathSegment(segments[1])
+		return folderID, 2, ok && folderID != ""
+	}
+
+	const alternateKeyPrefix = "mailfolders('"
+	if len(folder) <= len(alternateKeyPrefix) || !strings.EqualFold(folder[:len(alternateKeyPrefix)], alternateKeyPrefix) || !strings.HasSuffix(folder, "')") {
+		return "", 0, false
+	}
+	folderID, ok := graphODataString(folder[len(alternateKeyPrefix) : len(folder)-2])
+	return folderID, 1, ok && folderID != ""
+}
+
+func graphPathSegment(raw string) (string, bool) {
+	value, err := url.PathUnescape(raw)
+	return value, err == nil
+}
+
+func graphODataString(raw string) (string, bool) {
+	var value strings.Builder
+	for i := 0; i < len(raw); i++ {
+		if raw[i] != '\'' {
+			value.WriteByte(raw[i])
+			continue
+		}
+		if i+1 >= len(raw) || raw[i+1] != '\'' {
+			return "", false
+		}
+		value.WriteByte('\'')
+		i++
+	}
+	return value.String(), true
 }
 
 func graphUserCollectionPath(target, collection string) string {
@@ -126,14 +254,15 @@ func graphUserCollectionPath(target, collection string) string {
 
 func mailMessagesDeltaScope(target, folderID string) graphContinuationScope {
 	return graphContinuationScope{
+		host:           defaultGraphAPIHost,
 		collectionPath: graphUserCollectionPath(target, "mailFolders/"+url.PathEscape(folderID)+"/messages/delta"),
 	}
 }
 
 func calendarViewDeltaScope(target string) graphContinuationScope {
-	return graphContinuationScope{collectionPath: graphUserCollectionPath(target, "calendarView/delta")}
+	return graphContinuationScope{host: defaultGraphAPIHost, collectionPath: graphUserCollectionPath(target, "calendarView/delta")}
 }
 
 func contactsDeltaScope(target string) graphContinuationScope {
-	return graphContinuationScope{collectionPath: graphUserCollectionPath(target, "contacts/delta")}
+	return graphContinuationScope{host: defaultGraphAPIHost, collectionPath: graphUserCollectionPath(target, "contacts/delta")}
 }

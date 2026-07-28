@@ -124,6 +124,24 @@ func TestCollectMessagePagesRejectsRepeatedContinuationLink(t *testing.T) {
 	}
 }
 
+func TestCollectMessagePagesReturnsNoPartialResultAfterContinuationError(t *testing.T) {
+	wantErr := errors.New("continuation failed")
+	got, err := collectMessagePages(context.Background(), 2,
+		func(context.Context, int32) (messagePage, error) {
+			return messagePage{Values: messages("one"), NextLink: "next"}, nil
+		},
+		func(context.Context, string, int32) (messagePage, error) {
+			return messagePage{}, wantErr
+		},
+	)
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("collectMessagePages() error = %v, want %v", err, wantErr)
+	}
+	if got != nil {
+		t.Fatalf("collectMessagePages() messages = %v, want nil on error", got)
+	}
+}
+
 func TestCollectMessagePagesStopsOnCancellationBeforeContinuation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -166,7 +184,7 @@ func TestCollectMessagePagesStopsAtPageBound(t *testing.T) {
 }
 
 func TestValidateGraphContinuation(t *testing.T) {
-	scope := graphContinuationScope{collectionPath: "/v1.0/me/mailFolders/inbox/messages"}
+	scope := continuationScope("graph.microsoft.com", "/v1.0/me/mailFolders/inbox/messages")
 	if err := validateGraphContinuation("https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages?$skiptoken=abc", scope); err != nil {
 		t.Fatalf("validateGraphContinuation() error = %v", err)
 	}
@@ -178,11 +196,75 @@ func TestValidateGraphContinuation(t *testing.T) {
 		"https://evil.example.com/v1.0/me/mailFolders/inbox/messages",
 		"https://graph.microsoft.com/v1.0/me/mailFolders/archive/messages",
 		"https://graph.microsoft.com/v1.0/me/messages",
+		"https://graph.microsoft.com/v1.0/users/other@example.com/mailFolders/inbox/messages",
 		"https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages#fragment",
 	} {
 		t.Run(raw, func(t *testing.T) {
 			if err := validateGraphContinuation(raw, scope); err == nil {
 				t.Fatal("validateGraphContinuation() error = nil, want rejection")
+			}
+		})
+	}
+}
+
+func TestValidateGraphContinuationAllowsDocumentedMailDeltaLinkForms(t *testing.T) {
+	tests := []struct {
+		name  string
+		scope graphContinuationScope
+		url   string
+	}{
+		{
+			name:  "me nextLink segment form",
+			scope: continuationScope("graph.microsoft.com", "/v1.0/me/mailFolders/AQMk/messages/delta"),
+			url:   "https://graph.microsoft.com/v1.0/me/mailFolders/AQMk/messages/delta?$skiptoken=next",
+		},
+		{
+			name:  "me deltaLink alternate key form",
+			scope: continuationScope("graph.microsoft.com", "/v1.0/me/mailFolders/AQMk/messages/delta"),
+			url:   "https://graph.microsoft.com/v1.0/me/mailfolders('AQMk')/messages/delta?$deltatoken=done",
+		},
+		{
+			name:  "delegated nextLink segment form",
+			scope: continuationScope("graph.microsoft.com", "/v1.0/users/shared@example.com/mailFolders/AQMk/messages/delta"),
+			url:   "https://graph.microsoft.com/v1.0/users/shared@example.com/mailFolders/AQMk/messages/delta?$skiptoken=next",
+		},
+		{
+			name:  "delegated deltaLink alternate key form",
+			scope: continuationScope("graph.microsoft.com", "/v1.0/users/shared@example.com/mailFolders/AQMk/messages/delta"),
+			url:   "https://graph.microsoft.com/v1.0/users/shared@example.com/mailfolders('AQMk')/messages/delta?$deltatoken=done",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := validateGraphContinuation(tc.url, tc.scope); err != nil {
+				t.Fatalf("validateGraphContinuation() error = %v", err)
+			}
+		})
+	}
+}
+
+func TestValidateGraphContinuationRejectsOtherGraphCloud(t *testing.T) {
+	scope := continuationScope("graph.microsoft.com", "/v1.0/me/mailFolders/AQMk/messages/delta")
+	if err := validateGraphContinuation("https://graph.microsoft.us/v1.0/me/mailFolders/AQMk/messages/delta?$skiptoken=next", scope); err == nil {
+		t.Fatal("validateGraphContinuation() error = nil, want cross-cloud rejection")
+	}
+}
+
+func TestValidateGraphContinuationBindsExpectedGraphCloud(t *testing.T) {
+	for _, tc := range []struct {
+		expectedHost string
+		actualHost   string
+	}{
+		{expectedHost: "GRAPH.MICROSOFT.COM", actualHost: "graph.microsoft.com"},
+		{expectedHost: "graph.microsoft.us", actualHost: "graph.microsoft.us"},
+		{expectedHost: "dod-graph.microsoft.us", actualHost: "dod-graph.microsoft.us"},
+		{expectedHost: "microsoftgraph.chinacloudapi.cn", actualHost: "microsoftgraph.chinacloudapi.cn"},
+	} {
+		t.Run(tc.actualHost, func(t *testing.T) {
+			scope := continuationScope(tc.expectedHost, "/v1.0/me/mailFolders/AQMk/messages/delta")
+			url := "https://" + tc.actualHost + "/v1.0/me/mailFolders/AQMk/messages/delta?$skiptoken=next"
+			if err := validateGraphContinuation(url, scope); err != nil {
+				t.Fatalf("validateGraphContinuation() error = %v", err)
 			}
 		})
 	}
@@ -211,4 +293,8 @@ func assertMessageIDs(t *testing.T, got []models.Messageable, want ...string) {
 			t.Errorf("message %d ID = %q, want %q", i, actual, want[i])
 		}
 	}
+}
+
+func continuationScope(host, collectionPath string) graphContinuationScope {
+	return graphContinuationScope{host: host, collectionPath: collectionPath}
 }
