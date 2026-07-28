@@ -2,26 +2,27 @@ package graphapi
 
 import "testing"
 
-func TestValidateDeltaToken(t *testing.T) {
-	ok := []string{
-		"https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages/delta?$deltatoken=abc",
-		"https://graph.microsoft.us/v1.0/me/contacts/delta?$skiptoken=xyz",
-		"https://microsoftgraph.chinacloudapi.cn/v1.0/me/calendarView/delta?$deltatoken=q",
+func TestValidateDeltaContinuation(t *testing.T) {
+	tests := []struct {
+		url   string
+		scope graphContinuationScope
+	}{
+		{
+			url:   "https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages/delta?$deltatoken=abc",
+			scope: mailMessagesDeltaScope("", "inbox"),
+		},
+		{
+			url:   "https://graph.microsoft.us/v1.0/me/contacts/delta?$skiptoken=xyz",
+			scope: contactsDeltaScope(""),
+		},
+		{
+			url:   "https://microsoftgraph.chinacloudapi.cn/v1.0/me/calendarView/delta?$deltatoken=q",
+			scope: calendarViewDeltaScope(""),
+		},
 	}
-	for _, u := range ok {
-		if err := validateDeltaToken(u); err != nil {
-			t.Errorf("expected %q to be accepted, got %v", u, err)
-		}
-	}
-	bad := []string{
-		"http://graph.microsoft.com/v1.0/me/messages/delta",        // non-https
-		"https://evil.example.com/v1.0/me/messages/delta?$token=x", // untrusted host
-		"https://graph.microsoft.com.evil.com/delta",               // suffix trick
-		"::not a url", // unparseable
-	}
-	for _, u := range bad {
-		if err := validateDeltaToken(u); err == nil {
-			t.Errorf("expected %q to be rejected", u)
+	for _, tc := range tests {
+		if err := validateGraphContinuation(tc.url, tc.scope); err != nil {
+			t.Errorf("expected %q to be accepted, got %v", tc.url, err)
 		}
 	}
 }

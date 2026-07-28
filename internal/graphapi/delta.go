@@ -3,8 +3,6 @@ package graphapi
 import (
 	"context"
 	"fmt"
-	"net/url"
-	"strings"
 	"time"
 
 	abs "github.com/microsoft/kiota-abstractions-go"
@@ -74,31 +72,14 @@ func deltaPageFrom(r deltaLinker) DeltaPage {
 	return DeltaPage{Complete: true}
 }
 
-// graphAPIHosts are the Microsoft Graph endpoints a delta continuation token may
-// target. A token is a full Graph URL replayed with the authenticated adapter,
-// so it must be validated before use to avoid sending the bearer token to an
-// attacker-supplied host (SSRF / token exfiltration).
+// graphAPIHosts are the Microsoft Graph endpoints continuations may target. A
+// continuation is a full Graph URL replayed with the authenticated adapter, so
+// it must be validated before use to avoid bearer-token exfiltration.
 var graphAPIHosts = map[string]bool{
 	"graph.microsoft.com":             true,
 	"graph.microsoft.us":              true, // US Government L4
 	"dod-graph.microsoft.us":          true, // US Government L5 (DOD)
 	"microsoftgraph.chinacloudapi.cn": true, // 21Vianet (China)
-}
-
-// validateDeltaToken rejects a continuation token that isn't an HTTPS Microsoft
-// Graph URL, so a model can't redirect an authenticated request elsewhere.
-func validateDeltaToken(raw string) error {
-	u, err := url.Parse(raw)
-	if err != nil {
-		return fmt.Errorf("invalid delta token")
-	}
-	if !strings.EqualFold(u.Scheme, "https") {
-		return fmt.Errorf("refusing non-HTTPS delta token")
-	}
-	if !graphAPIHosts[strings.ToLower(u.Hostname())] {
-		return fmt.Errorf("refusing delta token for untrusted host %q", u.Hostname())
-	}
-	return nil
 }
 
 func isRemoved(additionalData map[string]any) bool {
@@ -121,7 +102,7 @@ func (c *Client) DeltaMessages(ctx context.Context, target, folderID, token stri
 		cfg := &users.ItemMailFoldersItemMessagesDeltaRequestBuilderGetRequestConfiguration{Headers: maxPageSizeHeaders(top)}
 		resp, err = c.targetUser(target).MailFolders().ByMailFolderId(folderID).Messages().Delta().GetAsDeltaGetResponse(ctx, cfg)
 	} else {
-		if err := validateDeltaToken(token); err != nil {
+		if err := validateGraphContinuation(token, mailMessagesDeltaScope(target, folderID)); err != nil {
 			return nil, DeltaPage{}, err
 		}
 		rb := users.NewItemMailFoldersItemMessagesDeltaRequestBuilder(token, c.inner.GetAdapter())
@@ -150,7 +131,7 @@ func (c *Client) DeltaCalendarView(ctx context.Context, target, token string, st
 		cfg := &users.ItemCalendarViewDeltaRequestBuilderGetRequestConfiguration{QueryParameters: qp, Headers: maxPageSizeHeaders(top)}
 		resp, err = c.targetUser(target).CalendarView().Delta().GetAsDeltaGetResponse(ctx, cfg)
 	} else {
-		if err := validateDeltaToken(token); err != nil {
+		if err := validateGraphContinuation(token, calendarViewDeltaScope(target)); err != nil {
 			return nil, DeltaPage{}, err
 		}
 		rb := users.NewItemCalendarViewDeltaRequestBuilder(token, c.inner.GetAdapter())
@@ -175,7 +156,7 @@ func (c *Client) DeltaContacts(ctx context.Context, target, token string, top in
 		cfg := &users.ItemContactsDeltaRequestBuilderGetRequestConfiguration{Headers: maxPageSizeHeaders(top)}
 		resp, err = c.targetUser(target).Contacts().Delta().GetAsDeltaGetResponse(ctx, cfg)
 	} else {
-		if err := validateDeltaToken(token); err != nil {
+		if err := validateGraphContinuation(token, contactsDeltaScope(target)); err != nil {
 			return nil, DeltaPage{}, err
 		}
 		rb := users.NewItemContactsDeltaRequestBuilder(token, c.inner.GetAdapter())
