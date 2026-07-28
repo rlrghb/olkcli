@@ -2,6 +2,7 @@ package graphapi
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/url"
 	"regexp"
@@ -10,6 +11,8 @@ import (
 	"github.com/microsoftgraph/msgraph-sdk-go/models"
 	"github.com/microsoftgraph/msgraph-sdk-go/users"
 )
+
+var errNilMessageResponse = errors.New("graph returned no message response")
 
 // allowedOrderBy is the set of valid $orderby field values.
 var allowedOrderBy = map[string]bool{
@@ -157,6 +160,9 @@ func (c *Client) ListMessages(ctx context.Context, target string, opts *ListMess
 				if err != nil {
 					return messagePage{}, err
 				}
+				if resp == nil {
+					return messagePage{}, errNilMessageResponse
+				}
 				return messagePage{Values: resp.GetValue(), NextLink: derefStr(resp.GetOdataNextLink())}, nil
 			},
 			func(ctx context.Context, nextLink string, _ int32) (messagePage, error) {
@@ -169,6 +175,9 @@ func (c *Client) ListMessages(ctx context.Context, target string, opts *ListMess
 				resp, err := users.NewItemMailFoldersItemMessagesRequestBuilder(nextLink, c.inner.GetAdapter()).Get(ctx, nil)
 				if err != nil {
 					return messagePage{}, err
+				}
+				if resp == nil {
+					return messagePage{}, errNilMessageResponse
 				}
 				return messagePage{Values: resp.GetValue(), NextLink: derefStr(resp.GetOdataNextLink())}, nil
 			},
@@ -192,6 +201,9 @@ func (c *Client) ListMessages(ctx context.Context, target string, opts *ListMess
 			if err != nil {
 				return messagePage{}, err
 			}
+			if resp == nil {
+				return messagePage{}, errNilMessageResponse
+			}
 			return messagePage{Values: resp.GetValue(), NextLink: derefStr(resp.GetOdataNextLink())}, nil
 		},
 		func(ctx context.Context, nextLink string, _ int32) (messagePage, error) {
@@ -204,6 +216,9 @@ func (c *Client) ListMessages(ctx context.Context, target string, opts *ListMess
 			resp, err := users.NewItemMessagesRequestBuilder(nextLink, c.inner.GetAdapter()).Get(ctx, nil)
 			if err != nil {
 				return messagePage{}, err
+			}
+			if resp == nil {
+				return messagePage{}, errNilMessageResponse
 			}
 			return messagePage{Values: resp.GetValue(), NextLink: derefStr(resp.GetOdataNextLink())}, nil
 		},

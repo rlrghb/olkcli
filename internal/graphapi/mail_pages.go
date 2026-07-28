@@ -173,6 +173,10 @@ func parseGraphCollectionRoute(path string) (graphCollectionRoute, bool) {
 	default:
 		return graphCollectionRoute{}, false
 	}
+	if len(collection) == 1 && strings.EqualFold(collection[0], "messages") {
+		route.operation = graphMessageCollection
+		return route, true
+	}
 
 	if folderID, consumed, ok := graphMailFolderRoute(collection); ok {
 		route.folderID = folderID

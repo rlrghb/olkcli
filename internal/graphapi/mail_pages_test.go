@@ -5,6 +5,8 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"net/url"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -22,16 +24,11 @@ func TestListMessagesCollectsPagesWithRequestedShape(t *testing.T) {
 			if req.URL.Path != "/v1.0/users/shared@example.com/mailFolders/inbox/messages" {
 				t.Errorf("first request path = %q, want inbox messages", req.URL.Path)
 			}
-			query := req.URL.Query()
-			if got := query.Get("$orderby"); got != "receivedDateTime asc" {
-				t.Errorf("first request $orderby = %q, want oldest-first", got)
-			}
-			if got := query.Get("$select"); got != "id,subject,receivedDateTime" {
-				t.Errorf("first request $select = %q, want exact projection", got)
-			}
-			if got := query.Get("$top"); got != "3" {
-				t.Errorf("first request $top = %q, want 3", got)
-			}
+			assertExactQuery(t, req.URL.Query(), url.Values{
+				"$orderby": {"receivedDateTime asc"},
+				"$select":  {"id,subject,receivedDateTime"},
+				"$top":     {"3"},
+			})
 			return graphJSONResponse(req, `{"value":[{"id":"one","subject":"first"},{"id":"two","subject":"second"}],"@odata.nextLink":"https://graph.microsoft.com/v1.0/users/shared@example.com/mailFolders/inbox/messages?$skiptoken=second"}`)
 		case 2:
 			if got := req.URL.String(); got != "https://graph.microsoft.com/v1.0/users/shared@example.com/mailFolders/inbox/messages?$skiptoken=second" {
@@ -66,6 +63,124 @@ func TestListMessagesCollectsPagesWithRequestedShape(t *testing.T) {
 	}
 }
 
+func TestListMessagesCollectsRootPages(t *testing.T) {
+	for _, tc := range []struct {
+		name             string
+		target           string
+		firstPath        string
+		continuationPath string
+		continuationLink string
+	}{
+		{
+			name:             "me",
+			firstPath:        "/v1.0/users/me-token-to-replace/messages",
+			continuationPath: "/v1.0/me/messages",
+			continuationLink: "https://graph.microsoft.com/v1.0/me/messages?$skiptoken=second",
+		},
+		{
+			name:             "delegated mailbox",
+			target:           "shared@example.com",
+			firstPath:        "/v1.0/users/shared@example.com/messages",
+			continuationPath: "/v1.0/users/shared@example.com/messages",
+			continuationLink: "https://graph.microsoft.com/v1.0/users/shared@example.com/messages?$skiptoken=second",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			requests := 0
+			client := testGraphClient(t, func(req *http.Request) *http.Response {
+				requests++
+				switch requests {
+				case 1:
+					if got := req.URL.Path; got != tc.firstPath {
+						t.Errorf("first request path = %q, want %q", got, tc.firstPath)
+					}
+					return graphJSONResponse(req, `{"value":[{"id":"one"}],"@odata.nextLink":"`+tc.continuationLink+`"}`)
+				case 2:
+					if got := req.URL.String(); got != tc.continuationLink {
+						t.Errorf("continuation request URL = %q, want %q", got, tc.continuationLink)
+					}
+					if got := req.URL.Path; got != tc.continuationPath {
+						t.Errorf("continuation request path = %q, want %q", got, tc.continuationPath)
+					}
+					return graphJSONResponse(req, `{"value":[{"id":"two"}]}`)
+				default:
+					t.Fatalf("unexpected request %d: %s", requests, req.URL)
+					return nil
+				}
+			})
+
+			messages, err := client.ListMessages(context.Background(), tc.target, &ListMessagesOptions{Top: 2})
+			if err != nil {
+				t.Fatalf("ListMessages() error = %v", err)
+			}
+			if requests != 2 {
+				t.Fatalf("request count = %d, want 2", requests)
+			}
+			if len(messages) != 2 {
+				t.Fatalf("message count = %d, want 2", len(messages))
+			}
+			if got := []string{messages[0].ID, messages[1].ID}; !reflect.DeepEqual(got, []string{"one", "two"}) {
+				t.Errorf("message IDs = %v, want [one two]", got)
+			}
+		})
+	}
+}
+
+func TestListMessagesRejectsNilSDKResponse(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		target     string
+		folderID   string
+		nilRequest int
+		nextLink   string
+	}{
+		{
+			name:       "folder first page",
+			folderID:   "inbox",
+			nilRequest: 1,
+		},
+		{
+			name:       "folder continuation",
+			target:     "shared@example.com",
+			folderID:   "inbox",
+			nilRequest: 2,
+			nextLink:   "https://graph.microsoft.com/v1.0/users/shared@example.com/mailFolders/inbox/messages?$skiptoken=second",
+		},
+		{
+			name:       "root first page",
+			nilRequest: 1,
+		},
+		{
+			name:       "root continuation",
+			target:     "shared@example.com",
+			nilRequest: 2,
+			nextLink:   "https://graph.microsoft.com/v1.0/users/shared@example.com/messages?$skiptoken=second",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			requests := 0
+			client := testGraphClient(t, func(req *http.Request) *http.Response {
+				requests++
+				if requests == tc.nilRequest {
+					return graphEmptyResponse(req)
+				}
+				return graphJSONResponse(req, `{"value":[{"id":"one"}],"@odata.nextLink":"`+tc.nextLink+`"}`)
+			})
+
+			messages, err := client.ListMessages(context.Background(), tc.target, &ListMessagesOptions{FolderID: tc.folderID, Top: 2})
+			if err == nil || err.Error() != "listing messages: graph returned no message response" {
+				t.Fatalf("ListMessages() error = %v, want deterministic nil-response error", err)
+			}
+			if messages != nil {
+				t.Fatalf("ListMessages() messages = %v, want nil", messages)
+			}
+			if requests != tc.nilRequest {
+				t.Errorf("request count = %d, want %d", requests, tc.nilRequest)
+			}
+		})
+	}
+}
+
 type roundTripFunc func(*http.Request) *http.Response
 
 func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
@@ -90,6 +205,22 @@ func graphJSONResponse(req *http.Request, body string) *http.Response {
 		Body:          io.NopCloser(strings.NewReader(body)),
 		Request:       req,
 		ContentLength: int64(len(body)),
+	}
+}
+
+func graphEmptyResponse(req *http.Request) *http.Response {
+	return &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"application/json"}},
+		Body:       http.NoBody,
+		Request:    req,
+	}
+}
+
+func assertExactQuery(t *testing.T, actual, want url.Values) {
+	t.Helper()
+	if !reflect.DeepEqual(actual, want) {
+		t.Errorf("request query = %v, want exact %v", actual, want)
 	}
 }
 
