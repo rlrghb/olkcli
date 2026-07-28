@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"fmt"
+	"reflect"
+	"strings"
 
 	"github.com/rlrghb/olkcli/internal/graphapi"
 	"github.com/rlrghb/olkcli/internal/outfmt"
@@ -16,6 +18,7 @@ type MailListCmd struct {
 	Before  string `help:"Filter messages before date (ISO 8601)"`
 	Focused bool   `help:"Show only Focused Inbox messages"`
 	Other   bool   `help:"Show only Other Inbox messages"`
+	Order   string `help:"Message order: newest|oldest" default:"newest" enum:"newest,oldest"`
 }
 
 func (c *MailListCmd) Run(ctx *RunContext) error {
@@ -54,14 +57,39 @@ func (c *MailListCmd) Run(ctx *RunContext) error {
 		FolderID: c.Folder,
 		Top:      c.Top,
 		Filter:   filter,
+		OrderBy:  mailListOrderBy(c.Order),
+		Select:   parseMailSelect(ctx.Flags.Select),
 	}
 
 	messages, err := client.ListMessages(ctx.Ctx, target, &opts)
 	if err != nil {
 		return err
 	}
+	if ctx.Flags.JSON {
+		if selected := parseMailSelect(ctx.Flags.Select); len(selected) > 0 {
+			return ctx.Printer().PrintJSON(projectMailMessages(messages, selected), len(messages), "")
+		}
+	}
 
 	return printMessageList(ctx, messages)
+}
+
+func mailListOrderBy(order string) string {
+	if order == "oldest" {
+		return "receivedDateTime asc"
+	}
+	return "receivedDateTime desc"
+}
+
+func parseMailSelect(selectFields string) []string {
+	if selectFields == "" {
+		return nil
+	}
+	fields := strings.Split(selectFields, ",")
+	for i := range fields {
+		fields[i] = strings.TrimSpace(fields[i])
+	}
+	return fields
 }
 
 // printMessageList renders a slice of messages as JSON (full structs) or an
@@ -92,4 +120,31 @@ func printMessageList(ctx *RunContext, messages []graphapi.MailMessage) error {
 	}
 
 	return printer.Print(headers, rows, messages, len(messages), "")
+}
+
+func projectMailMessages(messages []graphapi.MailMessage, selected []string) []map[string]any {
+	projected := make([]map[string]any, len(messages))
+	messageType := reflect.TypeOf(graphapi.MailMessage{})
+	for i := range messages {
+		projected[i] = map[string]any{}
+		messageValue := reflect.ValueOf(messages[i])
+		for fieldIndex := range messageType.NumField() {
+			field := messageType.Field(fieldIndex)
+			jsonName := strings.Split(field.Tag.Get("json"), ",")[0]
+			if jsonName == "" || !mailJSONFieldSelected(jsonName, selected) {
+				continue
+			}
+			projected[i][jsonName] = messageValue.Field(fieldIndex).Interface()
+		}
+	}
+	return projected
+}
+
+func mailJSONFieldSelected(jsonName string, selected []string) bool {
+	for _, field := range selected {
+		if field == jsonName || (field == "toRecipients" && jsonName == "to") {
+			return true
+		}
+	}
+	return false
 }
