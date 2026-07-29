@@ -2,7 +2,9 @@ package cmd
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 	"time"
@@ -249,14 +251,50 @@ func Execute() int {
 	// Command allow/deny lists gate dispatch. Applies to the bare CLI; the MCP
 	// server reuses the same predicate to filter its tool registry.
 	if path := selectedCommandPath(ctx); !commandAllowed(&cli.RootFlags, path) {
-		fmt.Fprintf(os.Stderr, "Error: command %q is not allowed by --enable-commands/--disable-commands\n", strings.Join(path, " "))
+		writeCommandError(
+			cli.JSON,
+			fmt.Errorf(
+				"command %q is not allowed by --enable-commands/--disable-commands",
+				strings.Join(path, " "),
+			),
+			os.Stdout,
+			os.Stderr,
+		)
 		return 1
 	}
 
 	err := ctx.Run(runCtx)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %s\n", outfmt.SanitizeMultiline(err.Error()))
+		writeCommandError(cli.JSON, err, os.Stdout, os.Stderr)
 		return 1
 	}
 	return 0
+}
+
+func writeCommandError(
+	jsonMode bool,
+	err error,
+	stdout io.Writer,
+	stderr io.Writer,
+) {
+	if jsonMode {
+		code, status := graphapi.ErrorMetadata(err)
+		value := struct {
+			Error struct {
+				Code   string `json:"code"`
+				Status int    `json:"status"`
+			} `json:"error"`
+		}{}
+		value.Error.Code = code
+		value.Error.Status = status
+		if encodeErr := json.NewEncoder(stdout).Encode(value); encodeErr != nil {
+			fmt.Fprintln(stderr, "Error: JSON error output failed")
+		}
+		return
+	}
+	fmt.Fprintf(
+		stderr,
+		"Error: %s\n",
+		outfmt.SanitizeMultiline(err.Error()),
+	)
 }

@@ -15,6 +15,7 @@ type versionInfo struct {
 }
 
 var advertisedCapabilities = []string{
+	"cli.json-error-v1",
 	"mail.folders.well-known-v1",
 	"mail.get.parent-folder-v1",
 	"mail.move.structured-receipt-v1",

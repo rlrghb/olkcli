@@ -155,6 +155,17 @@ olk contacts list
 
 Results go to **stdout**; errors, prompts, and diagnostics go to **stderr** — so `olk … --json | jq` (or an agent reading stdout) stays clean even when a prompt or warning fires.
 
+In JSON mode, a failed command exits non-zero and writes a message-free error
+envelope to stdout:
+
+```json
+{"error":{"code":"ErrorItemNotFound","status":404}}
+```
+
+Provider failures retain the Microsoft Graph error code and HTTP status. Local
+command failures use `CommandFailed` and status `0`. Human-readable mode keeps
+its sanitized error text on stderr.
+
 ### JSON Envelope
 
 ```bash

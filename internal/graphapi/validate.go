@@ -152,6 +152,27 @@ func graphErrorMessage(err error) string {
 	return "unknown error"
 }
 
+// ErrorMetadata returns a stable, message-free code and status for JSON CLI
+// consumers. Graph errors retain their provider code and HTTP status; local
+// command failures use a fixed non-HTTP status.
+func ErrorMetadata(err error) (string, int) {
+	var odataErr *odataerrors.ODataError
+	if errors.As(err, &odataErr) {
+		code := "GraphError"
+		if main := odataErr.GetErrorEscaped(); main != nil {
+			if value := main.GetCode(); value != nil && *value != "" {
+				code = *value
+			}
+		}
+		status := odataErr.GetStatusCode()
+		if status <= 0 {
+			status = 500
+		}
+		return code, status
+	}
+	return "CommandFailed", 0
+}
+
 // enterpriseError wraps a Graph API error with a hint that the feature
 // may require a work/school account, if the error indicates access issues.
 func enterpriseError(action string, err error) error {
