@@ -117,3 +117,83 @@ func TestMoveMessageRequiresProviderDestinationID(t *testing.T) {
 		t.Fatalf("receipt = %#v, want nil", receipt)
 	}
 }
+
+func TestImmutableMessageIDsCoverPagingReadAndMove(t *testing.T) {
+	requests := 0
+	client := testGraphClient(t, func(req *http.Request) *http.Response {
+		requests++
+		if got := req.Header.Values("Prefer"); !reflect.DeepEqual(
+			got,
+			[]string{`IdType="ImmutableId"`},
+		) {
+			t.Errorf("request %d Prefer = %q, want immutable ID", requests, got)
+		}
+		switch {
+		case strings.HasSuffix(req.URL.Path, "/move"):
+			return graphJSONResponse(req, `{"id":"immutable-one"}`)
+		case strings.HasSuffix(req.URL.Path, "/messages/immutable-one"):
+			return graphJSONResponse(req, `{"id":"immutable-one"}`)
+		case req.URL.Query().Has("$skiptoken"):
+			return graphJSONResponse(
+				req,
+				`{"value":[{"id":"immutable-two"}]}`,
+			)
+		default:
+			return graphJSONResponse(
+				req,
+				`{"value":[{"id":"immutable-one"}],`+
+					`"@odata.nextLink":`+
+					`"https://graph.microsoft.com/v1.0/me/messages?$skiptoken=next"}`,
+			)
+		}
+	})
+	client.SetImmutableIDs(true)
+
+	messages, err := client.ListMessages(
+		context.Background(),
+		"",
+		&ListMessagesOptions{Top: 2},
+	)
+	if err != nil {
+		t.Fatalf("ListMessages() error = %v", err)
+	}
+	if len(messages) != 2 {
+		t.Fatalf("ListMessages() count = %d, want 2", len(messages))
+	}
+	if _, err := client.GetMessage(
+		context.Background(),
+		"",
+		"immutable-one",
+		MessageBodyDefault,
+	); err != nil {
+		t.Fatalf("GetMessage() error = %v", err)
+	}
+	if _, err := client.MoveMessage(
+		context.Background(),
+		"immutable-one",
+		"deleteditems",
+	); err != nil {
+		t.Fatalf("MoveMessage() error = %v", err)
+	}
+	if requests != 4 {
+		t.Fatalf("request count = %d, want 4", requests)
+	}
+}
+
+func TestImmutableMessageIDsRemainExplicitOptIn(t *testing.T) {
+	client := testGraphClient(t, func(req *http.Request) *http.Response {
+		if got := req.Header.Values("Prefer"); len(got) != 0 {
+			t.Errorf("Prefer = %q, want no immutable ID without opt-in", got)
+		}
+		return graphJSONResponse(req, `{"id":"default-id"}`)
+	})
+
+	if _, err := client.GetMessage(
+		context.Background(),
+		"",
+		"default-id",
+		MessageBodyDefault,
+	); err != nil {
+		t.Fatalf("GetMessage() error = %v", err)
+	}
+}

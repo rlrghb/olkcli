@@ -19,7 +19,8 @@ import (
 
 // Client wraps the Graph SDK client
 type Client struct {
-	inner *msgraphsdk.GraphServiceClient
+	inner        *msgraphsdk.GraphServiceClient
+	immutableIDs bool
 
 	// Capability guards. When set, mutating methods refuse to run. They are the
 	// single enforcement point for --no-write / --no-send, so the guarantee
@@ -32,6 +33,12 @@ type Client struct {
 func (c *Client) SetGuards(noWrite, noSend bool) {
 	c.noWrite = noWrite
 	c.noSend = noSend
+}
+
+// SetImmutableIDs opts Outlook item requests into IDs that remain stable
+// across moves within the same mailbox.
+func (c *Client) SetImmutableIDs(enabled bool) {
+	c.immutableIDs = enabled
 }
 
 // ErrNoWrite and ErrNoSend are returned by mutating methods when the

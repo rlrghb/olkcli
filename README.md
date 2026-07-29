@@ -394,6 +394,7 @@ For common workflows, `olk` provides top-level shortcuts:
 | `--no-send` | `OLK_NO_SEND` | Refuse sending mail or meeting invites |
 | `--no-input` | `OLK_NO_INPUT` | Fail instead of prompting (headless/agent safety) |
 | `--wrap-untrusted` | `OLK_WRAP_UNTRUSTED` | Wrap external free-text in untrusted-content markers (JSON/plain) |
+| `--immutable-ids` | `OLK_IMMUTABLE_IDS` | Return Outlook item IDs that remain stable across moves within the same mailbox |
 | `--enable-commands CSV` | `OLK_ENABLE_COMMANDS` | Allow only these command prefixes (e.g. `mail,calendar`) |
 | `--enable-commands-exact CSV` | `OLK_ENABLE_COMMANDS_EXACT` | Allow only these exact command paths (e.g. `mail.list,mail.get`) |
 | `--disable-commands CSV` | `OLK_DISABLE_COMMANDS` | Block these command paths (overrides allows) |

@@ -244,10 +244,10 @@ func TestPaths_HonorsEnvOverride(t *testing.T) {
 	if ConfigDir() != "/tmp/olk-test-xyzzy" {
 		t.Errorf("ConfigDir should honor OLK_CONFIG_DIR; got %q", ConfigDir())
 	}
-	if ConfigFilePath() != "/tmp/olk-test-xyzzy/config.json" {
+	if ConfigFilePath() != filepath.Join(ConfigDir(), "config.json") {
 		t.Errorf("ConfigFilePath: got %q", ConfigFilePath())
 	}
-	if AccountsDir() != "/tmp/olk-test-xyzzy/accounts" {
+	if AccountsDir() != filepath.Join(ConfigDir(), "accounts") {
 		t.Errorf("AccountsDir: got %q", AccountsDir())
 	}
 }

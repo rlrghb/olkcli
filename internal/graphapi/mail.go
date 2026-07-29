@@ -189,6 +189,7 @@ func (c *Client) ListMessages(ctx context.Context, target string, opts *ListMess
 			func(ctx context.Context, pageTop int32) (messagePage, error) {
 				folderQueryParams.Top = &pageTop
 				resp, err := c.targetUser(target).MailFolders().ByMailFolderId(opts.FolderID).Messages().Get(ctx, &users.ItemMailFoldersItemMessagesRequestBuilderGetRequestConfiguration{
+					Headers:         c.messageIDHeaders(nil),
 					QueryParameters: folderQueryParams,
 				})
 				if err != nil {
@@ -206,7 +207,9 @@ func (c *Client) ListMessages(ctx context.Context, target string, opts *ListMess
 				}); err != nil {
 					return messagePage{}, err
 				}
-				resp, err := users.NewItemMailFoldersItemMessagesRequestBuilder(nextLink, c.inner.GetAdapter()).Get(ctx, nil)
+				resp, err := users.NewItemMailFoldersItemMessagesRequestBuilder(nextLink, c.inner.GetAdapter()).Get(ctx, &users.ItemMailFoldersItemMessagesRequestBuilderGetRequestConfiguration{
+					Headers: c.messageIDHeaders(nil),
+				})
 				if err != nil {
 					return messagePage{}, err
 				}
@@ -230,6 +233,7 @@ func (c *Client) ListMessages(ctx context.Context, target string, opts *ListMess
 		func(ctx context.Context, pageTop int32) (messagePage, error) {
 			queryParams.Top = &pageTop
 			resp, err := c.targetUser(target).Messages().Get(ctx, &users.ItemMessagesRequestBuilderGetRequestConfiguration{
+				Headers:         c.messageIDHeaders(nil),
 				QueryParameters: queryParams,
 			})
 			if err != nil {
@@ -247,7 +251,9 @@ func (c *Client) ListMessages(ctx context.Context, target string, opts *ListMess
 			}); err != nil {
 				return messagePage{}, err
 			}
-			resp, err := users.NewItemMessagesRequestBuilder(nextLink, c.inner.GetAdapter()).Get(ctx, nil)
+			resp, err := users.NewItemMessagesRequestBuilder(nextLink, c.inner.GetAdapter()).Get(ctx, &users.ItemMessagesRequestBuilderGetRequestConfiguration{
+				Headers: c.messageIDHeaders(nil),
+			})
 			if err != nil {
 				return messagePage{}, err
 			}
@@ -278,7 +284,7 @@ func (c *Client) GetMessage(ctx context.Context, target, messageID string, prefe
 		return nil, err
 	}
 	msg, err := c.targetUser(target).Messages().ByMessageId(messageID).Get(ctx, &users.ItemMessagesMessageItemRequestBuilderGetRequestConfiguration{
-		Headers: headers,
+		Headers: c.messageIDHeaders(headers),
 		Options: options,
 		QueryParameters: &users.ItemMessagesMessageItemRequestBuilderGetQueryParameters{
 			Select: messageDetailSelect,
@@ -443,7 +449,13 @@ func (c *Client) MoveMessage(ctx context.Context, messageID, folderID string) (*
 	body := users.NewItemMessagesItemMovePostRequestBody()
 	body.SetDestinationId(&folderID)
 
-	moved, err := c.inner.Me().Messages().ByMessageId(messageID).Move().Post(ctx, body, nil)
+	moved, err := c.inner.Me().Messages().ByMessageId(messageID).Move().Post(
+		ctx,
+		body,
+		&users.ItemMessagesItemMoveRequestBuilderPostRequestConfiguration{
+			Headers: c.messageIDHeaders(nil),
+		},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("move message: %w", err)
 	}

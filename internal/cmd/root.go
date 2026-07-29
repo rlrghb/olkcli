@@ -26,19 +26,20 @@ var (
 )
 
 type RootFlags struct {
-	JSON        bool         `help:"Output as JSON" env:"OLK_JSON"`
-	Plain       bool         `help:"Output as plain TSV" env:"OLK_PLAIN"`
-	Account     string       `help:"Account email to use" env:"OLK_ACCOUNT"`
-	Mailbox     string       `help:"Target a different user's mailbox via delegated access (requires Mail.Read.Shared at login)" env:"OLK_MAILBOX"`
-	Verbose     bool         `help:"Verbose output" short:"v" env:"OLK_VERBOSE"`
-	DryRun      bool         `help:"Dry run mode" env:"OLK_DRY_RUN"`
-	Force       bool         `help:"Force operation" env:"OLK_FORCE"`
-	Color       string       `help:"Color mode: auto|never|always" default:"auto" env:"OLK_COLOR" enum:"auto,never,always"`
-	Select      SelectFields `help:"Comma-separated fields to output" env:"OLK_SELECT"`
-	ResultsOnly bool         `help:"Output only the results array (no envelope)" env:"OLK_RESULTS_ONLY"`
-	Concise     bool         `help:"Drop large free-text fields (message/event/task bodies, previews, attendee lists) from JSON output to reduce size" env:"OLK_CONCISE"`
-	Timeout     int          `help:"Request timeout in seconds" default:"60" env:"OLK_TIMEOUT"`
-	TimeZone    string       `help:"IANA time zone for display (e.g. America/New_York, Local, UTC)" name:"tz" env:"OLK_TIMEZONE"`
+	JSON         bool         `help:"Output as JSON" env:"OLK_JSON"`
+	Plain        bool         `help:"Output as plain TSV" env:"OLK_PLAIN"`
+	Account      string       `help:"Account email to use" env:"OLK_ACCOUNT"`
+	Mailbox      string       `help:"Target a different user's mailbox via delegated access (requires Mail.Read.Shared at login)" env:"OLK_MAILBOX"`
+	Verbose      bool         `help:"Verbose output" short:"v" env:"OLK_VERBOSE"`
+	DryRun       bool         `help:"Dry run mode" env:"OLK_DRY_RUN"`
+	Force        bool         `help:"Force operation" env:"OLK_FORCE"`
+	Color        string       `help:"Color mode: auto|never|always" default:"auto" env:"OLK_COLOR" enum:"auto,never,always"`
+	Select       SelectFields `help:"Comma-separated fields to output" env:"OLK_SELECT"`
+	ResultsOnly  bool         `help:"Output only the results array (no envelope)" env:"OLK_RESULTS_ONLY"`
+	Concise      bool         `help:"Drop large free-text fields (message/event/task bodies, previews, attendee lists) from JSON output to reduce size" env:"OLK_CONCISE"`
+	Timeout      int          `help:"Request timeout in seconds" default:"60" env:"OLK_TIMEOUT"`
+	TimeZone     string       `help:"IANA time zone for display (e.g. America/New_York, Local, UTC)" name:"tz" env:"OLK_TIMEZONE"`
+	ImmutableIDs bool         `help:"Use Outlook IDs that remain stable across moves within one mailbox" env:"OLK_IMMUTABLE_IDS"`
 
 	// Capability guards (enforced for CLI, MCP, scripts, and --mailbox alike).
 	// Named --no-write rather than --read-only because `auth login --read-only`
@@ -163,6 +164,7 @@ func (r *RunContext) GraphClient() (*graphapi.Client, error) {
 	// Capability guards apply at the client layer, so they cover every command
 	// path uniformly (CLI, MCP, scripts, delegated --mailbox).
 	client.SetGuards(r.Flags.NoWrite, r.Flags.NoSend)
+	client.SetImmutableIDs(r.Flags.ImmutableIDs)
 
 	r.client = client
 	return client, nil

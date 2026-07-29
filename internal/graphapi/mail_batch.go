@@ -52,6 +52,9 @@ func (c *Client) GetMessagesBatch(ctx context.Context, target string, ids []stri
 		if preference != MessageBodyDefault {
 			reqInfo.Headers.Add(preferHeader, preferenceValue)
 		}
+		if c.immutableIDs {
+			reqInfo.Headers.Add(preferHeader, immutableIDPreference)
+		}
 		item, err := batch.AddBatchRequestStep(*reqInfo)
 		if err != nil {
 			return nil, fmt.Errorf("adding batch step: %w", err)
@@ -191,6 +194,7 @@ func (c *Client) ListCompleteThread(
 			response, err := c.targetUser(target).Messages().Get(
 				ctx,
 				&users.ItemMessagesRequestBuilderGetRequestConfiguration{
+					Headers:         c.messageIDHeaders(nil),
 					QueryParameters: query,
 				},
 			)
@@ -225,7 +229,12 @@ func (c *Client) ListCompleteThread(
 			response, err := users.NewItemMessagesRequestBuilder(
 				nextLink,
 				c.inner.GetAdapter(),
-			).Get(ctx, nil)
+			).Get(
+				ctx,
+				&users.ItemMessagesRequestBuilderGetRequestConfiguration{
+					Headers: c.messageIDHeaders(nil),
+				},
+			)
 			if err != nil {
 				return messagePage{}, err
 			}
