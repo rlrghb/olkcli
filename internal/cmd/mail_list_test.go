@@ -272,6 +272,99 @@ func TestMailThreadJSONIgnoresGlobalSelect(t *testing.T) {
 	}
 }
 
+func TestMailGetTextRequestsVerifiedProviderRepresentation(t *testing.T) {
+	output, calls, err := runMailCommand(t, []string{"mail", "get"}, []string{"--json", "--format", "text", "message-id"}, func(req *http.Request) *http.Response {
+		if got := req.Header.Get("Prefer"); got != `outlook.body-content-type="text"` {
+			t.Errorf("Prefer = %q, want provider text preference", got)
+		}
+		resp := graphJSONResponse(req, `{"id":"message-id","body":{"contentType":"text","content":"Provider text"}}`)
+		resp.Header.Set("Preference-Applied", `outlook.body-content-type="text"`)
+		return resp
+	})
+	if err != nil {
+		t.Fatalf("run mail get: %v", err)
+	}
+	if calls != 1 {
+		t.Fatalf("Graph handler calls = %d, want 1", calls)
+	}
+	var envelope struct {
+		Results map[string]any `json:"results"`
+	}
+	if err := json.Unmarshal([]byte(output), &envelope); err != nil {
+		t.Fatalf("decode JSON output: %v\n%s", err, output)
+	}
+	if got := envelope.Results["body"]; got != "Provider text" {
+		t.Fatalf("JSON body = %v, want provider text", got)
+	}
+}
+
+func TestMailBatchBodyFormatTextRequestsVerifiedProviderRepresentation(t *testing.T) {
+	output, calls, err := runMailCommand(t, []string{"mail", "batch"}, []string{"--json", "--id", "message-id", "--body-format", "text"}, func(req *http.Request) *http.Response {
+		var batch struct {
+			Requests []struct {
+				ID      string            `json:"id"`
+				Headers map[string]string `json:"headers"`
+			} `json:"requests"`
+		}
+		if err := decodeGraphJSON(req.Body, &batch); err != nil {
+			t.Fatalf("decode batch request: %v", err)
+		}
+		if len(batch.Requests) != 1 {
+			t.Fatalf("batch request count = %d, want 1", len(batch.Requests))
+		}
+		if got := caseInsensitiveHeader(batch.Requests[0].Headers, "Prefer"); got != `outlook.body-content-type="text"` {
+			t.Errorf("batch Prefer = %q, want provider text preference", got)
+		}
+		return graphJSONResponse(req, `{"responses":[{
+			"id":"`+batch.Requests[0].ID+`",
+			"status":200,
+			"headers":{"Content-Type":"application/json","Preference-Applied":"outlook.body-content-type=\"text\""},
+			"body":{"id":"message-id","body":{"contentType":"text","content":"Provider text"}}
+		}]}`)
+	})
+	if err != nil {
+		t.Fatalf("run mail batch: %v", err)
+	}
+	if calls != 1 {
+		t.Fatalf("Graph handler calls = %d, want 1", calls)
+	}
+	if got := firstJSONMessage(t, output)["body"]; got != "Provider text" {
+		t.Fatalf("JSON body = %v, want provider text", got)
+	}
+}
+
+func TestMailThreadBodyFormatTextRequestsVerifiedProviderRepresentation(t *testing.T) {
+	output, calls, err := runMailCommand(t, []string{"mail", "thread"}, []string{"--json", "--body-format", "text", "conversation-id"}, func(req *http.Request) *http.Response {
+		if got := req.Header.Get("Prefer"); got != `outlook.body-content-type="text"` {
+			t.Errorf("Prefer = %q, want provider text preference", got)
+		}
+		if got := req.URL.Query().Get("$select"); !strings.Contains(got, "body") {
+			t.Errorf("$select = %q, want explicit body", got)
+		}
+		resp := graphJSONResponse(req, `{"value":[{"id":"message-id","body":{"contentType":"text","content":"Provider text"}}]}`)
+		resp.Header.Set("Preference-Applied", `outlook.body-content-type="text"`)
+		return resp
+	})
+	if err != nil {
+		t.Fatalf("run mail thread: %v", err)
+	}
+	if calls != 1 {
+		t.Fatalf("Graph handler calls = %d, want 1", calls)
+	}
+	if got := firstJSONMessage(t, output)["body"]; got != "Provider text" {
+		t.Fatalf("JSON body = %v, want provider text", got)
+	}
+}
+
+func caseInsensitiveHeader(headers map[string]string, name string) string {
+	for key, value := range headers {
+		if strings.EqualFold(key, name) {
+			return value
+		}
+	}
+	return ""
+}
+
 func runMailList(t *testing.T, args ...string) (url.Values, string) {
 	t.Helper()
 	query, output, err := runMailListResult(t, args...)

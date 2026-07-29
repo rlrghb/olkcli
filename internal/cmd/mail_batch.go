@@ -1,10 +1,15 @@
 package cmd
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/rlrghb/olkcli/internal/graphapi"
+)
 
 // MailBatchCmd fetches up to 20 messages by ID in one Graph $batch round-trip.
 type MailBatchCmd struct {
-	ID []string `help:"Message ID to fetch (repeatable, max 20)" name:"id"`
+	ID         []string `help:"Message ID to fetch (repeatable, max 20)" name:"id"`
+	BodyFormat *string  `help:"Request provider-returned message body representation" enum:"text,html"`
 }
 
 func (c *MailBatchCmd) Run(ctx *RunContext) error {
@@ -20,7 +25,15 @@ func (c *MailBatchCmd) Run(ctx *RunContext) error {
 		return err
 	}
 
-	messages, err := client.GetMessagesBatch(ctx.Ctx, target, c.ID)
+	bodyFormat := ""
+	if c.BodyFormat != nil {
+		bodyFormat = *c.BodyFormat
+	}
+	preference, err := graphapi.ParseMessageBodyPreference(bodyFormat)
+	if err != nil {
+		return err
+	}
+	messages, err := client.GetMessagesBatch(ctx.Ctx, target, c.ID, preference)
 	if err != nil {
 		return err
 	}

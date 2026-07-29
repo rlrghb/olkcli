@@ -8,14 +8,17 @@ import (
 type VersionCmd struct{}
 
 type versionInfo struct {
-	Version string `json:"version"`
-	Commit  string `json:"commit"`
-	Date    string `json:"date"`
+	Version      string   `json:"version"`
+	Commit       string   `json:"commit"`
+	Date         string   `json:"date"`
+	Capabilities []string `json:"capabilities"`
 }
+
+var advertisedCapabilities = []string{"mail.provider-body-format-v1"}
 
 func (c *VersionCmd) Run(ctx *RunContext) error {
 	if ctx.Flags.JSON {
-		info := versionInfo{Version: Version, Commit: Commit, Date: Date}
+		info := versionInfo{Version: Version, Commit: Commit, Date: Date, Capabilities: advertisedCapabilities}
 		data, err := json.Marshal(info)
 		if err != nil {
 			return err

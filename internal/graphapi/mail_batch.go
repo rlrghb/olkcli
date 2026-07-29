@@ -17,7 +17,7 @@ const maxBatchMessages = 20
 // (up to maxBatchMessages), instead of one request each. It is best-effort: an
 // id that fails (not found / no access) is omitted from the result rather than
 // failing the whole call, so a missing id in the output means that fetch failed.
-func (c *Client) GetMessagesBatch(ctx context.Context, target string, ids []string) ([]MailMessage, error) {
+func (c *Client) GetMessagesBatch(ctx context.Context, target string, ids []string, preference MessageBodyPreference) ([]MailMessage, error) {
 	if len(ids) == 0 {
 		return nil, fmt.Errorf("no message IDs provided")
 	}
@@ -28,6 +28,10 @@ func (c *Client) GetMessagesBatch(ctx context.Context, target string, ids []stri
 		if err := validateID(id, "message ID"); err != nil {
 			return nil, err
 		}
+	}
+	preferenceValue, err := preference.headerValue()
+	if err != nil {
+		return nil, err
 	}
 
 	adapter := c.inner.GetAdapter()
@@ -45,6 +49,9 @@ func (c *Client) GetMessagesBatch(ctx context.Context, target string, ids []stri
 		if err != nil {
 			return nil, fmt.Errorf("building batch request: %w", err)
 		}
+		if preference != MessageBodyDefault {
+			reqInfo.Headers.Add(preferHeader, preferenceValue)
+		}
 		item, err := batch.AddBatchRequestStep(*reqInfo)
 		if err != nil {
 			return nil, fmt.Errorf("adding batch step: %w", err)
@@ -59,12 +66,27 @@ func (c *Client) GetMessagesBatch(ctx context.Context, target string, ids []stri
 
 	out := make([]MailMessage, 0, len(stepIDs))
 	for _, stepID := range stepIDs {
+		if preference != MessageBodyDefault {
+			item := resp.GetResponseById(stepID)
+			if item == nil || item.GetStatus() == nil || *item.GetStatus() >= 400 {
+				return nil, fmt.Errorf("batch message %q did not return a successful provider body response", stepID)
+			}
+			if err := verifyPreferenceApplied(batchResponseHeader(item.GetHeaders(), preferenceAppliedHeader), preference); err != nil {
+				return nil, fmt.Errorf("batch message %q: %w", stepID, err)
+			}
+		}
 		msg, err := graphcore.GetBatchResponseById[models.Messageable](resp, stepID, models.CreateMessageFromDiscriminatorValue)
 		if err != nil {
+			if preference != MessageBodyDefault {
+				return nil, fmt.Errorf("batch message %q: %w", stepID, err)
+			}
 			continue // best-effort: skip ids that failed (not found / no access)
 		}
 		m := convertMessage(msg)
 		fillBody(&m, msg)
+		if err := verifyMessageBody(m, preference); err != nil {
+			return nil, fmt.Errorf("batch message %q: %w", stepID, err)
+		}
 		out = append(out, m)
 	}
 	if len(out) == 0 {
@@ -76,7 +98,7 @@ func (c *Client) GetMessagesBatch(ctx context.Context, target string, ids []stri
 // ListThread returns every message in a conversation, oldest first. The
 // conversation id comes from a message's conversationId field (now included in
 // list/get output). Messages are matched across all folders (inbox, sent, …).
-func (c *Client) ListThread(ctx context.Context, target, conversationID string, top int32) ([]MailMessage, error) {
+func (c *Client) ListThread(ctx context.Context, target, conversationID string, top int32, preference MessageBodyPreference) ([]MailMessage, error) {
 	if err := validateID(conversationID, "conversation ID"); err != nil {
 		return nil, err
 	}
@@ -84,7 +106,12 @@ func (c *Client) ListThread(ctx context.Context, target, conversationID string, 
 	// the OData string literal — the filter is injection-safe. Graph rejects
 	// $orderby alongside a conversationId filter, so order client-side.
 	filter := fmt.Sprintf("conversationId eq '%s'", conversationID)
-	messages, err := c.ListMessages(ctx, target, &ListMessagesOptions{Filter: filter, Top: top})
+	opts := &ListMessagesOptions{Filter: filter, Top: top}
+	if preference != MessageBodyDefault {
+		opts.Select = messageDetailSelect
+		opts.BodyPreference = preference
+	}
+	messages, err := c.ListMessages(ctx, target, opts)
 	if err != nil {
 		return nil, err
 	}

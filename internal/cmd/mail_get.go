@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/rlrghb/olkcli/internal/graphapi"
 	"github.com/rlrghb/olkcli/internal/outfmt"
 )
 
@@ -23,7 +24,14 @@ func (c *MailGetCmd) Run(ctx *RunContext) error {
 		return err
 	}
 
-	msg, err := client.GetMessage(ctx.Ctx, target, c.ID)
+	preference := graphapi.MessageBodyDefault
+	if c.Format != "full" {
+		preference, err = graphapi.ParseMessageBodyPreference(c.Format)
+		if err != nil {
+			return err
+		}
+	}
+	msg, err := client.GetMessage(ctx.Ctx, target, c.ID, preference)
 	if err != nil {
 		return err
 	}

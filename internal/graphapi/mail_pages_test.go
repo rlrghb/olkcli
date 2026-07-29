@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	absauth "github.com/microsoft/kiota-abstractions-go/authentication"
+	khttp "github.com/microsoft/kiota-http-go"
 	msgraphsdk "github.com/microsoftgraph/msgraph-sdk-go"
 	"github.com/microsoftgraph/msgraph-sdk-go/models"
 )
@@ -258,7 +259,9 @@ func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
 func testGraphClient(t *testing.T, responder roundTripFunc) *Client {
 	t.Helper()
 	adapter, err := msgraphsdk.NewGraphRequestAdapterWithParseNodeFactoryAndSerializationWriterFactoryAndHttpClient(
-		&absauth.AnonymousAuthenticationProvider{}, nil, nil, &http.Client{Transport: responder},
+		&absauth.AnonymousAuthenticationProvider{}, nil, nil, &http.Client{
+			Transport: khttp.NewCustomTransportWithParentTransport(responder, khttp.NewHeadersInspectionHandler()),
+		},
 	)
 	if err != nil {
 		t.Fatalf("creating Graph request adapter: %v", err)
