@@ -75,6 +75,7 @@ olk mail send --to a@b.com --subject "Report" --body "See attached" --attach rep
 olk mail send --to a@b.com --subject "Urgent" --body "ASAP" --importance high
 olk mail send --to a@b.com --subject "Contract" --body "Please review" --read-receipt
 olk mail search "from:boss@co.com subject:urgent" [-n 25]                 # KQL
+olk mail thread <CONVERSATION_ID> [--top 50 | --complete]               # one conversation
 olk mail reply <ID> --body "Thanks" [--reply-all]
 olk mail forward <ID> --to a@b.com [--comment "FYI"]
 olk mail move <ID> <FOLDER>
@@ -103,6 +104,11 @@ continuations stay opaque and are never returned for callers to replay.
 Traversal fails closed: an unsafe, unexpected, non-progressing, or repeated
 continuation, duplicate or missing message ID, cancellation, or request error
 returns no partial list.
+
+`mail thread --complete` applies the same fail-closed traversal to one
+conversation and returns only after Graph has supplied a terminal page. Use it
+when complete thread evidence is required; the default thread command remains
+bounded by `--top`.
 
 `--order` cannot be combined with `--focused` or `--other`. Those
 classification filters use Graph's provider order; `olk` does not fall back to

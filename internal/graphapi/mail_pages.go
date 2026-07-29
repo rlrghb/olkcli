@@ -30,14 +30,38 @@ func collectMessagePages(
 	if limit <= 0 {
 		return []models.Messageable{}, nil
 	}
+	return collectMessagePagesMode(ctx, limit, limit, true, first, next)
+}
 
-	page, err := first(ctx, limit)
+// collectAllMessagePages consumes continuation links until the provider
+// returns a terminal page. pageSize bounds each request, not the total result.
+func collectAllMessagePages(
+	ctx context.Context,
+	pageSize int32,
+	first func(context.Context, int32) (messagePage, error),
+	next func(context.Context, string, int32) (messagePage, error),
+) ([]models.Messageable, error) {
+	if pageSize <= 0 {
+		return nil, fmt.Errorf("message page size must be positive")
+	}
+	return collectMessagePagesMode(ctx, 0, pageSize, false, first, next)
+}
+
+func collectMessagePagesMode(
+	ctx context.Context,
+	limit int32,
+	pageSize int32,
+	bounded bool,
+	first func(context.Context, int32) (messagePage, error),
+	next func(context.Context, string, int32) (messagePage, error),
+) ([]models.Messageable, error) {
+	page, err := first(ctx, pageSize)
 	if err != nil {
 		return nil, err
 	}
 
-	result := make([]models.Messageable, 0, limit)
-	seenIDs := make(map[string]struct{}, limit)
+	result := make([]models.Messageable, 0)
+	seenIDs := make(map[string]struct{})
 	seenLinks := make(map[string]struct{})
 	for {
 		if err := ctx.Err(); err != nil {
@@ -48,7 +72,7 @@ func collectMessagePages(
 		}
 
 		for _, message := range page.Values {
-			if int32(len(result)) == limit {
+			if bounded && int32(len(result)) == limit {
 				return result, nil
 			}
 			if message == nil || message.GetId() == nil || *message.GetId() == "" {
@@ -62,7 +86,7 @@ func collectMessagePages(
 			result = append(result, message)
 		}
 
-		if int32(len(result)) == limit || page.NextLink == "" {
+		if (bounded && int32(len(result)) == limit) || page.NextLink == "" {
 			return result, nil
 		}
 		if _, exists := seenLinks[page.NextLink]; exists {
@@ -73,8 +97,11 @@ func collectMessagePages(
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
-		remaining := limit - int32(len(result))
-		page, err = next(ctx, page.NextLink, remaining)
+		nextTop := pageSize
+		if bounded {
+			nextTop = limit - int32(len(result))
+		}
+		page, err = next(ctx, page.NextLink, nextTop)
 		if err != nil {
 			return nil, err
 		}

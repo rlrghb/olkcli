@@ -116,8 +116,10 @@ func (c *Client) ListThread(ctx context.Context, target, conversationID string, 
 		if err != nil {
 			return nil, err
 		}
-		sortThreadMessages(messages)
-		return messages, nil
+		return completeThreadMessages(
+			conversationID,
+			messages,
+		)
 	}
 
 	metadata, err := c.ListMessages(ctx, target, &ListMessagesOptions{
@@ -128,6 +130,137 @@ func (c *Client) ListThread(ctx context.Context, target, conversationID string, 
 	if err != nil {
 		return nil, err
 	}
+	return c.hydrateThread(
+		ctx,
+		target,
+		conversationID,
+		metadata,
+		preference,
+	)
+}
+
+const completeThreadPageSize int32 = 1000
+
+// ListCompleteThread consumes every Graph continuation page before returning
+// one exact conversation, oldest first.
+func (c *Client) ListCompleteThread(
+	ctx context.Context,
+	target string,
+	conversationID string,
+	preference MessageBodyPreference,
+) ([]MailMessage, error) {
+	if err := validateID(conversationID, "conversation ID"); err != nil {
+		return nil, err
+	}
+	if _, err := preference.headerValue(); err != nil {
+		return nil, err
+	}
+	filter := fmt.Sprintf("conversationId eq '%s'", conversationID)
+	selectFields := []string{
+		"id",
+		"subject",
+		"from",
+		"toRecipients",
+		"receivedDateTime",
+		"isRead",
+		"hasAttachments",
+		"bodyPreview",
+		"categories",
+		"conversationId",
+	}
+	if preference != MessageBodyDefault {
+		selectFields = []string{"id"}
+	}
+	pageTop := completeThreadPageSize
+	query := &users.ItemMessagesRequestBuilderGetQueryParameters{
+		Top:    &pageTop,
+		Filter: &filter,
+		Select: selectFields,
+	}
+	raw, err := collectAllMessagePages(
+		ctx,
+		completeThreadPageSize,
+		func(
+			ctx context.Context,
+			top int32,
+		) (messagePage, error) {
+			query.Top = &top
+			response, err := c.targetUser(target).Messages().Get(
+				ctx,
+				&users.ItemMessagesRequestBuilderGetRequestConfiguration{
+					QueryParameters: query,
+				},
+			)
+			if err != nil {
+				return messagePage{}, err
+			}
+			if response == nil {
+				return messagePage{}, errNilMessageResponse
+			}
+			return messagePage{
+				Values:   response.GetValue(),
+				NextLink: derefStr(response.GetOdataNextLink()),
+			}, nil
+		},
+		func(
+			ctx context.Context,
+			nextLink string,
+			_ int32,
+		) (messagePage, error) {
+			if err := validateGraphContinuation(
+				nextLink,
+				graphContinuationScope{
+					host: defaultGraphAPIHost,
+					collectionPath: graphUserCollectionPath(
+						target,
+						"messages",
+					),
+				},
+			); err != nil {
+				return messagePage{}, err
+			}
+			response, err := users.NewItemMessagesRequestBuilder(
+				nextLink,
+				c.inner.GetAdapter(),
+			).Get(ctx, nil)
+			if err != nil {
+				return messagePage{}, err
+			}
+			if response == nil {
+				return messagePage{}, errNilMessageResponse
+			}
+			return messagePage{
+				Values:   response.GetValue(),
+				NextLink: derefStr(response.GetOdataNextLink()),
+			}, nil
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("listing complete thread: %w", err)
+	}
+	metadata := make([]MailMessage, 0, len(raw))
+	for _, message := range raw {
+		metadata = append(metadata, convertMessage(message))
+	}
+	if preference == MessageBodyDefault {
+		return completeThreadMessages(conversationID, metadata)
+	}
+	return c.hydrateThread(
+		ctx,
+		target,
+		conversationID,
+		metadata,
+		preference,
+	)
+}
+
+func (c *Client) hydrateThread(
+	ctx context.Context,
+	target string,
+	conversationID string,
+	metadata []MailMessage,
+	preference MessageBodyPreference,
+) ([]MailMessage, error) {
 	discoveredIDs := make([]string, 0, len(metadata))
 	for _, message := range metadata {
 		discoveredIDs = append(discoveredIDs, message.ID)
@@ -149,9 +282,21 @@ func (c *Client) ListThread(ctx context.Context, target, conversationID string, 
 	if err := verifyExactMessageIdentity(discoveredIDs, messages); err != nil {
 		return nil, fmt.Errorf("thread identity: %w", err)
 	}
+	return completeThreadMessages(conversationID, messages)
+}
+
+func completeThreadMessages(
+	conversationID string,
+	messages []MailMessage,
+) ([]MailMessage, error) {
 	for _, message := range messages {
 		if message.ConversationID != conversationID {
-			return nil, fmt.Errorf("thread message %q conversation = %q, want %q", message.ID, message.ConversationID, conversationID)
+			return nil, fmt.Errorf(
+				"thread message %q conversation = %q, want %q",
+				message.ID,
+				message.ConversationID,
+				conversationID,
+			)
 		}
 	}
 	sortThreadMessages(messages)

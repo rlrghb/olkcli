@@ -20,6 +20,7 @@ var advertisedCapabilities = []string{
 	"mail.get.parent-folder-v1",
 	"mail.move.structured-receipt-v1",
 	"mail.provider-body-format-v1",
+	"mail.thread.complete-v1",
 }
 
 func (c *VersionCmd) Run(ctx *RunContext) error {

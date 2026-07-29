@@ -272,6 +272,29 @@ func TestMailThreadJSONIgnoresGlobalSelect(t *testing.T) {
 	}
 }
 
+func TestMailThreadCompleteRequestsAnUnboundedProviderTraversal(t *testing.T) {
+	output, calls, err := runMailCommand(
+		t,
+		[]string{"mail", "thread"},
+		[]string{"--json", "--complete", "conversation-id"},
+		func(req *http.Request) *http.Response {
+			if got := req.URL.Query().Get("$top"); got != "1000" {
+				t.Errorf("complete thread $top = %q, want page size 1000", got)
+			}
+			return graphMessageListResponse(req)
+		},
+	)
+	if err != nil {
+		t.Fatalf("run complete mail thread: %v", err)
+	}
+	if calls != 1 {
+		t.Fatalf("Graph handler calls = %d, want 1", calls)
+	}
+	if got := firstJSONMessage(t, output)["conversationId"]; got != "conversation-id" {
+		t.Fatalf("conversationId = %v, want conversation-id", got)
+	}
+}
+
 func TestMailGetTextRequestsVerifiedProviderRepresentation(t *testing.T) {
 	output, calls, err := runMailCommand(t, []string{"mail", "get"}, []string{"--json", "--format", "text", "message-id"}, func(req *http.Request) *http.Response {
 		if got := req.Header.Get("Prefer"); got != `outlook.body-content-type="text"` {

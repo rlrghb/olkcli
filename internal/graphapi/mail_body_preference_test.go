@@ -255,6 +255,74 @@ func TestListThreadDiscoversPagedMetadataThenFetchesAcknowledgedBatchChunks(t *t
 	}
 }
 
+func TestListCompleteThreadConsumesEveryProviderPage(t *testing.T) {
+	requests := 0
+	var batchSizes []int
+	client := testGraphClient(t, func(req *http.Request) *http.Response {
+		requests++
+		switch requests {
+		case 1:
+			if got := req.URL.Query().Get("$top"); got != "1000" {
+				t.Errorf("first metadata $top = %q, want 1000-page request", got)
+			}
+			if got := req.URL.Query().Get("$select"); got != "id" {
+				t.Errorf("metadata $select = %q, want id", got)
+			}
+			return graphMessageIDsResponse(
+				req,
+				[]string{"message-02", "message-01"},
+				"https://graph.microsoft.com/v1.0/me/messages?$skiptoken=second",
+			)
+		case 2:
+			return graphMessageIDsResponse(
+				req,
+				[]string{"message-00"},
+				"",
+			)
+		case 3:
+			batch := decodeBodyPreferenceBatch(t, req)
+			batchSizes = append(batchSizes, len(batch))
+			return graphThreadBatchResponse(
+				t,
+				req,
+				batch,
+				"conversation-one",
+				true,
+				nil,
+			)
+		default:
+			t.Fatalf("unexpected request %d", requests)
+			return nil
+		}
+	})
+
+	messages, err := client.ListCompleteThread(
+		context.Background(),
+		"",
+		"conversation-one",
+		MessageBodyText,
+	)
+	if err != nil {
+		t.Fatalf("ListCompleteThread() error = %v", err)
+	}
+	if requests != 3 {
+		t.Fatalf("request count = %d, want 3", requests)
+	}
+	if !reflect.DeepEqual(batchSizes, []int{3}) {
+		t.Fatalf("batch sizes = %v, want [3]", batchSizes)
+	}
+	if len(messages) != 3 ||
+		messages[0].ID != "message-00" ||
+		messages[2].ID != "message-02" {
+		t.Fatalf(
+			"sorted message IDs start/end count = %q/%q %d",
+			messages[0].ID,
+			messages[len(messages)-1].ID,
+			len(messages),
+		)
+	}
+}
+
 func TestListThreadRejectsBatchIdentitySetMismatch(t *testing.T) {
 	client := testGraphClient(t, func(req *http.Request) *http.Response {
 		if req.URL.Path != "/v1.0/$batch" {
