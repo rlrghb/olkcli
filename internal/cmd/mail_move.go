@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/rlrghb/olkcli/internal/graphapi"
 	"github.com/rlrghb/olkcli/internal/outfmt"
 )
 
@@ -22,11 +23,14 @@ func (c *MailMoveCmd) Run(ctx *RunContext) error {
 		return nil
 	}
 
-	err = client.MoveMessage(ctx.Ctx, c.ID, c.Folder)
+	receipt, err := client.MoveMessage(ctx.Ctx, c.ID, c.Folder)
 	if err != nil {
 		return err
 	}
 
+	if ctx.Flags.JSON {
+		return ctx.Printer().PrintJSON([]*graphapi.MoveMessageReceipt{receipt}, 1, "")
+	}
 	fmt.Printf("Message moved to %s.\n", outfmt.Sanitize(c.Folder))
 	return nil
 }

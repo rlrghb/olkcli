@@ -21,7 +21,7 @@ func TestNoWriteGuardBlocksMutations(t *testing.T) {
 		call func() error
 	}{
 		{"DeleteMessage", func() error { return c.DeleteMessage(ctx, "id") }},
-		{"MoveMessage", func() error { return c.MoveMessage(ctx, "id", "f") }},
+		{"MoveMessage", func() error { _, err := c.MoveMessage(ctx, "id", "f"); return err }},
 		{"DeleteEvent", func() error { return c.DeleteEvent(ctx, "id") }},
 		{"DeleteContact", func() error { return c.DeleteContact(ctx, "id") }},
 		{"DeleteDriveItem", func() error { return c.DeleteDriveItem(ctx, "d", "i") }},

@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func TestVersionJSONAdvertisesProviderBodyFormatCapability(t *testing.T) {
+func TestVersionJSONAdvertisesStructuredMailCapabilities(t *testing.T) {
 	flags := &RootFlags{JSON: true}
 	stdout, _, err := captureStd(func() error {
 		return (&VersionCmd{}).Run(&RunContext{Ctx: context.Background(), Flags: flags})
@@ -23,7 +23,12 @@ func TestVersionJSONAdvertisesProviderBodyFormatCapability(t *testing.T) {
 	if err := json.Unmarshal([]byte(strings.TrimSpace(stdout)), &got); err != nil {
 		t.Fatalf("decoding version JSON: %v\n%s", err, stdout)
 	}
-	if want := []string{"mail.provider-body-format-v1"}; !reflect.DeepEqual(got.Capabilities, want) {
+	if want := []string{
+		"mail.folders.well-known-v1",
+		"mail.get.parent-folder-v1",
+		"mail.move.structured-receipt-v1",
+		"mail.provider-body-format-v1",
+	}; !reflect.DeepEqual(got.Capabilities, want) {
 		t.Fatalf("capabilities = %v, want %v", got.Capabilities, want)
 	}
 }

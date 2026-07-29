@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/rlrghb/olkcli/internal/graphapi"
 	"github.com/rlrghb/olkcli/internal/outfmt"
 )
 
@@ -15,7 +16,9 @@ type MailFoldersCmd struct {
 }
 
 // MailFoldersListCmd lists all mail folders (default subcommand)
-type MailFoldersListCmd struct{}
+type MailFoldersListCmd struct {
+	WellKnown string `help:"Resolve one guarded destination by canonical Graph name (archive, deleteditems, inbox, or junkemail)"`
+}
 
 func (c *MailFoldersListCmd) Run(ctx *RunContext) error {
 	client, err := ctx.GraphClient()
@@ -28,7 +31,16 @@ func (c *MailFoldersListCmd) Run(ctx *RunContext) error {
 		return err
 	}
 
-	folders, err := client.ListMailFolders(ctx.Ctx, target)
+	var folders []graphapi.MailFolder
+	if c.WellKnown != "" {
+		var folder *graphapi.MailFolder
+		folder, err = client.GetWellKnownMailFolder(ctx.Ctx, target, c.WellKnown)
+		if err == nil {
+			folders = []graphapi.MailFolder{*folder}
+		}
+	} else {
+		folders, err = client.ListMailFolders(ctx.Ctx, target)
+	}
 	if err != nil {
 		return err
 	}
@@ -41,12 +53,25 @@ func (c *MailFoldersListCmd) Run(ctx *RunContext) error {
 	headers := []string{"ID", "NAME", "TOTAL", "UNREAD"}
 	rows := make([][]string, 0, len(folders))
 	for _, f := range folders {
-		rows = append(rows, []string{
+		row := []string{
 			f.ID,
 			f.DisplayName,
 			fmt.Sprintf("%d", f.TotalCount),
 			fmt.Sprintf("%d", f.UnreadCount),
-		})
+		}
+		if c.WellKnown != "" {
+			row = []string{
+				f.ID,
+				f.DisplayName,
+				f.WellKnownName,
+				fmt.Sprintf("%d", f.TotalCount),
+				fmt.Sprintf("%d", f.UnreadCount),
+			}
+		}
+		rows = append(rows, row)
+	}
+	if c.WellKnown != "" {
+		headers = []string{"ID", "NAME", "WELL-KNOWN", "TOTAL", "UNREAD"}
 	}
 
 	return printer.Print(headers, rows, folders, len(folders), "")

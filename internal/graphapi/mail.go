@@ -12,7 +12,10 @@ import (
 	"github.com/microsoftgraph/msgraph-sdk-go/users"
 )
 
-var errNilMessageResponse = errors.New("graph returned no message response")
+var (
+	errNilMailFolderResponse = errors.New("graph returned no mail folder response")
+	errNilMessageResponse    = errors.New("graph returned no message response")
+)
 
 // allowedOrderBy is the set of valid $orderby field values.
 var allowedOrderBy = map[string]bool{
@@ -47,6 +50,7 @@ var allowedSelectFields = map[string]bool{
 // MailMessage is a simplified mail message for output
 type MailMessage struct {
 	ID             string   `json:"id"`
+	ParentFolderID string   `json:"parentFolderId,omitempty"`
 	Subject        string   `json:"subject" untrusted:"true"`
 	From           string   `json:"from" untrusted:"true"`
 	To             []string `json:"to" untrusted:"true"`
@@ -65,15 +69,36 @@ type MailMessage struct {
 var messageDetailSelect = []string{
 	"id", "subject", "from", "toRecipients", "ccRecipients", "bccRecipients",
 	"receivedDateTime", "isRead", "hasAttachments", "body", "bodyPreview", "conversationId",
+	"parentFolderId",
 }
 
 // MailFolder is a simplified folder representation
 type MailFolder struct {
 	ID             string `json:"id"`
+	WellKnownName  string `json:"wellKnownName,omitempty"`
 	DisplayName    string `json:"displayName" untrusted:"true"`
 	TotalCount     int32  `json:"totalItemCount"`
 	UnreadCount    int32  `json:"unreadItemCount"`
 	ParentFolderID string `json:"parentFolderId,omitempty"`
+}
+
+// protectedWellKnownMailFolders is the canonical folder set used by guarded
+// mailbox moves. Each value is resolved through Graph's well-known-name route;
+// display names are never interpreted as identity.
+var protectedWellKnownMailFolders = map[string]bool{
+	"archive":      true,
+	"deleteditems": true,
+	"inbox":        true,
+	"junkemail":    true,
+}
+
+// MoveMessageReceipt is the stable provider-success result returned after
+// Graph has created the destination message.
+type MoveMessageReceipt struct {
+	SourceID string `json:"sourceId"`
+	ID       string `json:"id"`
+	Status   string `json:"status"`
+	Code     string `json:"code"`
 }
 
 // ListMessagesOptions for filtering messages
@@ -398,24 +423,32 @@ func (c *Client) ForwardMessage(ctx context.Context, messageID, comment string, 
 	return nil
 }
 
-func (c *Client) MoveMessage(ctx context.Context, messageID, folderID string) error {
+func (c *Client) MoveMessage(ctx context.Context, messageID, folderID string) (*MoveMessageReceipt, error) {
 	if err := c.ensureWritable(); err != nil {
-		return err
+		return nil, err
 	}
 	if err := validateID(messageID, "message ID"); err != nil {
-		return err
+		return nil, err
 	}
 	if err := validateID(folderID, "folder ID"); err != nil {
-		return err
+		return nil, err
 	}
 	body := users.NewItemMessagesItemMovePostRequestBody()
 	body.SetDestinationId(&folderID)
 
-	_, err := c.inner.Me().Messages().ByMessageId(messageID).Move().Post(ctx, body, nil)
+	moved, err := c.inner.Me().Messages().ByMessageId(messageID).Move().Post(ctx, body, nil)
 	if err != nil {
-		return fmt.Errorf("move message: %w", err)
+		return nil, fmt.Errorf("move message: %w", err)
 	}
-	return nil
+	if moved == nil || moved.GetId() == nil || *moved.GetId() == "" {
+		return nil, fmt.Errorf("move message: %w", errNilMessageResponse)
+	}
+	return &MoveMessageReceipt{
+		SourceID: messageID,
+		ID:       *moved.GetId(),
+		Status:   "succeeded",
+		Code:     "move_succeeded",
+	}, nil
 }
 
 func (c *Client) DeleteMessage(ctx context.Context, messageID string) error {
@@ -464,24 +497,31 @@ func (c *Client) ListMailFolders(ctx context.Context, target string) ([]MailFold
 
 	folders := make([]MailFolder, 0, len(resp.GetValue()))
 	for _, f := range resp.GetValue() {
-		folder := MailFolder{
-			DisplayName: derefStr(f.GetDisplayName()),
-		}
-		if f.GetId() != nil {
-			folder.ID = *f.GetId()
-		}
-		if f.GetTotalItemCount() != nil {
-			folder.TotalCount = *f.GetTotalItemCount()
-		}
-		if f.GetUnreadItemCount() != nil {
-			folder.UnreadCount = *f.GetUnreadItemCount()
-		}
-		if f.GetParentFolderId() != nil {
-			folder.ParentFolderID = *f.GetParentFolderId()
-		}
-		folders = append(folders, folder)
+		folders = append(folders, convertMailFolder(f))
 	}
 	return folders, nil
+}
+
+// GetWellKnownMailFolder resolves one guarded move destination by its canonical
+// Graph identifier. It intentionally does not infer identity from localized or
+// user-editable display names.
+func (c *Client) GetWellKnownMailFolder(ctx context.Context, target, name string) (*MailFolder, error) {
+	if !protectedWellKnownMailFolders[name] {
+		return nil, fmt.Errorf("unsupported well-known mail folder %q", name)
+	}
+	value, err := c.targetUser(target).MailFolders().ByMailFolderId(name).Get(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("getting well-known folder %s: %w", name, err)
+	}
+	if value == nil {
+		return nil, fmt.Errorf("getting well-known folder %s: %w", name, errNilMailFolderResponse)
+	}
+	folder := convertMailFolder(value)
+	if folder.ID == "" {
+		return nil, fmt.Errorf("getting well-known folder %s: missing folder ID", name)
+	}
+	folder.WellKnownName = name
+	return &folder, nil
 }
 
 // CreateMailFolder creates a new mail folder.
@@ -734,6 +774,9 @@ func convertMessage(msg models.Messageable) MailMessage {
 	if msg.GetId() != nil {
 		m.ID = *msg.GetId()
 	}
+	if msg.GetParentFolderId() != nil {
+		m.ParentFolderID = *msg.GetParentFolderId()
+	}
 	if msg.GetSubject() != nil {
 		m.Subject = *msg.GetSubject()
 	}
@@ -767,6 +810,25 @@ func convertMessage(msg models.Messageable) MailMessage {
 		m.ConversationID = *msg.GetConversationId()
 	}
 	return m
+}
+
+func convertMailFolder(value models.MailFolderable) MailFolder {
+	folder := MailFolder{
+		DisplayName: derefStr(value.GetDisplayName()),
+	}
+	if value.GetId() != nil {
+		folder.ID = *value.GetId()
+	}
+	if value.GetTotalItemCount() != nil {
+		folder.TotalCount = *value.GetTotalItemCount()
+	}
+	if value.GetUnreadItemCount() != nil {
+		folder.UnreadCount = *value.GetUnreadItemCount()
+	}
+	if value.GetParentFolderId() != nil {
+		folder.ParentFolderID = *value.GetParentFolderId()
+	}
+	return folder
 }
 
 // fillBody copies a message's body content and type into m (convertMessage only

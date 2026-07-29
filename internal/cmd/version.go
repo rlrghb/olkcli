@@ -14,7 +14,12 @@ type versionInfo struct {
 	Capabilities []string `json:"capabilities"`
 }
 
-var advertisedCapabilities = []string{"mail.provider-body-format-v1"}
+var advertisedCapabilities = []string{
+	"mail.folders.well-known-v1",
+	"mail.get.parent-folder-v1",
+	"mail.move.structured-receipt-v1",
+	"mail.provider-body-format-v1",
+}
 
 func (c *VersionCmd) Run(ctx *RunContext) error {
 	if ctx.Flags.JSON {
