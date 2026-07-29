@@ -3,9 +3,11 @@ package graphapi
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -200,67 +202,204 @@ func TestGetMessagesBatchFailsWholeResultOnRepresentationContractFailure(t *test
 	}
 }
 
-func TestListThreadRequestsAndVerifiesProviderTextOnEveryPage(t *testing.T) {
+func TestListThreadDiscoversPagedMetadataThenFetchesAcknowledgedBatchChunks(t *testing.T) {
 	requests := 0
+	firstPage := make([]string, 0, 10)
+	secondPage := make([]string, 0, 11)
+	for index := 20; index >= 11; index-- {
+		firstPage = append(firstPage, fmt.Sprintf("message-%02d", index))
+	}
+	for index := 10; index >= 0; index-- {
+		secondPage = append(secondPage, fmt.Sprintf("message-%02d", index))
+	}
+	var batchSizes []int
+
 	client := testGraphClient(t, func(req *http.Request) *http.Response {
 		requests++
-		if got := req.Header.Get("Prefer"); got != `outlook.body-content-type="text"` {
-			t.Errorf("request %d Prefer = %q, want provider text preference", requests, got)
-		}
-		if requests == 1 && !strings.Contains(req.URL.Query().Get("$select"), "body") {
-			got := req.URL.Query().Get("$select")
-			t.Errorf("request %d $select = %q, want explicit body", requests, got)
-		}
-
-		var body string
 		switch requests {
 		case 1:
-			body = `{"value":[{"id":"one","receivedDateTime":"2026-01-01T00:00:00Z","body":{"contentType":"text","content":""}}],"@odata.nextLink":"https://graph.microsoft.com/v1.0/me/messages?$skiptoken=second"}`
+			if got := req.Header.Get("Prefer"); got != "" {
+				t.Errorf("metadata Prefer = %q, want none", got)
+			}
+			if got := req.URL.Query().Get("$select"); got != "id" {
+				t.Errorf("metadata $select = %q, want id", got)
+			}
+			return graphMessageIDsResponse(req, firstPage, "https://graph.microsoft.com/v1.0/me/messages?$skiptoken=second")
 		case 2:
-			body = `{"value":[{"id":"two","receivedDateTime":"2026-01-02T00:00:00Z","body":{"contentType":"text","content":"Second"}}]}`
+			if got := req.Header.Get("Prefer"); got != "" {
+				t.Errorf("continuation metadata Prefer = %q, want none", got)
+			}
+			return graphMessageIDsResponse(req, secondPage, "")
+		case 3, 4:
+			batch := decodeBodyPreferenceBatch(t, req)
+			batchSizes = append(batchSizes, len(batch))
+			return graphThreadBatchResponse(t, req, batch, "conversation-one", true, nil)
 		default:
 			t.Fatalf("unexpected request %d", requests)
+			return nil
 		}
-		resp := graphJSONResponse(req, body)
-		resp.Header.Set("Preference-Applied", `outlook.body-content-type="text"`)
-		return resp
 	})
 
-	messages, err := client.ListThread(context.Background(), "", "conversation-one", 2, MessageBodyText)
+	messages, err := client.ListThread(context.Background(), "", "conversation-one", 21, MessageBodyText)
 	if err != nil {
 		t.Fatalf("ListThread() error = %v", err)
 	}
-	if requests != 2 {
-		t.Fatalf("request count = %d, want 2", requests)
+	if requests != 4 {
+		t.Fatalf("request count = %d, want 4", requests)
 	}
-	got := []string{messages[0].Body, messages[1].Body}
-	if !reflect.DeepEqual(got, []string{"", "Second"}) {
-		t.Fatalf("ListThread() bodies = %v, want [empty Second]", got)
+	if !reflect.DeepEqual(batchSizes, []int{20, 1}) {
+		t.Fatalf("batch sizes = %v, want [20 1]", batchSizes)
+	}
+	if len(messages) != 21 || messages[0].ID != "message-00" || messages[20].ID != "message-20" {
+		t.Fatalf("sorted message IDs start/end = %q/%q count=%d, want message-00/message-20 count=21", messages[0].ID, messages[len(messages)-1].ID, len(messages))
 	}
 }
 
-func TestListThreadRejectsMissingContinuationAcknowledgement(t *testing.T) {
-	requests := 0
+func TestListThreadRejectsBatchIdentitySetMismatch(t *testing.T) {
 	client := testGraphClient(t, func(req *http.Request) *http.Response {
-		requests++
-		var body string
-		if requests == 1 {
-			body = `{"value":[{"id":"one","body":{"contentType":"text","content":"First"}}],"@odata.nextLink":"https://graph.microsoft.com/v1.0/me/messages?$skiptoken=second"}`
-		} else {
-			body = `{"value":[{"id":"two","body":{"contentType":"text","content":"Second"}}]}`
+		if req.URL.Path != "/v1.0/$batch" {
+			return graphMessageIDsResponse(req, []string{"one", "two"}, "")
 		}
-		resp := graphJSONResponse(req, body)
-		if requests == 1 {
-			resp.Header.Set("Preference-Applied", `outlook.body-content-type="text"`)
-		}
-		return resp
+		batch := decodeBodyPreferenceBatch(t, req)
+		return graphThreadBatchResponse(t, req, batch, "conversation-one", true, func(id string) string {
+			if id == "two" {
+				return "one"
+			}
+			return id
+		})
 	})
 
 	messages, err := client.ListThread(context.Background(), "", "conversation-one", 2, MessageBodyText)
-	if err == nil || !strings.Contains(err.Error(), "Preference-Applied") {
-		t.Fatalf("ListThread() error = %v, want continuation acknowledgement failure", err)
+	if err == nil || !strings.Contains(err.Error(), "identity") {
+		t.Fatalf("ListThread() error = %v, want exact identity rejection", err)
 	}
 	if messages != nil {
-		t.Fatalf("ListThread() messages = %#v, want nil on representation contract failure", messages)
+		t.Fatalf("ListThread() messages = %#v, want nil on identity failure", messages)
 	}
+}
+
+func TestListThreadRejectsWrongConversationInHydratedMessage(t *testing.T) {
+	client := testGraphClient(t, func(req *http.Request) *http.Response {
+		if req.URL.Path != "/v1.0/$batch" {
+			return graphMessageIDsResponse(req, []string{"one"}, "")
+		}
+		return graphThreadBatchResponse(t, req, decodeBodyPreferenceBatch(t, req), "other-conversation", true, nil)
+	})
+
+	messages, err := client.ListThread(context.Background(), "", "conversation-one", 1, MessageBodyText)
+	if err == nil || !strings.Contains(err.Error(), "conversation") {
+		t.Fatalf("ListThread() error = %v, want conversation mismatch rejection", err)
+	}
+	if messages != nil {
+		t.Fatalf("ListThread() messages = %#v, want nil on conversation failure", messages)
+	}
+}
+
+func TestListThreadRejectsUnacknowledgedBatchBody(t *testing.T) {
+	client := testGraphClient(t, func(req *http.Request) *http.Response {
+		if req.URL.Path != "/v1.0/$batch" {
+			return graphMessageIDsResponse(req, []string{"one"}, "")
+		}
+		return graphThreadBatchResponse(t, req, decodeBodyPreferenceBatch(t, req), "conversation-one", false, nil)
+	})
+
+	messages, err := client.ListThread(context.Background(), "", "conversation-one", 1, MessageBodyText)
+	if err == nil || !strings.Contains(err.Error(), "Preference-Applied") {
+		t.Fatalf("ListThread() error = %v, want batch acknowledgement rejection", err)
+	}
+	if messages != nil {
+		t.Fatalf("ListThread() messages = %#v, want nil on acknowledgement failure", messages)
+	}
+}
+
+type bodyPreferenceBatchRequest struct {
+	ID      string            `json:"id"`
+	URL     string            `json:"url"`
+	Headers map[string]string `json:"headers"`
+}
+
+func decodeBodyPreferenceBatch(t *testing.T, req *http.Request) []bodyPreferenceBatchRequest {
+	t.Helper()
+	var payload struct {
+		Requests []bodyPreferenceBatchRequest `json:"requests"`
+	}
+	data, err := io.ReadAll(req.Body)
+	if err != nil {
+		t.Fatalf("reading batch request: %v", err)
+	}
+	if err := json.Unmarshal(data, &payload); err != nil {
+		t.Fatalf("decoding batch request: %v\n%s", err, data)
+	}
+	for _, item := range payload.Requests {
+		if got := headerValue(item.Headers, "Prefer"); got != `outlook.body-content-type="text"` {
+			t.Errorf("batch item %q Prefer = %q, want provider text preference", item.ID, got)
+		}
+	}
+	return payload.Requests
+}
+
+func graphMessageIDsResponse(req *http.Request, ids []string, nextLink string) *http.Response {
+	values := make([]map[string]string, 0, len(ids))
+	for _, id := range ids {
+		values = append(values, map[string]string{"id": id})
+	}
+	payload := map[string]any{"value": values}
+	if nextLink != "" {
+		payload["@odata.nextLink"] = nextLink
+	}
+	body, _ := json.Marshal(payload)
+	return graphJSONResponse(req, string(body))
+}
+
+func graphThreadBatchResponse(
+	t *testing.T,
+	req *http.Request,
+	batch []bodyPreferenceBatchRequest,
+	conversationID string,
+	acknowledge bool,
+	transformID func(string) string,
+) *http.Response {
+	t.Helper()
+	responses := make([]map[string]any, 0, len(batch))
+	for _, item := range batch {
+		messageID := item.URL
+		if marker := strings.LastIndex(messageID, "/messages/"); marker >= 0 {
+			messageID = messageID[marker+len("/messages/"):]
+		}
+		if query := strings.IndexByte(messageID, '?'); query >= 0 {
+			messageID = messageID[:query]
+		}
+		if transformID != nil {
+			messageID = transformID(messageID)
+		}
+		headers := map[string]string{"Content-Type": "application/json"}
+		if acknowledge {
+			headers["Preference-Applied"] = `outlook.body-content-type="text"`
+		}
+		received := "2026-01-01T00:00:00Z"
+		if suffix := strings.TrimPrefix(messageID, "message-"); suffix != messageID {
+			if index, err := strconv.Atoi(suffix); err == nil {
+				received = fmt.Sprintf("2026-01-%02dT00:00:00Z", index+1)
+			}
+		}
+		responses = append(responses, map[string]any{
+			"id":      item.ID,
+			"status":  http.StatusOK,
+			"headers": headers,
+			"body": map[string]any{
+				"id":               messageID,
+				"conversationId":   conversationID,
+				"receivedDateTime": received,
+				"body": map[string]string{
+					"contentType": "text",
+					"content":     "Provider text for " + messageID,
+				},
+			},
+		})
+	}
+	body, err := json.Marshal(map[string]any{"responses": responses})
+	if err != nil {
+		t.Fatalf("encoding batch response: %v", err)
+	}
+	return graphJSONResponse(req, string(body))
 }

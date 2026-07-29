@@ -102,21 +102,87 @@ func (c *Client) ListThread(ctx context.Context, target, conversationID string, 
 	if err := validateID(conversationID, "conversation ID"); err != nil {
 		return nil, err
 	}
+	if _, err := preference.headerValue(); err != nil {
+		return nil, err
+	}
 	// validateID's character set excludes quotes, so the id can't break out of
 	// the OData string literal — the filter is injection-safe. Graph rejects
 	// $orderby alongside a conversationId filter, so order client-side.
 	filter := fmt.Sprintf("conversationId eq '%s'", conversationID)
-	opts := &ListMessagesOptions{Filter: filter, Top: top}
-	if preference != MessageBodyDefault {
-		opts.Select = messageDetailSelect
-		opts.BodyPreference = preference
+	if preference == MessageBodyDefault {
+		// Preserve the historical single-list-request, metadata-only contract.
+		// Only an explicit typed body preference opts into exact batch hydration.
+		messages, err := c.ListMessages(ctx, target, &ListMessagesOptions{Filter: filter, Top: top})
+		if err != nil {
+			return nil, err
+		}
+		sortThreadMessages(messages)
+		return messages, nil
 	}
-	messages, err := c.ListMessages(ctx, target, opts)
+
+	metadata, err := c.ListMessages(ctx, target, &ListMessagesOptions{
+		Filter: filter,
+		Top:    top,
+		Select: []string{"id"},
+	})
 	if err != nil {
 		return nil, err
 	}
+	discoveredIDs := make([]string, 0, len(metadata))
+	for _, message := range metadata {
+		discoveredIDs = append(discoveredIDs, message.ID)
+	}
+
+	messages := make([]MailMessage, 0, len(discoveredIDs))
+	for start := 0; start < len(discoveredIDs); start += maxBatchMessages {
+		end := min(start+maxBatchMessages, len(discoveredIDs))
+		chunkIDs := discoveredIDs[start:end]
+		chunk, err := c.GetMessagesBatch(ctx, target, chunkIDs, preference)
+		if err != nil {
+			return nil, err
+		}
+		if err := verifyExactMessageIdentity(chunkIDs, chunk); err != nil {
+			return nil, fmt.Errorf("thread batch identity: %w", err)
+		}
+		messages = append(messages, chunk...)
+	}
+	if err := verifyExactMessageIdentity(discoveredIDs, messages); err != nil {
+		return nil, fmt.Errorf("thread identity: %w", err)
+	}
+	for _, message := range messages {
+		if message.ConversationID != conversationID {
+			return nil, fmt.Errorf("thread message %q conversation = %q, want %q", message.ID, message.ConversationID, conversationID)
+		}
+	}
+	sortThreadMessages(messages)
+	return messages, nil
+}
+
+func verifyExactMessageIdentity(expected []string, messages []MailMessage) error {
+	if len(messages) != len(expected) {
+		return fmt.Errorf("returned %d messages, want %d", len(messages), len(expected))
+	}
+	remaining := make(map[string]struct{}, len(expected))
+	for _, id := range expected {
+		if _, duplicate := remaining[id]; duplicate {
+			return fmt.Errorf("expected message ID %q is duplicated", id)
+		}
+		remaining[id] = struct{}{}
+	}
+	for _, message := range messages {
+		if _, found := remaining[message.ID]; !found {
+			return fmt.Errorf("unexpected or duplicate message ID %q", message.ID)
+		}
+		delete(remaining, message.ID)
+	}
+	if len(remaining) != 0 {
+		return fmt.Errorf("missing %d expected message IDs", len(remaining))
+	}
+	return nil
+}
+
+func sortThreadMessages(messages []MailMessage) {
 	sort.SliceStable(messages, func(i, j int) bool {
 		return messages[i].ReceivedAt < messages[j].ReceivedAt // RFC3339 Z strings sort chronologically
 	})
-	return messages, nil
 }

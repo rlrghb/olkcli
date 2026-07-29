@@ -78,13 +78,12 @@ type MailFolder struct {
 
 // ListMessagesOptions for filtering messages
 type ListMessagesOptions struct {
-	FolderID       string
-	Top            int32
-	Filter         string
-	OrderBy        string
-	Search         string
-	Select         []string
-	BodyPreference MessageBodyPreference
+	FolderID string
+	Top      int32
+	Filter   string
+	OrderBy  string
+	Search   string
+	Select   []string
 }
 
 // ListMessages returns messages from the target mailbox, or the signed-in user's
@@ -96,9 +95,6 @@ func (c *Client) ListMessages(ctx context.Context, target string, opts *ListMess
 		opts = &ListMessagesOptions{}
 	}
 	top := clampTop(opts.Top)
-	if _, err := opts.BodyPreference.headerValue(); err != nil {
-		return nil, err
-	}
 
 	hasInferenceClassification := strings.Contains(opts.Filter, "inferenceClassification")
 	if opts.OrderBy != "" && hasInferenceClassification {
@@ -160,19 +156,10 @@ func (c *Client) ListMessages(ctx context.Context, target string, opts *ListMess
 		messages, err := collectMessagePages(ctx, top,
 			func(ctx context.Context, pageTop int32) (messagePage, error) {
 				folderQueryParams.Top = &pageTop
-				headers, options, contract, err := newMessageBodyResponseContract(opts.BodyPreference)
-				if err != nil {
-					return messagePage{}, err
-				}
 				resp, err := c.targetUser(target).MailFolders().ByMailFolderId(opts.FolderID).Messages().Get(ctx, &users.ItemMailFoldersItemMessagesRequestBuilderGetRequestConfiguration{
-					Headers:         headers,
-					Options:         options,
 					QueryParameters: folderQueryParams,
 				})
 				if err != nil {
-					return messagePage{}, err
-				}
-				if err := contract.verify(); err != nil {
 					return messagePage{}, err
 				}
 				if resp == nil {
@@ -187,18 +174,8 @@ func (c *Client) ListMessages(ctx context.Context, target string, opts *ListMess
 				}); err != nil {
 					return messagePage{}, err
 				}
-				headers, options, contract, err := newMessageBodyResponseContract(opts.BodyPreference)
+				resp, err := users.NewItemMailFoldersItemMessagesRequestBuilder(nextLink, c.inner.GetAdapter()).Get(ctx, nil)
 				if err != nil {
-					return messagePage{}, err
-				}
-				resp, err := users.NewItemMailFoldersItemMessagesRequestBuilder(nextLink, c.inner.GetAdapter()).Get(ctx, &users.ItemMailFoldersItemMessagesRequestBuilderGetRequestConfiguration{
-					Headers: headers,
-					Options: options,
-				})
-				if err != nil {
-					return messagePage{}, err
-				}
-				if err := contract.verify(); err != nil {
 					return messagePage{}, err
 				}
 				if resp == nil {
@@ -212,12 +189,7 @@ func (c *Client) ListMessages(ctx context.Context, target string, opts *ListMess
 		}
 		result := make([]MailMessage, 0, len(messages))
 		for _, msg := range messages {
-			converted := convertMessage(msg)
-			fillBody(&converted, msg)
-			if err := verifyMessageBody(converted, opts.BodyPreference); err != nil {
-				return nil, err
-			}
-			result = append(result, converted)
+			result = append(result, convertMessage(msg))
 		}
 		return result, nil
 	}
@@ -225,19 +197,10 @@ func (c *Client) ListMessages(ctx context.Context, target string, opts *ListMess
 	messages, err := collectMessagePages(ctx, top,
 		func(ctx context.Context, pageTop int32) (messagePage, error) {
 			queryParams.Top = &pageTop
-			headers, options, contract, err := newMessageBodyResponseContract(opts.BodyPreference)
-			if err != nil {
-				return messagePage{}, err
-			}
 			resp, err := c.targetUser(target).Messages().Get(ctx, &users.ItemMessagesRequestBuilderGetRequestConfiguration{
-				Headers:         headers,
-				Options:         options,
 				QueryParameters: queryParams,
 			})
 			if err != nil {
-				return messagePage{}, err
-			}
-			if err := contract.verify(); err != nil {
 				return messagePage{}, err
 			}
 			if resp == nil {
@@ -252,18 +215,8 @@ func (c *Client) ListMessages(ctx context.Context, target string, opts *ListMess
 			}); err != nil {
 				return messagePage{}, err
 			}
-			headers, options, contract, err := newMessageBodyResponseContract(opts.BodyPreference)
+			resp, err := users.NewItemMessagesRequestBuilder(nextLink, c.inner.GetAdapter()).Get(ctx, nil)
 			if err != nil {
-				return messagePage{}, err
-			}
-			resp, err := users.NewItemMessagesRequestBuilder(nextLink, c.inner.GetAdapter()).Get(ctx, &users.ItemMessagesRequestBuilderGetRequestConfiguration{
-				Headers: headers,
-				Options: options,
-			})
-			if err != nil {
-				return messagePage{}, err
-			}
-			if err := contract.verify(); err != nil {
 				return messagePage{}, err
 			}
 			if resp == nil {
@@ -277,12 +230,7 @@ func (c *Client) ListMessages(ctx context.Context, target string, opts *ListMess
 	}
 	result := make([]MailMessage, 0, len(messages))
 	for _, msg := range messages {
-		converted := convertMessage(msg)
-		fillBody(&converted, msg)
-		if err := verifyMessageBody(converted, opts.BodyPreference); err != nil {
-			return nil, err
-		}
-		result = append(result, converted)
+		result = append(result, convertMessage(msg))
 	}
 	return result, nil
 }

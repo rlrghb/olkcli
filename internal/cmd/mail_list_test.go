@@ -335,21 +335,39 @@ func TestMailBatchBodyFormatTextRequestsVerifiedProviderRepresentation(t *testin
 
 func TestMailThreadBodyFormatTextRequestsVerifiedProviderRepresentation(t *testing.T) {
 	output, calls, err := runMailCommand(t, []string{"mail", "thread"}, []string{"--json", "--body-format", "text", "conversation-id"}, func(req *http.Request) *http.Response {
-		if got := req.Header.Get("Prefer"); got != `outlook.body-content-type="text"` {
-			t.Errorf("Prefer = %q, want provider text preference", got)
+		if req.URL.Path != "/v1.0/$batch" {
+			if got := req.Header.Get("Prefer"); got != "" {
+				t.Errorf("metadata Prefer = %q, want none", got)
+			}
+			return graphJSONResponse(req, `{"value":[{"id":"message-id"}]}`)
 		}
-		if got := req.URL.Query().Get("$select"); !strings.Contains(got, "body") {
-			t.Errorf("$select = %q, want explicit body", got)
+		var batch struct {
+			Requests []struct {
+				ID      string            `json:"id"`
+				Headers map[string]string `json:"headers"`
+			} `json:"requests"`
 		}
-		resp := graphJSONResponse(req, `{"value":[{"id":"message-id","body":{"contentType":"text","content":"Provider text"}}]}`)
-		resp.Header.Set("Preference-Applied", `outlook.body-content-type="text"`)
-		return resp
+		if err := decodeGraphJSON(req.Body, &batch); err != nil {
+			t.Fatalf("decode batch request: %v", err)
+		}
+		if len(batch.Requests) != 1 {
+			t.Fatalf("batch request count = %d, want 1", len(batch.Requests))
+		}
+		if got := caseInsensitiveHeader(batch.Requests[0].Headers, "Prefer"); got != `outlook.body-content-type="text"` {
+			t.Errorf("batch Prefer = %q, want provider text preference", got)
+		}
+		return graphJSONResponse(req, `{"responses":[{
+			"id":"`+batch.Requests[0].ID+`",
+			"status":200,
+			"headers":{"Content-Type":"application/json","Preference-Applied":"outlook.body-content-type=\"text\""},
+			"body":{"id":"message-id","conversationId":"conversation-id","body":{"contentType":"text","content":"Provider text"}}
+		}]}`)
 	})
 	if err != nil {
 		t.Fatalf("run mail thread: %v", err)
 	}
-	if calls != 1 {
-		t.Fatalf("Graph handler calls = %d, want 1", calls)
+	if calls != 2 {
+		t.Fatalf("Graph handler calls = %d, want 2", calls)
 	}
 	if got := firstJSONMessage(t, output)["body"]; got != "Provider text" {
 		t.Fatalf("JSON body = %v, want provider text", got)
