@@ -4,9 +4,47 @@ import (
 	"context"
 	"net/http"
 	"path"
+	"reflect"
 	"strings"
 	"testing"
 )
+
+func TestGetMessagePreservesAllRecipientClasses(t *testing.T) {
+	client := testGraphClient(t, func(req *http.Request) *http.Response {
+		return graphJSONResponse(req, `{
+			"id":"message-id",
+			"conversationId":"conversation-id",
+			"toRecipients":[{"emailAddress":{"address":"to@example.com"}}],
+			"ccRecipients":[{"emailAddress":{"address":"cc@example.com"}}],
+			"bccRecipients":[{"emailAddress":{"address":"bcc@example.com"}}],
+			"replyTo":[{"emailAddress":{"address":"reply@example.com"}}]
+		}`)
+	})
+
+	message, err := client.GetMessage(
+		context.Background(),
+		"",
+		"message-id",
+		MessageBodyDefault,
+	)
+	if err != nil {
+		t.Fatalf("GetMessage() error = %v", err)
+	}
+	for label, got := range map[string][]string{
+		"to":      message.To,
+		"cc":      message.Cc,
+		"bcc":     message.Bcc,
+		"replyTo": message.ReplyTo,
+	} {
+		want := []string{strings.ToLower(label) + "@example.com"}
+		if label == "replyTo" {
+			want = []string{"reply@example.com"}
+		}
+		if !reflect.DeepEqual(got, want) {
+			t.Errorf("%s = %v, want %v", label, got, want)
+		}
+	}
+}
 
 func TestGetWellKnownMailFolderUsesCanonicalDelegatedRoute(t *testing.T) {
 	requests := 0

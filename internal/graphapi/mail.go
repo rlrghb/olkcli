@@ -54,6 +54,9 @@ type MailMessage struct {
 	Subject        string   `json:"subject" untrusted:"true"`
 	From           string   `json:"from" untrusted:"true"`
 	To             []string `json:"to" untrusted:"true"`
+	Cc             []string `json:"cc" untrusted:"true"`
+	Bcc            []string `json:"bcc" untrusted:"true"`
+	ReplyTo        []string `json:"replyTo" untrusted:"true"`
 	ReceivedAt     string   `json:"receivedDateTime"`
 	IsRead         bool     `json:"isRead"`
 	HasAttachments bool     `json:"hasAttachments"`
@@ -158,7 +161,11 @@ func (c *Client) ListMessages(ctx context.Context, target string, opts *ListMess
 		}
 		queryParams.Select = append([]string(nil), opts.Select...)
 	} else {
-		queryParams.Select = []string{"id", "subject", "from", "toRecipients", "receivedDateTime", "isRead", "hasAttachments", "bodyPreview", "categories", "conversationId"}
+		queryParams.Select = []string{
+			"id", "subject", "from", "toRecipients", "ccRecipients",
+			"bccRecipients", "replyTo", "receivedDateTime", "isRead",
+			"hasAttachments", "bodyPreview", "categories", "conversationId",
+		}
 	}
 
 	if opts.FolderID != "" {
@@ -770,7 +777,12 @@ func (c *Client) CategorizeMessage(ctx context.Context, messageID string, catego
 }
 
 func convertMessage(msg models.Messageable) MailMessage {
-	m := MailMessage{}
+	m := MailMessage{
+		To:      []string{},
+		Cc:      []string{},
+		Bcc:     []string{},
+		ReplyTo: []string{},
+	}
 	if msg.GetId() != nil {
 		m.ID = *msg.GetId()
 	}
@@ -786,11 +798,10 @@ func convertMessage(msg models.Messageable) MailMessage {
 			m.From = *addr.GetAddress()
 		}
 	}
-	for _, r := range msg.GetToRecipients() {
-		if r.GetEmailAddress() != nil && r.GetEmailAddress().GetAddress() != nil {
-			m.To = append(m.To, *r.GetEmailAddress().GetAddress())
-		}
-	}
+	m.To = recipientAddresses(msg.GetToRecipients())
+	m.Cc = recipientAddresses(msg.GetCcRecipients())
+	m.Bcc = recipientAddresses(msg.GetBccRecipients())
+	m.ReplyTo = recipientAddresses(msg.GetReplyTo())
 	if msg.GetReceivedDateTime() != nil {
 		m.ReceivedAt = msg.GetReceivedDateTime().Format("2006-01-02T15:04:05Z")
 	}
@@ -810,6 +821,20 @@ func convertMessage(msg models.Messageable) MailMessage {
 		m.ConversationID = *msg.GetConversationId()
 	}
 	return m
+}
+
+func recipientAddresses(recipients []models.Recipientable) []string {
+	result := make([]string, 0, len(recipients))
+	for _, recipient := range recipients {
+		if recipient.GetEmailAddress() != nil &&
+			recipient.GetEmailAddress().GetAddress() != nil {
+			result = append(
+				result,
+				*recipient.GetEmailAddress().GetAddress(),
+			)
+		}
+	}
+	return result
 }
 
 func convertMailFolder(value models.MailFolderable) MailFolder {

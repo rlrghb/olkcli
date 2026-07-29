@@ -109,6 +109,9 @@ func TestMailListAdmittedSelectorsSerialize(t *testing.T) {
 		{"categories", "categories", []any{"green"}},
 		{"conversationId", "conversationId", "conversation-id"},
 		{"toRecipients", "to", []any{"recipient@example.com"}},
+		{"ccRecipients", "cc", []any{"cc@example.com"}},
+		{"bccRecipients", "bcc", []any{"bcc@example.com"}},
+		{"replyTo", "replyTo", []any{"reply@example.com"}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.selector, func(t *testing.T) {
@@ -130,7 +133,7 @@ func TestMailListAdmittedSelectorsSerialize(t *testing.T) {
 func TestMailListWithoutSelectKeepsDefaultJSON(t *testing.T) {
 	_, output := runMailList(t, "--json")
 	message := firstJSONMessage(t, output)
-	want := []string{"bodyPreview", "categories", "conversationId", "from", "hasAttachments", "id", "isRead", "receivedDateTime", "subject", "to"}
+	want := []string{"bcc", "bodyPreview", "categories", "cc", "conversationId", "from", "hasAttachments", "id", "isRead", "receivedDateTime", "replyTo", "subject", "to"}
 	if got := sortedJSONKeys(message); !reflect.DeepEqual(got, want) {
 		t.Errorf("default JSON keys = %v, want %v", got, want)
 	}
@@ -479,6 +482,9 @@ func graphMessageListResponse(req *http.Request) *http.Response {
 			"subject": "Hello",
 			"from": {"emailAddress": {"address": "sender@example.com"}},
 			"toRecipients": [{"emailAddress": {"address": "recipient@example.com"}}],
+			"ccRecipients": [{"emailAddress": {"address": "cc@example.com"}}],
+			"bccRecipients": [{"emailAddress": {"address": "bcc@example.com"}}],
+			"replyTo": [{"emailAddress": {"address": "reply@example.com"}}],
 			"receivedDateTime": "2026-07-28T10:30:00Z",
 			"isRead": false,
 			"hasAttachments": true,

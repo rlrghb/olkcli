@@ -29,6 +29,9 @@ var mailListSelectableFields = map[string]bool{
 	"subject":          true,
 	"from":             true,
 	"toRecipients":     true,
+	"ccRecipients":     true,
+	"bccRecipients":    true,
+	"replyTo":          true,
 	"receivedDateTime": true,
 	"isRead":           true,
 	"hasAttachments":   true,
@@ -42,12 +45,9 @@ var mailListSelectableFields = map[string]bool{
 // contract honest instead of fetching fields that would disappear in output.
 var unsupportedMailListSelectors = map[string]bool{
 	"body":                 true,
-	"ccRecipients":         true,
-	"bccRecipients":        true,
 	"importance":           true,
 	"parentFolderId":       true,
 	"sender":               true,
-	"replyTo":              true,
 	"flag":                 true,
 	"internetMessageId":    true,
 	"createdDateTime":      true,
@@ -62,6 +62,9 @@ type mailListJSONMessage struct {
 	Subject        *string   `json:"subject,omitempty" untrusted:"true"`
 	From           *string   `json:"from,omitempty" untrusted:"true"`
 	To             *[]string `json:"to,omitempty" untrusted:"true"`
+	Cc             *[]string `json:"cc,omitempty" untrusted:"true"`
+	Bcc            *[]string `json:"bcc,omitempty" untrusted:"true"`
+	ReplyTo        *[]string `json:"replyTo,omitempty" untrusted:"true"`
 	ReceivedAt     *string   `json:"receivedDateTime,omitempty"`
 	IsRead         *bool     `json:"isRead,omitempty"`
 	HasAttachments *bool     `json:"hasAttachments,omitempty"`
@@ -227,6 +230,12 @@ func projectMailMessage(message *graphapi.MailMessage, selected []string) mailLi
 			projected.From = &message.From
 		case "toRecipients":
 			projected.To = &message.To
+		case "ccRecipients":
+			projected.Cc = &message.Cc
+		case "bccRecipients":
+			projected.Bcc = &message.Bcc
+		case "replyTo":
+			projected.ReplyTo = &message.ReplyTo
 		case "receivedDateTime":
 			projected.ReceivedAt = &message.ReceivedAt
 		case "isRead":
