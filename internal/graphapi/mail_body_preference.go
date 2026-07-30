@@ -88,10 +88,19 @@ func verifyPreferenceApplied(values []string, preference MessageBodyPreference) 
 	if preference == MessageBodyDefault {
 		return nil
 	}
-	if len(values) != 1 || !strings.EqualFold(strings.TrimSpace(values[0]), expected) {
-		return fmt.Errorf("%s = %q, want exact %q", preferenceAppliedHeader, values, expected)
+	for _, value := range values {
+		for directive := range strings.SplitSeq(value, ",") {
+			if strings.EqualFold(strings.TrimSpace(directive), expected) {
+				return nil
+			}
+		}
 	}
-	return nil
+	return fmt.Errorf(
+		"%s = %q, want exact directive %q",
+		preferenceAppliedHeader,
+		values,
+		expected,
+	)
 }
 
 func batchResponseHeader(headers map[string]string, name string) []string {

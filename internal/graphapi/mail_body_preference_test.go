@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -37,6 +38,49 @@ func TestGetMessageRequestsAndVerifiesProviderText(t *testing.T) {
 	}
 	if msg.Body != "Provider returned text" || msg.BodyType != "text" {
 		t.Fatalf("GetMessage() body = %q type = %q, want verified provider text", msg.Body, msg.BodyType)
+	}
+}
+
+func TestGetMessageAcceptsProviderTextAlongsideImmutableIDPreference(t *testing.T) {
+	client := testGraphClient(t, func(req *http.Request) *http.Response {
+		got := req.Header.Values("Prefer")
+		slices.Sort(got)
+		if !slices.Equal(
+			got,
+			[]string{
+				`IdType="ImmutableId"`,
+				`outlook.body-content-type="text"`,
+			},
+		) {
+			t.Errorf("Prefer = %q, want provider text and immutable ID", got)
+		}
+		resp := graphJSONResponse(req, `{
+			"id":"immutable-message-one",
+			"body":{"contentType":"text","content":"Provider returned text"}
+		}`)
+		resp.Header.Set(
+			"Preference-Applied",
+			`outlook.body-content-type="text", IdType="ImmutableId"`,
+		)
+		return resp
+	})
+	client.SetImmutableIDs(true)
+
+	msg, err := client.GetMessage(
+		context.Background(),
+		"",
+		"immutable-message-one",
+		MessageBodyText,
+	)
+	if err != nil {
+		t.Fatalf("GetMessage() error = %v", err)
+	}
+	if msg.Body != "Provider returned text" || msg.BodyType != "text" {
+		t.Fatalf(
+			"GetMessage() body = %q type = %q, want verified provider text",
+			msg.Body,
+			msg.BodyType,
+		)
 	}
 }
 
