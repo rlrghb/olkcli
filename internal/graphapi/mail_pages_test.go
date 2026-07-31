@@ -549,8 +549,8 @@ func TestValidateGraphContinuationBindsExpectedGraphCloud(t *testing.T) {
 	} {
 		t.Run(tc.actualHost, func(t *testing.T) {
 			scope := continuationScope(tc.expectedHost, "/v1.0/me/mailFolders/AQMk/messages/delta")
-			url := "https://" + tc.actualHost + "/v1.0/me/mailFolders/AQMk/messages/delta?$skiptoken=next"
-			if err := validateGraphContinuation(url, scope); err != nil {
+			continuationURL := "https://" + tc.actualHost + "/v1.0/me/mailFolders/AQMk/messages/delta?$skiptoken=next"
+			if err := validateGraphContinuation(continuationURL, scope); err != nil {
 				t.Fatalf("validateGraphContinuation() error = %v", err)
 			}
 		})

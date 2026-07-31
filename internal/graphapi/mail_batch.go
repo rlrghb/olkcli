@@ -87,7 +87,7 @@ func (c *Client) GetMessagesBatch(ctx context.Context, target string, ids []stri
 		}
 		m := convertMessage(msg)
 		fillBody(&m, msg)
-		if err := verifyMessageBody(m, preference); err != nil {
+		if err := verifyMessageBody(&m, preference); err != nil {
 			return nil, fmt.Errorf("batch message %q: %w", stepID, err)
 		}
 		out = append(out, m)
@@ -183,70 +183,7 @@ func (c *Client) ListCompleteThread(
 		Filter: &filter,
 		Select: selectFields,
 	}
-	raw, err := collectAllMessagePages(
-		ctx,
-		completeThreadPageSize,
-		func(
-			ctx context.Context,
-			top int32,
-		) (messagePage, error) {
-			query.Top = &top
-			response, err := c.targetUser(target).Messages().Get(
-				ctx,
-				&users.ItemMessagesRequestBuilderGetRequestConfiguration{
-					Headers:         c.messageIDHeaders(nil),
-					QueryParameters: query,
-				},
-			)
-			if err != nil {
-				return messagePage{}, err
-			}
-			if response == nil {
-				return messagePage{}, errNilMessageResponse
-			}
-			return messagePage{
-				Values:   response.GetValue(),
-				NextLink: derefStr(response.GetOdataNextLink()),
-			}, nil
-		},
-		func(
-			ctx context.Context,
-			nextLink string,
-			_ int32,
-		) (messagePage, error) {
-			if err := validateGraphContinuation(
-				nextLink,
-				graphContinuationScope{
-					host: defaultGraphAPIHost,
-					collectionPath: graphUserCollectionPath(
-						target,
-						"messages",
-					),
-				},
-			); err != nil {
-				return messagePage{}, err
-			}
-			response, err := users.NewItemMessagesRequestBuilder(
-				nextLink,
-				c.inner.GetAdapter(),
-			).Get(
-				ctx,
-				&users.ItemMessagesRequestBuilderGetRequestConfiguration{
-					Headers: c.messageIDHeaders(nil),
-				},
-			)
-			if err != nil {
-				return messagePage{}, err
-			}
-			if response == nil {
-				return messagePage{}, errNilMessageResponse
-			}
-			return messagePage{
-				Values:   response.GetValue(),
-				NextLink: derefStr(response.GetOdataNextLink()),
-			}, nil
-		},
-	)
+	raw, err := c.collectUserMessagePages(ctx, target, completeThreadPageSize, true, query)
 	if err != nil {
 		return nil, fmt.Errorf("listing complete thread: %w", err)
 	}
@@ -274,8 +211,8 @@ func (c *Client) hydrateThread(
 	preference MessageBodyPreference,
 ) ([]MailMessage, error) {
 	discoveredIDs := make([]string, 0, len(metadata))
-	for _, message := range metadata {
-		discoveredIDs = append(discoveredIDs, message.ID)
+	for i := range metadata {
+		discoveredIDs = append(discoveredIDs, metadata[i].ID)
 	}
 
 	messages := make([]MailMessage, 0, len(discoveredIDs))
@@ -301,12 +238,12 @@ func completeThreadMessages(
 	conversationID string,
 	messages []MailMessage,
 ) ([]MailMessage, error) {
-	for _, message := range messages {
-		if message.ConversationID != conversationID {
+	for i := range messages {
+		if messages[i].ConversationID != conversationID {
 			return nil, fmt.Errorf(
 				"thread message %q conversation = %q, want %q",
-				message.ID,
-				message.ConversationID,
+				messages[i].ID,
+				messages[i].ConversationID,
 				conversationID,
 			)
 		}
@@ -326,11 +263,11 @@ func verifyExactMessageIdentity(expected []string, messages []MailMessage) error
 		}
 		remaining[id] = struct{}{}
 	}
-	for _, message := range messages {
-		if _, found := remaining[message.ID]; !found {
-			return fmt.Errorf("unexpected or duplicate message ID %q", message.ID)
+	for i := range messages {
+		if _, found := remaining[messages[i].ID]; !found {
+			return fmt.Errorf("unexpected or duplicate message ID %q", messages[i].ID)
 		}
-		delete(remaining, message.ID)
+		delete(remaining, messages[i].ID)
 	}
 	if len(remaining) != 0 {
 		return fmt.Errorf("missing %d expected message IDs", len(remaining))

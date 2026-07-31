@@ -43,7 +43,7 @@ func (p MessageBodyPreference) headerValue() (string, error) {
 	case MessageBodyDefault:
 		return "", nil
 	case MessageBodyText, MessageBodyHTML:
-		return fmt.Sprintf(`outlook.body-content-type="%s"`, p), nil
+		return fmt.Sprintf("outlook.body-content-type=%q", p), nil
 	default:
 		return "", fmt.Errorf("invalid message body preference %q", p)
 	}
@@ -112,7 +112,7 @@ func batchResponseHeader(headers map[string]string, name string) []string {
 	return nil
 }
 
-func verifyMessageBody(message MailMessage, preference MessageBodyPreference) error {
+func verifyMessageBody(message *MailMessage, preference MessageBodyPreference) error {
 	if preference == MessageBodyDefault {
 		return nil
 	}

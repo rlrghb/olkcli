@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/microsoftgraph/msgraph-sdk-go/models"
+	"github.com/microsoftgraph/msgraph-sdk-go/users"
 )
 
 // messagePage is one page of Graph messages and its opaque continuation URL.
@@ -106,6 +107,51 @@ func collectMessagePagesMode(
 			return nil, err
 		}
 	}
+}
+
+func (c *Client) collectUserMessagePages(
+	ctx context.Context,
+	target string,
+	pageSize int32,
+	complete bool,
+	query *users.ItemMessagesRequestBuilderGetQueryParameters,
+) ([]models.Messageable, error) {
+	first := func(ctx context.Context, top int32) (messagePage, error) {
+		query.Top = &top
+		response, err := c.targetUser(target).Messages().Get(ctx, &users.ItemMessagesRequestBuilderGetRequestConfiguration{
+			Headers:         c.messageIDHeaders(nil),
+			QueryParameters: query,
+		})
+		if err != nil {
+			return messagePage{}, err
+		}
+		if response == nil {
+			return messagePage{}, errNilMessageResponse
+		}
+		return messagePage{Values: response.GetValue(), NextLink: derefStr(response.GetOdataNextLink())}, nil
+	}
+	next := func(ctx context.Context, nextLink string, _ int32) (messagePage, error) {
+		if err := validateGraphContinuation(nextLink, graphContinuationScope{
+			host:           defaultGraphAPIHost,
+			collectionPath: graphUserCollectionPath(target, "messages"),
+		}); err != nil {
+			return messagePage{}, err
+		}
+		response, err := users.NewItemMessagesRequestBuilder(nextLink, c.inner.GetAdapter()).Get(ctx, &users.ItemMessagesRequestBuilderGetRequestConfiguration{
+			Headers: c.messageIDHeaders(nil),
+		})
+		if err != nil {
+			return messagePage{}, err
+		}
+		if response == nil {
+			return messagePage{}, errNilMessageResponse
+		}
+		return messagePage{Values: response.GetValue(), NextLink: derefStr(response.GetOdataNextLink())}, nil
+	}
+	if complete {
+		return collectAllMessagePages(ctx, pageSize, first, next)
+	}
+	return collectMessagePages(ctx, pageSize, first, next)
 }
 
 const defaultGraphAPIHost = "graph.microsoft.com"
@@ -230,7 +276,7 @@ func parseGraphCollectionRoute(path string) (graphCollectionRoute, bool) {
 	return graphCollectionRoute{}, false
 }
 
-func graphMailFolderRoute(segments []string) (string, int, bool) {
+func graphMailFolderRoute(segments []string) (folderID string, consumed int, ok bool) {
 	if len(segments) == 0 {
 		return "", 0, false
 	}
@@ -250,7 +296,7 @@ func graphMailFolderRoute(segments []string) (string, int, bool) {
 	if len(folder) <= len(alternateKeyPrefix) || !strings.EqualFold(folder[:len(alternateKeyPrefix)], alternateKeyPrefix) || !strings.HasSuffix(folder, "')") {
 		return "", 0, false
 	}
-	folderID, ok := graphODataString(folder[len(alternateKeyPrefix) : len(folder)-2])
+	folderID, ok = graphODataString(folder[len(alternateKeyPrefix) : len(folder)-2])
 	return folderID, 1, ok && folderID != ""
 }
 

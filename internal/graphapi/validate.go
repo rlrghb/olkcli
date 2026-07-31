@@ -155,7 +155,7 @@ func graphErrorMessage(err error) string {
 // ErrorMetadata returns a stable, message-free code and status for JSON CLI
 // consumers. Graph errors retain their provider code and HTTP status; local
 // command failures use a fixed non-HTTP status.
-func ErrorMetadata(err error) (string, int) {
+func ErrorMetadata(err error) (code string, status int) {
 	var odataErr *odataerrors.ODataError
 	if errors.As(err, &odataErr) {
 		code := "GraphError"

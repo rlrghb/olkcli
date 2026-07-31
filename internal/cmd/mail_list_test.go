@@ -270,9 +270,7 @@ func TestMailBatchJSONIgnoresGlobalSelect(t *testing.T) {
 }
 
 func TestMailThreadJSONIgnoresGlobalSelect(t *testing.T) {
-	output, calls, err := runMailCommand(t, []string{"mail", "thread"}, []string{"--json", "--select", "subject", "conversation-id"}, func(req *http.Request) *http.Response {
-		return graphMessageListResponse(req)
-	})
+	output, calls, err := runMailCommand(t, []string{"mail", "thread"}, []string{"--json", "--select", "subject", "conversation-id"}, graphMessageListResponse)
 	if err != nil {
 		t.Fatalf("run mail thread: %v", err)
 	}
@@ -419,7 +417,7 @@ func caseInsensitiveHeader(headers map[string]string, name string) string {
 	return ""
 }
 
-func runMailList(t *testing.T, args ...string) (url.Values, string) {
+func runMailList(t *testing.T, args ...string) (query url.Values, output string) {
 	t.Helper()
 	query, output, err := runMailListResult(t, args...)
 	if err != nil {
@@ -428,15 +426,13 @@ func runMailList(t *testing.T, args ...string) (url.Values, string) {
 	return query, output
 }
 
-func runMailListResult(t *testing.T, args ...string) (url.Values, string, error) {
-	query, output, _, err := runMailListResultWithCalls(t, args...)
+func runMailListResult(t *testing.T, args ...string) (query url.Values, output string, err error) {
+	query, output, _, err = runMailListResultWithCalls(t, args...)
 	return query, output, err
 }
 
-func runMailListResultWithCalls(t *testing.T, args ...string) (url.Values, string, int, error) {
+func runMailListResultWithCalls(t *testing.T, args ...string) (query url.Values, output string, calls int, err error) {
 	t.Helper()
-	var query url.Values
-	calls := 0
 	client := testMailListClient(t, func(req *http.Request) *http.Response {
 		calls++
 		query = req.URL.Query()
@@ -453,7 +449,7 @@ func runMailListResultWithCalls(t *testing.T, args ...string) (url.Values, strin
 		return nil, "", calls, err
 	}
 
-	output, _, err := captureStd(func() error {
+	output, _, err = captureStd(func() error {
 		return kctx.Run(&RunContext{
 			Ctx:    context.Background(),
 			Flags:  &cli.RootFlags,
@@ -463,9 +459,12 @@ func runMailListResultWithCalls(t *testing.T, args ...string) (url.Values, strin
 	return query, output, calls, err
 }
 
-func runMailCommand(t *testing.T, path, args []string, responder func(*http.Request) *http.Response) (string, int, error) {
+func runMailCommand(
+	t *testing.T,
+	path, args []string,
+	responder func(*http.Request) *http.Response,
+) (output string, calls int, err error) {
 	t.Helper()
-	calls := 0
 	client := testMailListClient(t, func(req *http.Request) *http.Response {
 		calls++
 		return responder(req)
@@ -479,7 +478,7 @@ func runMailCommand(t *testing.T, path, args []string, responder func(*http.Requ
 	if err != nil {
 		return "", calls, err
 	}
-	output, _, err := captureStd(func() error {
+	output, _, err = captureStd(func() error {
 		return kctx.Run(&RunContext{Ctx: context.Background(), Flags: &cli.RootFlags, client: client})
 	})
 	return output, calls, err

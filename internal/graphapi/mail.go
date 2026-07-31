@@ -236,40 +236,7 @@ func (c *Client) ListMessages(ctx context.Context, target string, opts *ListMess
 		return result, nil
 	}
 
-	messages, err := collectMessagePages(ctx, top,
-		func(ctx context.Context, pageTop int32) (messagePage, error) {
-			queryParams.Top = &pageTop
-			resp, err := c.targetUser(target).Messages().Get(ctx, &users.ItemMessagesRequestBuilderGetRequestConfiguration{
-				Headers:         c.messageIDHeaders(nil),
-				QueryParameters: queryParams,
-			})
-			if err != nil {
-				return messagePage{}, err
-			}
-			if resp == nil {
-				return messagePage{}, errNilMessageResponse
-			}
-			return messagePage{Values: resp.GetValue(), NextLink: derefStr(resp.GetOdataNextLink())}, nil
-		},
-		func(ctx context.Context, nextLink string, _ int32) (messagePage, error) {
-			if err := validateGraphContinuation(nextLink, graphContinuationScope{
-				host:           defaultGraphAPIHost,
-				collectionPath: graphUserCollectionPath(target, "messages"),
-			}); err != nil {
-				return messagePage{}, err
-			}
-			resp, err := users.NewItemMessagesRequestBuilder(nextLink, c.inner.GetAdapter()).Get(ctx, &users.ItemMessagesRequestBuilderGetRequestConfiguration{
-				Headers: c.messageIDHeaders(nil),
-			})
-			if err != nil {
-				return messagePage{}, err
-			}
-			if resp == nil {
-				return messagePage{}, errNilMessageResponse
-			}
-			return messagePage{Values: resp.GetValue(), NextLink: derefStr(resp.GetOdataNextLink())}, nil
-		},
-	)
+	messages, err := c.collectUserMessagePages(ctx, target, top, false, queryParams)
 	if err != nil {
 		return nil, fmt.Errorf("listing messages: %w", err)
 	}
@@ -305,7 +272,7 @@ func (c *Client) GetMessage(ctx context.Context, target, messageID string, prefe
 	}
 	m := convertMessage(msg)
 	fillBody(&m, msg)
-	if err := verifyMessageBody(m, preference); err != nil {
+	if err := verifyMessageBody(&m, preference); err != nil {
 		return nil, fmt.Errorf("getting message: %w", err)
 	}
 	return &m, nil
