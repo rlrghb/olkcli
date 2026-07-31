@@ -49,22 +49,29 @@ var allowedSelectFields = map[string]bool{
 
 // MailMessage is a simplified mail message for output
 type MailMessage struct {
-	ID             string   `json:"id"`
-	ParentFolderID string   `json:"parentFolderId,omitempty"`
-	Subject        string   `json:"subject" untrusted:"true"`
-	From           string   `json:"from" untrusted:"true"`
-	To             []string `json:"to" untrusted:"true"`
-	Cc             []string `json:"cc" untrusted:"true"`
-	Bcc            []string `json:"bcc" untrusted:"true"`
-	ReplyTo        []string `json:"replyTo" untrusted:"true"`
-	ReceivedAt     string   `json:"receivedDateTime"`
-	IsRead         bool     `json:"isRead"`
-	HasAttachments bool     `json:"hasAttachments"`
-	BodyPreview    string   `json:"bodyPreview,omitempty" untrusted:"true" concise:"omit"`
-	Body           string   `json:"body,omitempty" untrusted:"true" concise:"omit"`
-	BodyType       string   `json:"bodyType,omitempty"`
-	Categories     []string `json:"categories,omitempty"`
-	ConversationID string   `json:"conversationId,omitempty"`
+	ID             string            `json:"id"`
+	ParentFolderID string            `json:"parentFolderId,omitempty"`
+	ChangeKey      string            `json:"changeKey,omitempty"`
+	Subject        string            `json:"subject" untrusted:"true"`
+	From           string            `json:"from" untrusted:"true"`
+	To             []string          `json:"to" untrusted:"true"`
+	Cc             []string          `json:"cc" untrusted:"true"`
+	Bcc            []string          `json:"bcc" untrusted:"true"`
+	ReplyTo        []string          `json:"replyTo" untrusted:"true"`
+	ReceivedAt     string            `json:"receivedDateTime"`
+	IsRead         bool              `json:"isRead"`
+	HasAttachments bool              `json:"hasAttachments"`
+	BodyPreview    string            `json:"bodyPreview,omitempty" untrusted:"true" concise:"omit"`
+	Body           string            `json:"body,omitempty" untrusted:"true" concise:"omit"`
+	BodyType       string            `json:"bodyType,omitempty"`
+	Categories     []string          `json:"categories,omitempty"`
+	ConversationID string            `json:"conversationId,omitempty"`
+	Flag           *MailFollowupFlag `json:"flag,omitempty"`
+}
+
+// MailFollowupFlag is the stable output shape for a provider follow-up flag.
+type MailFollowupFlag struct {
+	Status string `json:"status"`
 }
 
 // messageDetailSelect is the $select field set for a full single message (used by
@@ -72,7 +79,7 @@ type MailMessage struct {
 var messageDetailSelect = []string{
 	"id", "subject", "from", "toRecipients", "ccRecipients", "bccRecipients",
 	"receivedDateTime", "isRead", "hasAttachments", "body", "bodyPreview", "conversationId",
-	"parentFolderId",
+	"parentFolderId", "changeKey", "flag",
 }
 
 // MailFolder is a simplified folder representation
@@ -801,6 +808,9 @@ func convertMessage(msg models.Messageable) MailMessage {
 	if msg.GetParentFolderId() != nil {
 		m.ParentFolderID = *msg.GetParentFolderId()
 	}
+	if msg.GetChangeKey() != nil {
+		m.ChangeKey = *msg.GetChangeKey()
+	}
 	if msg.GetSubject() != nil {
 		m.Subject = *msg.GetSubject()
 	}
@@ -831,6 +841,9 @@ func convertMessage(msg models.Messageable) MailMessage {
 	}
 	if msg.GetConversationId() != nil {
 		m.ConversationID = *msg.GetConversationId()
+	}
+	if flag := msg.GetFlag(); flag != nil && flag.GetFlagStatus() != nil {
+		m.Flag = &MailFollowupFlag{Status: flag.GetFlagStatus().String()}
 	}
 	return m
 }

@@ -19,6 +19,7 @@ var advertisedCapabilities = []string{
 	"mail.folders.well-known-v1",
 	"mail.get.parent-folder-v1",
 	"mail.ids.immutable-v1",
+	"mail.message-observations-v1",
 	"mail.move.structured-receipt-v1",
 	"mail.provider-body-format-v1",
 	"mail.thread.complete-v1",

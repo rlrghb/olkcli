@@ -138,16 +138,25 @@ func TestMailMoveJSONReturnsStructuredReceipt(t *testing.T) {
 	}
 }
 
-func TestMailGetJSONReturnsParentFolderID(t *testing.T) {
+func TestMailGetJSONReturnsMessageObservations(t *testing.T) {
 	output, calls, err := runMailCommand(
 		t,
 		[]string{"mail", "get"},
 		[]string{"--json", "message-id"},
 		func(req *http.Request) *http.Response {
-			if got := req.URL.Query().Get("$select"); !containsCSVField(got, "parentFolderId") {
-				t.Errorf("$select = %q, want parentFolderId", got)
+			selected := req.URL.Query().Get("$select")
+			for _, field := range []string{"parentFolderId", "changeKey", "flag", "isRead"} {
+				if !containsCSVField(selected, field) {
+					t.Errorf("$select = %q, want %s", selected, field)
+				}
 			}
-			return graphJSONResponse(req, `{"id":"message-id","parentFolderId":"folder-id"}`)
+			return graphJSONResponse(req, `{
+				"id":"message-id",
+				"parentFolderId":"folder-id",
+				"changeKey":"version-1",
+				"isRead":false,
+				"flag":{"flagStatus":"flagged"}
+			}`)
 		},
 	)
 	if err != nil {
@@ -164,7 +173,19 @@ func TestMailGetJSONReturnsParentFolderID(t *testing.T) {
 	if err := json.Unmarshal([]byte(output), &envelope); err != nil {
 		t.Fatalf("decode JSON output: %v\n%s", err, output)
 	}
-	if envelope.Count != 1 || envelope.Results["id"] != "message-id" || envelope.Results["parentFolderId"] != "folder-id" {
+	want := map[string]any{
+		"id":             "message-id",
+		"parentFolderId": "folder-id",
+		"changeKey":      "version-1",
+		"isRead":         false,
+		"flag":           map[string]any{"status": "flagged"},
+	}
+	for key, value := range want {
+		if !reflect.DeepEqual(envelope.Results[key], value) {
+			t.Errorf("message result[%q] = %#v, want %#v", key, envelope.Results[key], value)
+		}
+	}
+	if envelope.Count != 1 {
 		t.Fatalf("message result = count %d, result %#v", envelope.Count, envelope.Results)
 	}
 }
