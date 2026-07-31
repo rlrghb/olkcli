@@ -77,3 +77,17 @@ func TestWriteCommandErrorDoesNotExposeLocalFailureMessageInJSON(t *testing.T) {
 		t.Fatalf("stderr = %q, want empty", stderr.String())
 	}
 }
+
+func TestImmutableIDsFlagUsesDocumentedSpelling(t *testing.T) {
+	cli := &CLI{}
+	parser, err := newKongParser(cli)
+	if err != nil {
+		t.Fatalf("newKongParser: %v", err)
+	}
+	if _, err := parser.Parse([]string{"--immutable-ids", "mail", "list"}); err != nil {
+		t.Fatalf("parse --immutable-ids: %v", err)
+	}
+	if !cli.ImmutableIDs {
+		t.Fatal("--immutable-ids did not set RootFlags.ImmutableIDs")
+	}
+}

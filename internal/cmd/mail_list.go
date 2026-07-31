@@ -74,9 +74,13 @@ type mailListJSONMessage struct {
 }
 
 func (c *MailListCmd) Run(ctx *RunContext) error {
-	selected, err := parseMailSelect(ctx.Flags.Select)
-	if err != nil {
-		return err
+	var selected []string
+	var err error
+	if ctx.Flags.JSON {
+		selected, err = parseMailSelect(ctx.Flags.Select)
+		if err != nil {
+			return err
+		}
 	}
 
 	if c.Focused && c.Other {

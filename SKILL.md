@@ -117,10 +117,13 @@ guessed ordering.
 
 With `mail list --json`, `--select` projects both the Graph request and the JSON
 result. Supported fields are `id`, `subject`, `from`, `toRecipients` (rendered
-as `to`), `receivedDateTime`, `isRead`, `hasAttachments`, `bodyPreview`,
-`categories`, and `conversationId`. Empty, duplicate, unknown, or unrenderable
-fields fail locally before Graph is called. A completed JSON envelope has an
-empty `nextLink`; raw provider continuations are not exposed.
+as `to`), `ccRecipients` (rendered as `cc`), `bccRecipients` (rendered as
+`bcc`), `replyTo`, `receivedDateTime`, `isRead`, `hasAttachments`,
+`bodyPreview`, `categories`, and `conversationId`. Empty, duplicate, unknown,
+or unrenderable fields fail locally before Graph is called. Without `--select`,
+default JSON list output includes all recipient classes (`to`, `cc`, `bcc`, and
+`replyTo`) so callers can preserve complete message evidence. A completed JSON
+envelope has an empty `nextLink`; raw provider continuations are not exposed.
 
 Well-known folder names: `inbox`, `sentitems`, `drafts`, `deleteditems`, `junkemail`, `archive`.
 

@@ -195,9 +195,12 @@ olk mail list --json --select id,from,subject,receivedDateTime
 For `mail list --json`, `--select` is both a Microsoft Graph projection and a
 JSON output projection: each result contains only the requested fields.
 Supported fields are `id`, `subject`, `from`, `toRecipients` (rendered as
-`to`), `receivedDateTime`, `isRead`, `hasAttachments`, `bodyPreview`,
-`categories`, and `conversationId`. Empty, duplicate, unknown, or
-unrenderable fields are rejected before any Graph request.
+`to`), `ccRecipients` (rendered as `cc`), `bccRecipients` (rendered as
+`bcc`), `replyTo`, `receivedDateTime`, `isRead`, `hasAttachments`,
+`bodyPreview`, `categories`, and `conversationId`. Empty, duplicate, unknown,
+or unrenderable fields are rejected before any Graph request. Without
+`--select`, default JSON list output includes all recipient classes (`to`,
+`cc`, `bcc`, and `replyTo`) so callers can preserve complete message evidence.
 
 ### Bounded Mail Lists
 

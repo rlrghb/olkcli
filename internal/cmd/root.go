@@ -39,7 +39,7 @@ type RootFlags struct {
 	Concise      bool         `help:"Drop large free-text fields (message/event/task bodies, previews, attendee lists) from JSON output to reduce size" env:"OLK_CONCISE"`
 	Timeout      int          `help:"Request timeout in seconds" default:"60" env:"OLK_TIMEOUT"`
 	TimeZone     string       `help:"IANA time zone for display (e.g. America/New_York, Local, UTC)" name:"tz" env:"OLK_TIMEZONE"`
-	ImmutableIDs bool         `help:"Use Outlook IDs that remain stable across moves within one mailbox" env:"OLK_IMMUTABLE_IDS"`
+	ImmutableIDs bool         `help:"Use Outlook IDs that remain stable across moves within one mailbox" name:"immutable-ids" env:"OLK_IMMUTABLE_IDS"`
 
 	// Capability guards (enforced for CLI, MCP, scripts, and --mailbox alike).
 	// Named --no-write rather than --read-only because `auth login --read-only`

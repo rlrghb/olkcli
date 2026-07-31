@@ -93,6 +93,16 @@ func TestMailListSelectDrivesGraphProjectionAndJSONKeys(t *testing.T) {
 	}
 }
 
+func TestMailListPlainSelectUsesOutputProjectionOnly(t *testing.T) {
+	query, output := runMailList(t, "--plain", "--select", "subject,id")
+	if got := query.Get("$select"); got != "id,subject,from,toRecipients,ccRecipients,bccRecipients,replyTo,receivedDateTime,isRead,hasAttachments,bodyPreview,categories,conversationId" {
+		t.Errorf("$select = %q, want default mail-list projection", got)
+	}
+	if got, want := output, "Hello\tmessage-id\n"; got != want {
+		t.Errorf("plain selected output = %q, want %q", got, want)
+	}
+}
+
 func TestMailListAdmittedSelectorsSerialize(t *testing.T) {
 	cases := []struct {
 		selector string
