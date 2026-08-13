@@ -523,7 +523,7 @@ olk calendar events [-d 7] [--after DATE] [--before DATE] [--calendar ID] [-n 25
 olk calendar view [-d 7] [--after DATE] [--before DATE] [--calendar ID] [-n 50]
 olk calendar delta [-d 30] [--after DATE] [--before DATE] [--token TOKEN] [-n N]  Incremental sync of events
 olk calendar get <ID>
-olk calendar create --subject X --start Y --end Z [--location L] [--attendees A] [--all-day] [--online-meeting] [-r daily|weekdays|weekly|monthly|yearly]
+olk calendar create --subject X --start Y --end Z [--calendar ID] [--location L] [--attendees A] [--all-day] [--online-meeting] [-r daily|weekdays|weekly|monthly|yearly]
 olk calendar update <ID> [--subject X] [--start Y] [--end Z] [--location L]
 olk calendar delete <ID> [--force]
 olk calendar respond <ID> accept|decline|tentative

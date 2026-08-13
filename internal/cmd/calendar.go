@@ -152,6 +152,7 @@ type CalendarCreateCmd struct {
 	Subject       string   `help:"Event subject" required:"" short:"s"`
 	Start         string   `help:"Start time (ISO 8601)" required:""`
 	End           string   `help:"End time (ISO 8601)" required:""`
+	Calendar      string   `help:"Calendar ID (default calendar when omitted)"`
 	Location      string   `help:"Event location" short:"l"`
 	Attendees     []string `help:"Attendee email addresses" short:"a"`
 	AllDay        bool     `help:"All-day event"`
@@ -180,14 +181,20 @@ func (c *CalendarCreateCmd) Run(ctx *RunContext) error {
 
 	if ctx.Flags.DryRun {
 		fmt.Printf("Would create event:\n  Subject: %s\n  Start: %s\n  End: %s\n", outfmt.Sanitize(c.Subject), c.Start, c.End)
+		if c.Calendar != "" {
+			fmt.Printf("  Calendar: %s\n", outfmt.Sanitize(c.Calendar))
+		}
 		return nil
 	}
 
-	event, err := client.CreateEvent(ctx.Ctx, c.Subject, start, end, c.Location, c.Attendees, c.AllDay, c.OnlineMeeting, c.Recurrence)
+	event, err := client.CreateEvent(ctx.Ctx, c.Calendar, c.Subject, start, end, c.Location, c.Attendees, c.AllDay, c.OnlineMeeting, c.Recurrence)
 	if err != nil {
 		return err
 	}
 
+	if ctx.Flags.JSON {
+		return ctx.Printer().PrintJSON(event, 1, "")
+	}
 	fmt.Printf("Event created: %s (ID: %s)\n", outfmt.Sanitize(event.Subject), event.ID)
 	return nil
 }
