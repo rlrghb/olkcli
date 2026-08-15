@@ -31,6 +31,7 @@ type CalendarEvent struct {
 	Recurrence  string   `json:"recurrence,omitempty"`
 	BodyPreview string   `json:"bodyPreview,omitempty" untrusted:"true" concise:"omit"`
 	Body        string   `json:"body,omitempty" untrusted:"true" concise:"omit"`
+	BodyType    string   `json:"bodyType,omitempty"`
 }
 
 // CalendarInfo is a simplified calendar representation
@@ -45,17 +46,25 @@ type CalendarInfo struct {
 // mailbox, or the signed-in user's calendar when target is empty. Targeting
 // another mailbox requires the calling token to carry Calendars.Read.Shared
 // and the calling user to have Exchange Full Access delegation on the target.
-func (c *Client) ListEvents(ctx context.Context, target string, startTime, endTime time.Time, calendarID string, top int32) ([]CalendarEvent, error) {
+func (c *Client) ListEvents(ctx context.Context, target string, startTime, endTime time.Time, calendarID string, top int32, preference BodyPreference) ([]CalendarEvent, error) {
 	top = clampTop(top)
+	headers, options, contract, err := newBodyResponseContract(preference)
+	if err != nil {
+		return nil, err
+	}
 
 	startStr := startTime.UTC().Format("2006-01-02T15:04:05")
 	endStr := endTime.UTC().Format("2006-01-02T15:04:05")
 
+	selected := []string{"id", "subject", "start", "end", "location", "organizer", "attendees", "isAllDay", "isOnlineMeeting", "onlineMeetingUrl", "showAs", "bodyPreview", "recurrence"}
+	if preference != BodyDefault {
+		selected = append(selected, "body")
+	}
 	queryParams := &users.ItemCalendarViewRequestBuilderGetQueryParameters{
 		StartDateTime: &startStr,
 		EndDateTime:   &endStr,
 		Top:           &top,
-		Select:        []string{"id", "subject", "start", "end", "location", "organizer", "attendees", "isAllDay", "isOnlineMeeting", "onlineMeetingUrl", "showAs", "bodyPreview", "recurrence"},
+		Select:        selected,
 		Orderby:       []string{"start/dateTime"},
 	}
 
@@ -64,6 +73,8 @@ func (c *Client) ListEvents(ctx context.Context, target string, startTime, endTi
 			return nil, err
 		}
 		calConfig := &users.ItemCalendarsItemCalendarViewRequestBuilderGetRequestConfiguration{
+			Headers: headers,
+			Options: options,
 			QueryParameters: &users.ItemCalendarsItemCalendarViewRequestBuilderGetQueryParameters{
 				StartDateTime: &startStr,
 				EndDateTime:   &endStr,
@@ -76,6 +87,9 @@ func (c *Client) ListEvents(ctx context.Context, target string, startTime, endTi
 		if err != nil {
 			return nil, fmt.Errorf("listing events: %w", err)
 		}
+		if err := contract.verify(); err != nil {
+			return nil, fmt.Errorf("listing events: %w", err)
+		}
 		events := make([]CalendarEvent, 0, len(resp.GetValue()))
 		for _, e := range resp.GetValue() {
 			events = append(events, convertEvent(e))
@@ -84,11 +98,16 @@ func (c *Client) ListEvents(ctx context.Context, target string, startTime, endTi
 	}
 
 	config := &users.ItemCalendarViewRequestBuilderGetRequestConfiguration{
+		Headers:         headers,
+		Options:         options,
 		QueryParameters: queryParams,
 	}
 
 	resp, err := c.targetUser(target).CalendarView().Get(ctx, config)
 	if err != nil {
+		return nil, fmt.Errorf("listing events: %w", err)
+	}
+	if err := contract.verify(); err != nil {
 		return nil, fmt.Errorf("listing events: %w", err)
 	}
 
@@ -101,18 +120,25 @@ func (c *Client) ListEvents(ctx context.Context, target string, startTime, endTi
 
 // GetEvent returns a single event from the target mailbox, or the signed-in
 // user's calendar when target is empty. See ListEvents for scope requirements.
-func (c *Client) GetEvent(ctx context.Context, target, eventID string) (*CalendarEvent, error) {
+func (c *Client) GetEvent(ctx context.Context, target, eventID string, preference BodyPreference) (*CalendarEvent, error) {
 	if err := validateID(eventID, "event ID"); err != nil {
 		return nil, err
 	}
-	event, err := c.targetUser(target).Events().ByEventId(eventID).Get(ctx, nil)
+	headers, options, contract, err := newBodyResponseContract(preference)
+	if err != nil {
+		return nil, err
+	}
+	event, err := c.targetUser(target).Events().ByEventId(eventID).Get(ctx, &users.ItemEventsEventItemRequestBuilderGetRequestConfiguration{
+		Headers: headers,
+		Options: options,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("getting event: %w", err)
 	}
-	e := convertEvent(event)
-	if event.GetBody() != nil && event.GetBody().GetContent() != nil {
-		e.Body = *event.GetBody().GetContent()
+	if err := contract.verify(); err != nil {
+		return nil, fmt.Errorf("getting event: %w", err)
 	}
+	e := convertEvent(event)
 	return &e, nil
 }
 
@@ -343,6 +369,14 @@ func convertEvent(e models.Eventable) CalendarEvent {
 	if e.GetBodyPreview() != nil {
 		ev.BodyPreview = *e.GetBodyPreview()
 	}
+	if e.GetBody() != nil {
+		if e.GetBody().GetContent() != nil {
+			ev.Body = *e.GetBody().GetContent()
+		}
+		if e.GetBody().GetContentType() != nil {
+			ev.BodyType = e.GetBody().GetContentType().String()
+		}
+	}
 	if e.GetRecurrence() != nil {
 		ev.Recurrence = formatRecurrence(e.GetRecurrence())
 	}
@@ -500,8 +534,8 @@ func formatDaysOfWeek(days []models.DayOfWeek) string {
 // ListCalendarView returns expanded occurrences (including recurring) in a date range.
 // ListCalendarView is an alias for ListEvents (which already calls the
 // calendarView endpoint and expands recurrences). Kept for caller clarity.
-func (c *Client) ListCalendarView(ctx context.Context, target string, startTime, endTime time.Time, calendarID string, top int32) ([]CalendarEvent, error) {
-	return c.ListEvents(ctx, target, startTime, endTime, calendarID, top)
+func (c *Client) ListCalendarView(ctx context.Context, target string, startTime, endTime time.Time, calendarID string, top int32, preference BodyPreference) ([]CalendarEvent, error) {
+	return c.ListEvents(ctx, target, startTime, endTime, calendarID, top, preference)
 }
 
 // MeetingTimeSuggestion represents a suggested meeting time

@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rlrghb/olkcli/internal/graphapi"
 	"github.com/rlrghb/olkcli/internal/outfmt"
 )
 
@@ -23,11 +24,12 @@ type CalendarCmd struct {
 }
 
 type CalendarEventsCmd struct {
-	Days     int    `help:"Number of days to look ahead" default:"7" short:"d"`
-	After    string `help:"Start date (ISO 8601)"`
-	Before   string `help:"End date (ISO 8601)"`
-	Calendar string `help:"Calendar ID"`
-	Top      int32  `help:"Max events to return" default:"25" short:"n"`
+	Days       int     `help:"Number of days to look ahead" default:"7" short:"d"`
+	After      string  `help:"Start date (ISO 8601)"`
+	Before     string  `help:"End date (ISO 8601)"`
+	Calendar   string  `help:"Calendar ID"`
+	Top        int32   `help:"Max events to return" default:"25" short:"n"`
+	BodyFormat *string `help:"Request provider-returned event body representation" enum:"text,html"`
 }
 
 func (c *CalendarEventsCmd) Run(ctx *RunContext) error {
@@ -72,7 +74,15 @@ func (c *CalendarEventsCmd) Run(ctx *RunContext) error {
 		return err
 	}
 
-	events, err := client.ListEvents(ctx.Ctx, target, start, end, c.Calendar, c.Top)
+	bodyFormat := ""
+	if c.BodyFormat != nil {
+		bodyFormat = *c.BodyFormat
+	}
+	preference, err := graphapi.ParseBodyPreference(bodyFormat)
+	if err != nil {
+		return err
+	}
+	events, err := client.ListEvents(ctx.Ctx, target, start, end, c.Calendar, c.Top, preference)
 	if err != nil {
 		return err
 	}
@@ -98,7 +108,8 @@ func (c *CalendarEventsCmd) Run(ctx *RunContext) error {
 }
 
 type CalendarGetCmd struct {
-	ID string `arg:"" help:"Event ID"`
+	ID         string  `arg:"" help:"Event ID"`
+	BodyFormat *string `help:"Request provider-returned event body representation" enum:"text,html"`
 }
 
 func (c *CalendarGetCmd) Run(ctx *RunContext) error {
@@ -112,7 +123,15 @@ func (c *CalendarGetCmd) Run(ctx *RunContext) error {
 		return err
 	}
 
-	event, err := client.GetEvent(ctx.Ctx, target, c.ID)
+	bodyFormat := ""
+	if c.BodyFormat != nil {
+		bodyFormat = *c.BodyFormat
+	}
+	preference, err := graphapi.ParseBodyPreference(bodyFormat)
+	if err != nil {
+		return err
+	}
+	event, err := client.GetEvent(ctx.Ctx, target, c.ID, preference)
 	if err != nil {
 		return err
 	}

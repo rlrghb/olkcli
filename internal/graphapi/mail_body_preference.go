@@ -13,53 +13,64 @@ const (
 	preferenceAppliedHeader = "Preference-Applied"
 )
 
-// MessageBodyPreference is a typed request for the representation Graph must
-// return for a message body. The zero value preserves Graph's default.
-type MessageBodyPreference string
+// BodyPreference is a typed request for the body representation Graph must
+// return. The zero value preserves Graph's default.
+type BodyPreference string
 
 const (
-	MessageBodyDefault MessageBodyPreference = ""
-	MessageBodyText    MessageBodyPreference = "text"
-	MessageBodyHTML    MessageBodyPreference = "html"
+	BodyDefault BodyPreference = ""
+	BodyText    BodyPreference = "text"
+	BodyHTML    BodyPreference = "html"
+
+	MessageBodyDefault = BodyDefault
+	MessageBodyText    = BodyText
+	MessageBodyHTML    = BodyHTML
 )
 
-// ParseMessageBodyPreference converts a CLI-facing value into the closed set
-// accepted by the Graph request layer.
-func ParseMessageBodyPreference(value string) (MessageBodyPreference, error) {
+// MessageBodyPreference remains as an alias for existing mail callers.
+type MessageBodyPreference = BodyPreference
+
+// ParseBodyPreference converts a CLI-facing value into the closed set accepted
+// by the Graph request layer.
+func ParseBodyPreference(value string) (BodyPreference, error) {
 	switch strings.ToLower(strings.TrimSpace(value)) {
 	case "":
-		return MessageBodyDefault, nil
-	case string(MessageBodyText):
-		return MessageBodyText, nil
-	case string(MessageBodyHTML):
-		return MessageBodyHTML, nil
+		return BodyDefault, nil
+	case string(BodyText):
+		return BodyText, nil
+	case string(BodyHTML):
+		return BodyHTML, nil
 	default:
-		return MessageBodyDefault, fmt.Errorf("invalid body format %q: must be text or html", value)
+		return BodyDefault, fmt.Errorf("invalid body format %q: must be text or html", value)
 	}
 }
 
-func (p MessageBodyPreference) headerValue() (string, error) {
+func ParseMessageBodyPreference(value string) (MessageBodyPreference, error) {
+	return ParseBodyPreference(value)
+}
+
+func (p BodyPreference) headerValue() (string, error) {
 	switch p {
-	case MessageBodyDefault:
+	case BodyDefault:
 		return "", nil
-	case MessageBodyText, MessageBodyHTML:
+	case BodyText, BodyHTML:
 		return fmt.Sprintf("outlook.body-content-type=%q", p), nil
 	default:
 		return "", fmt.Errorf("invalid message body preference %q", p)
 	}
 }
 
-type messageBodyResponseContract struct {
-	preference MessageBodyPreference
+type bodyResponseContract struct {
+	preference BodyPreference
 	inspection *khttp.HeadersInspectionOptions
 }
 
-func newMessageBodyResponseContract(preference MessageBodyPreference) (*abs.RequestHeaders, []abs.RequestOption, *messageBodyResponseContract, error) {
+func newBodyResponseContract(preference BodyPreference) (*abs.RequestHeaders, []abs.RequestOption, *bodyResponseContract, error) {
 	value, err := preference.headerValue()
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	if preference == MessageBodyDefault {
+	if preference == BodyDefault {
 		return nil, nil, nil, nil
 	}
 
@@ -67,20 +78,24 @@ func newMessageBodyResponseContract(preference MessageBodyPreference) (*abs.Requ
 	headers.Add(preferHeader, value)
 	inspection := khttp.NewHeadersInspectionOptions()
 	inspection.InspectResponseHeaders = true
-	return headers, []abs.RequestOption{inspection}, &messageBodyResponseContract{
+	return headers, []abs.RequestOption{inspection}, &bodyResponseContract{
 		preference: preference,
 		inspection: inspection,
 	}, nil
 }
 
-func (c *messageBodyResponseContract) verify() error {
+func newMessageBodyResponseContract(preference MessageBodyPreference) (*abs.RequestHeaders, []abs.RequestOption, *bodyResponseContract, error) {
+	return newBodyResponseContract(preference)
+}
+
+func (c *bodyResponseContract) verify() error {
 	if c == nil {
 		return nil
 	}
 	return verifyPreferenceApplied(c.inspection.GetResponseHeaders().Get(preferenceAppliedHeader), c.preference)
 }
 
-func verifyPreferenceApplied(values []string, preference MessageBodyPreference) error {
+func verifyPreferenceApplied(values []string, preference BodyPreference) error {
 	expected, err := preference.headerValue()
 	if err != nil {
 		return err

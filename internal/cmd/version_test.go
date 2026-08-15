@@ -24,6 +24,7 @@ func TestVersionJSONAdvertisesStructuredMailCapabilities(t *testing.T) {
 		t.Fatalf("decoding version JSON: %v\n%s", err, stdout)
 	}
 	if want := []string{
+		"calendar.provider-body-format-v1",
 		"cli.json-error-v1",
 		"mail.folders.well-known-v1",
 		"mail.get.parent-folder-v1",
