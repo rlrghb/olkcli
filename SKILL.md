@@ -188,6 +188,7 @@ Focused/other filters use provider order and cannot be combined with
 olk calendar events [-d DAYS] [--after DATE] [--before DATE] [--calendar ID] [-n 25]   # default: next 7 days
 olk calendar get <ID>
 olk calendar create --subject "Standup" --start 2025-06-15T09:00 --end 2025-06-15T09:30
+olk calendar create --calendar ID --subject "Appointment" --start 2025-06-15T09:00 --end 2025-06-15T09:30
 olk calendar create --subject "Sync" --start 2025-06-15T10:00 --end 2025-06-15T10:30 --attendees a@b.com --attendees c@d.com
 olk calendar create --subject "Offsite" --start 2025-06-15 --end 2025-06-16 --all-day
 olk calendar create --subject "Call" --start 2025-06-15T14:00 --end 2025-06-15T14:30 --online-meeting   # Teams link

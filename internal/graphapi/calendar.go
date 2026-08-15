@@ -116,12 +116,17 @@ func (c *Client) GetEvent(ctx context.Context, target, eventID string) (*Calenda
 	return &e, nil
 }
 
-func (c *Client) CreateEvent(ctx context.Context, subject string, start, end time.Time, location string, attendees []string, isAllDay, isOnlineMeeting bool, recurrence string) (*CalendarEvent, error) {
+func (c *Client) CreateEvent(ctx context.Context, calendarID, subject string, start, end time.Time, location string, attendees []string, isAllDay, isOnlineMeeting bool, recurrence string) (*CalendarEvent, error) {
 	if err := c.ensureWritable(); err != nil {
 		return nil, err
 	}
 	if len(attendees) > 0 {
 		if err := c.ensureMaySend(); err != nil {
+			return nil, err
+		}
+	}
+	if calendarID != "" {
+		if err := validateID(calendarID, "calendar ID"); err != nil {
 			return nil, err
 		}
 	}
@@ -176,7 +181,13 @@ func (c *Client) CreateEvent(ctx context.Context, subject string, start, end tim
 		event.SetRecurrence(rec)
 	}
 
-	created, err := c.inner.Me().Events().Post(ctx, event, nil)
+	var created models.Eventable
+	var err error
+	if calendarID == "" {
+		created, err = c.inner.Me().Events().Post(ctx, event, nil)
+	} else {
+		created, err = c.inner.Me().Calendars().ByCalendarId(calendarID).Events().Post(ctx, event, nil)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("creating event: %w", err)
 	}
