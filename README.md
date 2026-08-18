@@ -1,779 +1,109 @@
 # olk — Microsoft Outlook in Your Terminal
 
-A fast, scriptable **CLI and MCP server** for Microsoft Outlook and OneDrive via the Microsoft Graph API. Manage email, calendar, contacts, tasks, and OneDrive files from the command line — or expose them to AI agents as curated, read-first tools over the [Model Context Protocol](#mcp-server-ai-agents).
+`olk` is a scriptable CLI and MCP server for Outlook mail, calendars, contacts,
+tasks, and OneDrive through Microsoft Graph. It works with personal Outlook.com
+accounts and enterprise Microsoft 365 accounts.
 
-Works with both **personal Microsoft accounts** and **enterprise (Azure AD / Entra ID)** accounts. Zero-config setup with device-code authentication — just run `olk auth login` and go. For enterprise accounts, use `olk auth login --enterprise` to enable additional features like out-of-office, inbox rules, and directory search.
-
-## Key Capabilities
-
-### Mail
-- **List & read** inbox messages with filtering by sender, date, read status
-- **Send** emails with To/CC/BCC, HTML bodies, stdin piping, attachments, importance
-- **Search** using KQL (Keyword Query Language) syntax
-- **Reply, reply-all, forward** messages
-- **Move** messages between folders
-- **Delete** and **mark read/unread**
-- **Manage folders**: list, create, rename, delete mail folders
-- **View and download attachments**
-- **Drafts**: create, list, send, delete draft messages
-- **Flags & categories**: flag for follow-up, set importance, assign categories, manage category definitions
-- **Out-of-office**: get, set, and disable auto-reply / vacation responder *(enterprise only)*
-- **Inbox rules**: list, create, and delete server-side mail rules *(enterprise only)*
-- **Focused Inbox**: filter by `--focused` or `--other` classification
-- **Read receipts**: request read receipts with `--read-receipt`
-- **Sync & threads**: incremental delta sync (`mail delta`), batch-fetch up to 20 messages by id in one request (`mail batch`), and full conversation threads (`mail thread`)
-
-### Calendar
-- **List events** with configurable date ranges (default: 7 days ahead)
-- **Calendar view** with expanded recurring event occurrences
-- **Recurring events** displayed with human-readable recurrence patterns
-- **Create events** with location, attendees, all-day, online meeting, and recurrence support
-- **Provider event controls** with retry-safe transaction IDs, reminder disabling, location clearing, and all-day/timed updates
-- **Calendar synchronization metadata** including stable IDs, revisions, lifecycle/series state, attendee responses, and structured recurrence
-- **Update and delete** events
-- **Respond** to invitations (accept, decline, tentative)
-- **List calendars** across your account
-- **Check availability** / free-busy lookup for one or more users
-- **Find meeting times** — suggest available slots for multiple attendees *(enterprise only)*
-- **Incremental sync** of event changes (`calendar delta`)
-
-### Contacts
-- **List, search, create, update, delete** contacts with sorting and pagination
-- Fields: name, multiple emails, phone, company, job title, department, manager, birthday, notes, addresses, categories, and more
-- **Incremental sync** of contact changes (`contacts delta`)
-
-### Tasks (Microsoft To Do)
-- **Manage task lists**: list, create, delete task lists
-- **Create, update, complete, delete** tasks with due dates, importance, notes, start dates, reminders, recurrence, and categories
-- **Checklists**: list, create, toggle, update, and delete checklist items within tasks
-- **Attachments**: list, upload, download, and delete task file attachments
-- **Linked resources**: list, create, and delete linked resources on tasks
-
-### OneDrive
-- **Browse** files and folders with `drive ls [path]`
-- **Search** files by name or content
-- **Download** and **upload** files (simple and resumable for large files)
-- **Create folders**, **copy**, **move**, and **delete** items
-- **Share** files with view or edit links
-- **Version history** for files
-- **Drive info** including quota usage
-
-### People / Directory
-- **Search** people by name — returns name, email, job title, department, company. Personal accounts search known contacts; enterprise accounts also search the organization directory
-
-### Sync
-- **`olk changes`** — one call returns a unified delta digest across mail, calendar, and contacts, each with its own resume token
-- Per-resource delta commands (`mail delta`, `calendar delta`, `contacts delta`) return only what changed since an opaque cursor token; deletions are reported as `removed` items
-
-### User Profile
-- **`olk whoami`** — display current user info (name, email, job title, department)
-
-## Installation
-
-### From Source
-
-```bash
-git clone https://github.com/rlrghb/olkcli.git
-cd olkcli
-make build
-# Binary is at ./bin/olk
-```
-
-### Go Install
-
-```bash
-go install github.com/rlrghb/olkcli/cmd/olk@latest
-```
-
-### Homebrew
+## Install
 
 ```bash
 brew install rlrghb/tap/olk
+# or
+go install github.com/rlrghb/olkcli/cmd/olk@latest
 ```
 
-### npm
+The npm package is `olkcli`; the installed command is `olk`:
 
 ```bash
-# Install globally (provides the `olk` command)
 npm install -g olkcli
-
-# …or run on demand without installing
-npx olkcli mail list
 ```
 
-> The npm package is named **`olkcli`**; the installed binary is **`olk`**.
+See [macOS notes](docs/authentication.md#macos-keychain) if macOS asks for
+Keychain access after an upgrade.
 
-### macOS notes
-
-Two macOS-specific things to know:
-
-- **Gatekeeper quarantine** — as of **v0.9.1** the Homebrew cask clears this on install automatically. On older versions (or a direct download from the [releases page](https://github.com/rlrghb/olkcli/releases)), if olk won't launch ("olk can't be opened because Apple cannot verify it", or a silent `killed: 9`), run:
-  ```bash
-  xattr -d com.apple.quarantine $(brew --prefix)/bin/olk
-  ```
-- **Keychain prompt after upgrades** — your tokens are stored in the macOS Keychain. The first time you run olk after an upgrade, macOS prompts for Keychain access. Click **"Always Allow"** (not "Allow") so it won't ask again until the next upgrade.
-
-## Quick Start
+## Quick start
 
 ```bash
-# Authenticate (opens browser for device-code flow)
 olk auth login
-
-# List recent inbox messages
 olk mail list
-
-# Read a specific message
 olk mail get <message-id>
-
-# Send an email
-olk mail send --to user@example.com --subject "Hello" --body "Hi there"
-
-# Pipe body from stdin
-echo "Hello from the CLI" | olk mail send --to user@example.com --subject "Piped"
-
-# Search mail
-olk mail search "from:boss@company.com subject:urgent"
-
-# View this week's calendar
 olk calendar events
-
-# Today's events
-olk today
-
-# Create a meeting
-olk calendar create --subject "Standup" --start 2024-01-15T09:00 --end 2024-01-15T09:30 --attendees colleague@company.com
-
-# List contacts
+olk calendar create --subject "Standup" \
+  --start 2026-08-18T09:00 --end 2026-08-18T09:30
 olk contacts list
 ```
 
-## Output Formats
-
-| Flag | Format | Use Case |
-|------|--------|----------|
-| *(default)* | Aligned table | Human reading |
-| `--json` | JSON envelope | Scripting with `jq` |
-| `--plain` | Tab-separated | Piping to `awk`, `cut` |
-
-Results go to **stdout**; errors, prompts, and diagnostics go to **stderr** — so `olk … --json | jq` (or an agent reading stdout) stays clean even when a prompt or warning fires.
-
-In JSON mode, a failed command exits non-zero and writes a message-free error
-envelope to stdout:
-
-```json
-{"error":{"code":"ErrorItemNotFound","status":404}}
-```
-
-Provider failures retain the Microsoft Graph error code and HTTP status. Local
-command failures use `CommandFailed` and status `0`. Human-readable mode keeps
-its sanitized error text on stderr.
-
-### JSON Envelope
+For work/school accounts and enterprise-only features:
 
 ```bash
-olk mail list --json
-```
-
-```json
-{
-  "results": [...],
-  "count": 25,
-  "nextLink": ""
-}
-```
-
-Use `--results-only` to get just the array:
-
-```bash
-olk mail list --json --results-only | jq '.[0].subject'
-```
-
-### Field Selection
-
-```bash
-olk mail list --json --select id,from,subject,receivedDateTime
-```
-
-For `mail list --json`, `--select` is both a Microsoft Graph projection and a
-JSON output projection: each result contains only the requested fields.
-Supported fields are `id`, `subject`, `from`, `toRecipients` (rendered as
-`to`), `ccRecipients` (rendered as `cc`), `bccRecipients` (rendered as
-`bcc`), `replyTo`, `receivedDateTime`, `isRead`, `hasAttachments`,
-`bodyPreview`, `categories`, and `conversationId`. Empty, duplicate, unknown,
-or unrenderable fields are rejected before any Graph request. Without
-`--select`, default JSON list output includes all recipient classes (`to`,
-`cc`, `bcc`, and `replyTo`) so callers can preserve complete message evidence.
-
-### Bounded Mail Lists
-
-```bash
-# Return at most 1,000 inbox messages, oldest first
-olk mail list --folder inbox --top 1000 --order oldest --json --results-only
-```
-
-`--order` accepts `newest` (the default) or `oldest`. `--top` is the total
-result bound for the command, not a per-page size: `olk` follows provider pages
-internally until it reaches that bound or Microsoft Graph returns a terminal
-page. A terminal page before the bound is a successful short result containing
-every available matching message.
-
-`--order` cannot be combined with `--focused` or `--other`. Those
-classification filters use Microsoft Graph's provider order; `olk` does not
-fall back to client-side sorting, expose a raw Graph response, or return a
-partial or guessed ordering.
-
-Provider continuation URLs remain opaque and internal. A completed `mail list`
-JSON envelope therefore has an empty `nextLink`; raw continuations are never
-exposed for callers to replay. Traversal fails closed: an invalid, unexpected,
-non-progressing, or repeated continuation, a duplicate or missing message ID,
-cancellation, or a request failure returns an error and no partial list.
-
-## Authentication
-
-### Default (Zero Config)
-
-```bash
-# Personal accounts (Outlook.com, Hotmail, Live.com)
-olk auth login
-
-# Enterprise accounts (work/school) — enables OOO, inbox rules, directory search
 olk auth login --enterprise
 ```
 
-Uses an embedded public client ID with device-code flow. The `--enterprise` flag requests additional scopes (`User.ReadBasic.All`, `MailboxSettings.ReadWrite`) needed for enterprise-only features. Personal accounts should not use `--enterprise` as these scopes are not supported.
+## Common commands
 
-> **Note:** If you upgrade to a version that adds new features (e.g. OneDrive support), you may need to re-run `olk auth login` to grant the new permissions. If you see "access denied" errors, re-login to refresh your token scopes.
+| Need | Command |
+| --- | --- |
+| Search mail | `olk mail search "from:person@example.com subject:urgent"` |
+| Send mail | `olk mail send --to person@example.com --subject Hi --body Hello` |
+| Read calendar view | `olk calendar view --days 7` |
+| Request text/HTML event bodies | `olk calendar events --body-format text` |
+| Create retry-safe event | `olk calendar create ... --transaction-id ID` |
+| Disable an event reminder | `olk calendar create ... --no-reminder` |
+| Clear an event location | `olk calendar update <ID> --location none` |
+| Convert event representation | `olk calendar update <ID> --all-day` or `--timed` |
+| Synchronize changes | `olk changes --json` |
+| Use JSON for scripts | `olk mail list --json --results-only` |
+| Use as an MCP server | `olk mcp` |
 
-### Browser Sign-In (Auth-Code + PKCE)
+See the [command reference](docs/commands.md) for all commands and flags.
 
-```bash
-olk auth login --browser [--client-id YOUR_CLIENT_ID --tenant-id YOUR_TENANT_ID]
-```
+## Output and scripting
 
-`--browser` signs in through your system browser using the OAuth2 authorization-code flow with PKCE and a loopback redirect, instead of device code. Use it when your tenant's Conditional Access policies require a compliant/managed device or block device code flow: the browser session can carry device identity (via Platform SSO or Windows SSO on managed devices), so sign-in satisfies device-based policies that device code flow cannot.
-
-This flow requires the app registration to have a loopback redirect URI (see [Custom App Registration](#custom-app-registration) step 4). If the browser shows error **AADSTS50011** ("redirect URI mismatch") and the CLI times out, the app registration is missing the redirect URI — use `--client-id` with your own registration.
-
-### Custom App Registration
-
-If your organization blocks the default client ID, or your admin requires apps to be registered under your tenant, you'll need to create your own app registration:
-
-1. Go to [Azure Portal > App registrations](https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade) and click **New registration**
-2. Set **Supported account types** to match your needs — use **"Personal Microsoft accounts only"** for outlook.com/hotmail.com, **"Accounts in any organizational directory and personal Microsoft accounts"** for both, or single-tenant for org-only
-3. Under **Authentication > Advanced settings**, set **Allow public client flows** to **Yes** (required for device-code flow)
-4. For browser sign-in (`--browser`), register the loopback redirect URI: under **Authentication > Add a platform > Mobile and desktop applications**, add `http://localhost/callback`. Entra ignores the port when matching `http://localhost` redirect URIs, so no port is needed — `olk` picks a free port at login time. Device-code flow needs only step 3.
-5. Under **API permissions**, add **Microsoft Graph** delegated permissions: `Mail.ReadWrite`, `Mail.Send`, `Calendars.ReadWrite`, `Contacts.ReadWrite`, `Tasks.ReadWrite`, `Files.ReadWrite`, `People.Read`, `User.Read`, `User.ReadBasic.All`, `MailboxSettings.ReadWrite`, `offline_access` (use `Files.Read` instead of `Files.ReadWrite` for read-only access)
-6. Copy the **Application (client) ID** from the app's Overview page
-
-Tenant admins who prefer to script the whole thing — registration, permission GUIDs, admin consent, user/group assignment — can use [`contrib/create-entra-app.sh`](contrib/create-entra-app.sh); [docs/enterprise-setup.md](docs/enterprise-setup.md) walks through what it does and the roles each step needs.
-
-Then use it:
+Results are written to stdout; diagnostics and prompts go to stderr.
 
 ```bash
-# Personal Microsoft account (outlook.com, hotmail.com, live.com) — omit --tenant-id
-olk auth login --client-id YOUR_CLIENT_ID
-
-# Work or school account — include your Directory (tenant) ID from the app's Overview page
-olk auth login --client-id YOUR_CLIENT_ID --tenant-id YOUR_TENANT_ID
+olk mail list --json --results-only | jq '.[].subject'
+olk contacts list --plain
 ```
 
-Or via environment variables:
+Output modes are JSON (`--json`), TSV (`--plain`), and aligned tables by
+default. Use `--concise` to omit large bodies/previews and `--select` to limit
+fields where supported. See [scripting and sync](docs/scripting.md).
+
+## Safety defaults
+
+- Use `--no-write --no-send --no-input` for unattended read-only runs.
+- MCP exposes curated tools and requires explicit opt-in for mutations.
+- External mail, calendar, contact, and file text can be wrapped with
+  `--wrap-untrusted` for agent-safe consumption.
+- Refresh tokens are stored in the OS keychain; access tokens are kept in
+  memory only.
+
+Read the [security and privacy guide](docs/security.md) before connecting an
+agent or sharing logs.
+
+## Documentation
+
+- [Command reference](docs/commands.md)
+- [Authentication and accounts](docs/authentication.md)
+- [Scripting and synchronization](docs/scripting.md)
+- [MCP and AI agents](docs/mcp.md)
+- [Security and privacy](docs/security.md)
+- [Enterprise app setup](docs/enterprise-setup.md)
+- [Development and releases](docs/development.md)
+- [Agent instructions](SKILL.md)
+
+## Contributing
 
 ```bash
-export OLK_CLIENT_ID=your-client-id
-export OLK_TENANT_ID=your-tenant-id  # omit for personal accounts
-olk auth login
+make build
+make test
+make lint
 ```
 
-> **Note:** Personal Microsoft accounts (outlook.com, hotmail.com, live.com) do not have a meaningful tenant ID — they share Microsoft's common consumer tenant. Passing `--tenant-id` with a personal account will cause a 401 error. Omitting it lets `olk` use the `common` endpoint, which works for both personal and work/school accounts.
-
-### Additional Scopes
-
-Use `--scope` (repeatable) at login time to request additional OAuth scopes beyond the defaults — typically for tokens that need to read or act on a *different* user's mailbox under Microsoft 365 mailbox delegation (the executive-assistant pattern):
-
-```bash
-olk auth login --enterprise \
-  --scope Mail.Read.Shared \
-  --scope Calendars.Read.Shared \
-  --scope Contacts.Read.Shared
-```
-
-The flag merges with the default scope set (case-insensitive dedup) so you don't need to re-list the defaults. Make sure the corresponding API permissions are added to your app registration.
-
-### Delegated Mailbox Access
-
-Once your token carries `Mail.Read.Shared`, use the global `--mailbox` flag to target a mailbox you have **Full Access** to (granted in M365 Admin Center → Mailbox permissions):
-
-```bash
-# Mail
-olk mail list --mailbox boss@example.com
-olk mail get MESSAGE_ID --mailbox boss@example.com
-olk mail search "from:partner@example.com" --mailbox boss@example.com
-olk mail folders --mailbox boss@example.com
-
-# Calendar (requires Calendars.Read.Shared)
-olk calendar events --mailbox boss@example.com
-olk calendar view --mailbox boss@example.com --after 2026-06-01 --before 2026-06-08
-olk calendar get EVENT_ID --mailbox boss@example.com
-olk calendar calendars --mailbox boss@example.com
-
-# Contacts (requires Contacts.Read.Shared)
-olk contacts list --mailbox boss@example.com
-olk contacts get CONTACT_ID --mailbox boss@example.com
-olk contacts search "alice" --mailbox boss@example.com
-
-# Or set it once for the shell session
-export OLK_MAILBOX=boss@example.com
-olk mail list
-olk calendar events
-```
-
-This is the canonical executive-assistant / AI-agent pattern: the signed-in identity is your own (or a service account), Exchange ACLs control which mailboxes you can reach, and the OAuth scope controls what you can do inside them.
-
-> **Scope limits:** read-only delegated access — mail (list / get / search / folders), calendar (events / view / get / calendars), and contacts (list / get / search). Sending mail, creating/updating/deleting anything, and drive / todo across delegation are not yet supported.
-
-### Multi-Account
-
-```bash
-# Login to a second account
-olk auth login
-
-# List accounts
-olk auth list
-
-# Use a specific account
-olk mail list --account user2@example.com
-
-# Check auth status
-olk auth status
-```
-
-### Token Storage
-
-Refresh tokens are stored in the OS credential manager:
-- **macOS**: Keychain
-- **Linux**: Secret Service (GNOME Keyring / KDE Wallet)
-- **Windows**: Windows Credential Manager
-
-When no native credential manager is available (e.g. headless Linux without Secret Service), `olk` falls back to an encrypted file store and prompts for a password on **stderr**.
-
-#### Headless / Non-interactive Use
-
-For headless environments, CI/CD pipelines, or LLM-driven automation, set the `OLK_KEYRING_PASSWORD` environment variable to supply the file-backend password without an interactive prompt:
-
-```bash
-export OLK_KEYRING_PASSWORD="your-keyring-password"
-olk mail list --json | jq '.subject'
-```
-
-## Shortcuts
-
-For common workflows, `olk` provides top-level shortcuts:
-
-| Shortcut | Expands To |
-|----------|-----------|
-| `olk send` | `olk mail send` |
-| `olk ls` | `olk mail list` |
-| `olk inbox` | `olk mail list` |
-| `olk search <q>` | `olk mail search <q>` |
-| `olk today` | `olk calendar events --days 1` |
-| `olk week` | `olk calendar events --days 7` |
-
-## Global Flags
-
-| Flag | Env Var | Description |
-|------|---------|-------------|
-| `--json` | `OLK_JSON` | JSON output |
-| `--plain` | `OLK_PLAIN` | TSV output |
-| `--account EMAIL` | `OLK_ACCOUNT` | Account to use |
-| `--mailbox EMAIL` | `OLK_MAILBOX` | Target another user's mailbox via delegated access (requires `Mail.Read.Shared` at login) |
-| `-v, --verbose` | `OLK_VERBOSE` | Verbose output |
-| `--dry-run` | `OLK_DRY_RUN` | Dry run mode |
-| `--force` | `OLK_FORCE` | Skip confirmations |
-| `--color auto\|never\|always` | `OLK_COLOR` | Color mode |
-| `--select FIELDS` | `OLK_SELECT` | Command-specific field projection; `mail list --json` projects both the Graph request and JSON result |
-| `--concise` | `OLK_CONCISE` | Drop large free-text (bodies, previews, attendee lists) from JSON output |
-| `--results-only` | `OLK_RESULTS_ONLY` | Unwrap JSON envelope |
-| `--tz TIMEZONE` | `OLK_TIMEZONE` | IANA time zone for display (e.g. `America/New_York`) |
-| `--no-write` | `OLK_NO_WRITE` | Refuse any mutating operation (hard guarantee, all surfaces) |
-| `--no-send` | `OLK_NO_SEND` | Refuse sending mail or meeting invites |
-| `--no-input` | `OLK_NO_INPUT` | Fail instead of prompting (headless/agent safety) |
-| `--wrap-untrusted` | `OLK_WRAP_UNTRUSTED` | Wrap external free-text in untrusted-content markers (JSON/plain) |
-| `--immutable-ids` | `OLK_IMMUTABLE_IDS` | Return Outlook item IDs that remain stable across moves within the same mailbox |
-| `--enable-commands CSV` | `OLK_ENABLE_COMMANDS` | Allow only these command prefixes (e.g. `mail,calendar`) |
-| `--enable-commands-exact CSV` | `OLK_ENABLE_COMMANDS_EXACT` | Allow only these exact command paths (e.g. `mail.list,mail.get`) |
-| `--disable-commands CSV` | `OLK_DISABLE_COMMANDS` | Block these command paths (overrides allows) |
-| | `OLK_KEYRING_PASSWORD` | File-backend keyring password (for headless use) |
-
-These capability guards apply to **every** entry path — the bare CLI, scripts/CI, and the MCP server — so `OLK_NO_WRITE=1 olk --mailbox boss@example.com mail list` is a hard "read this mailbox, never write" guarantee.
-
-## MCP Server (AI agents)
-
-`olk mcp` runs a [Model Context Protocol](https://modelcontextprotocol.io) server over **stdio**, exposing a **curated, read-first** set of tools to MCP clients (Claude Desktop, IDEs, agents). It reuses your existing olk login — no separate auth.
-
-```jsonc
-// Claude Desktop / MCP client config
-{
-  "mcpServers": {
-    "olk": { "command": "olk", "args": ["mcp"] }
-  }
-}
-```
-
-It's also published to the [MCP Registry](https://registry.modelcontextprotocol.io) as **`io.github.rlrghb/outlook`**. To run it without a local install, point the client at npm (`olkcli`) via `npx`:
-
-```jsonc
-{
-  "mcpServers": {
-    "olk": { "command": "npx", "args": ["-y", "olkcli", "mcp"] }
-  }
-}
-```
-
-Either way, run `olk auth login` once first so the server has a token to reuse.
-
-The curated surface is **61 tools across 4 tiers** — 38 read · 12 safe-write · 7 send · 4 destructive — but only the 38 reads are exposed by default; each mutation tier is a separate, explicit opt-in (see below).
-
-- **Read-only by default.** Starting the server with no flags exposes a curated set of 38 read tools and nothing else; every mutation is opt-in, per tier (safe writes, then send, then destructive — see below):
-  - **Mail:** `mail_list`, `mail_get`, `mail_batch`, `mail_thread`, `mail_search`, `mail_folders_list`, `mail_attachments`, `mail_categories_list`, `mail_rules_list`, `mail_ooo_get`, `mail_delta`
-  - **Calendar:** `calendar_events`, `calendar_view`, `calendar_get`, `calendar_calendars`, `calendar_availability`, `calendar_find_times`, `calendar_delta`
-  - **Contacts:** `contacts_list`, `contacts_get`, `contacts_search`, `contacts_delta`
-  - **OneDrive:** `drive_ls`, `drive_get`, `drive_info`, `drive_search`, `drive_recent`, `drive_shared`, `drive_versions` *(reads only — no upload/move/delete/share via MCP)*
-  - **To Do:** `todo_lists_list`, `todo_list`, `todo_get`, `todo_checklist_list`, `todo_links_list`
-  - **Directory & meta:** `people_search`, `changes`, `whoami`, `version`
-- **Incremental sync (delta).** `mail_delta`, `calendar_delta`, and `contacts_delta` return only what changed since an opaque cursor token (the unified `changes` tool digests all three in one call, each with its own token). Pass an empty token for a fresh sync, then hand the returned token back next time; deletions come through as items with `"removed": true`. Tokens are validated to be Microsoft Graph URLs before reuse, so a model can't redirect an authenticated request elsewhere.
-- **Batch & threading.** `mail_batch` fetches up to 20 messages by id in a single Graph `$batch` round-trip (best-effort — an id that fails is omitted). `mail_thread` returns messages in a conversation (oldest first) given a `conversationId`, which `mail_list`/`mail_get` now include in their output. Add `--complete` when the caller must consume every provider page rather than accept the default bounded result.
-- **Opt into safe writes per-tool** by naming each one: `olk mcp --allow-write mail_flag` (repeatable, or `OLK_MCP_ALLOW_WRITE=mail_flag,todo_update`). The eligible writes are all **non-send and either non-destructive or reversible** — nothing sends a message/invite and nothing is hard-deleted: `mail_drafts_create`, `mail_flag`, `mail_categorize`, `mail_mark`, `mail_move`, `mail_folders_create`, `mail_folders_rename`, `contacts_create`, `contacts_update`, `todo_create`, `todo_update`, `todo_complete`. Nothing is exposed by default; naming a write is a deliberate action separate from starting the server (defense in depth), and `--allow-tool write` can opt into the whole class at once.
-- **Send and delete are separate, harder opt-ins** — they are *not* covered by `--allow-write`. A tool that transmits to other people needs `--allow-send <tool>` (`mail_send`, `mail_reply`, `mail_forward`, `mail_drafts_send`, `calendar_respond`, `calendar_create`, `calendar_update`); a tool that hard-deletes needs `--allow-destructive <tool>` (`mail_delete`, `calendar_delete`, `contacts_delete`, `todo_delete`). Both tiers are off by default and **defense-in-depth gated**: `--no-send` hides (and the API layer vetoes) every send tool even when named, and `--no-write` hides/vetoes every send *and* destructive tool — so `olk mcp --no-send --allow-send mail_send` exposes nothing. Destructive tools are auto-confirmed (the MCP layer supplies the `--force` a human would type), because naming `--allow-destructive` is itself the deliberate confirmation.
-- **Narrow the exposed set with `--allow-tool`** (`OLK_MCP_ALLOW_TOOL`, repeatable/csv). Selectors are an exact name (`mail_list`), a prefix glob (`mail_*`, or `mail.*`), or a category (`read`, `write`, `all`). E.g. `olk mcp --allow-tool 'mail.*' --allow-tool calendar_events` exposes only the mail tools plus that one calendar tool. This narrows tools by name; it never grants a write that `--allow-write` hasn't already enabled.
-- **Shrink responses with `concise`.** Every read tool accepts a `concise` boolean (maps to the global `--concise` / `OLK_CONCISE`) that drops large free-text — message/event/task bodies, previews, attendee lists — to cut token usage when an agent only needs headers/metadata.
-- **Bound tool output** with `--max-output-bytes` (`OLK_MCP_MAX_OUTPUT_BYTES`, default 100 KB): a single call's text is truncated past the cap with a notice, so a runaway list can't flood the agent's context or the stdio transport.
-- **Structured errors.** A failing tool call returns a `{code, message, action}` JSON envelope — `code` is a stable class (`unauthenticated`, `forbidden`, `not_found`, `rate_limited`, `invalid_input`, `error`) and `action` is a concrete next step — so agents branch on the class instead of parsing prose. Unknown/undeclared tool arguments are rejected rather than silently passed through.
-- **Prompt-injection defense.** Tool output is emitted with `--wrap-untrusted` forced on: externally-controlled fields (email bodies, subjects, sender names, file names…) are wrapped in `[UNTRUSTED:<id>]…[/UNTRUSTED:<id>]` markers, and each response carries a self-describing `untrustedNotice` that tells the agent to treat marked content as data, never instructions. The marker `id` is random per response, so malicious content can't forge a closing marker to escape the wrapper. No out-of-band briefing needed — the directive travels in the data.
-- **No HTTP transport** is shipped (stdio only) — a deliberate scope choice to avoid running a networked service.
-
-**Hardening agents that drive the CLI directly** (instead of MCP) — the same guards apply to every entry path, so compose them as env vars in a CI job or agent sandbox:
-
-```bash
-# Read-only, injection-wrapped, restricted to a few commands, never blocks on a prompt
-export OLK_NO_WRITE=1 OLK_WRAP_UNTRUSTED=1 OLK_NO_INPUT=1
-export OLK_ENABLE_COMMANDS_EXACT=mail.list,mail.get,mail.search,calendar.events
-olk mail list --json
-```
-
-See [Global Flags](#global-flags) for the full guard list (`--no-write`, `--no-send`, `--no-input`, `--wrap-untrusted`, `--enable-commands[-exact]`, `--disable-commands`), and [AI Agent Integration](#ai-agent-integration) for the skill-based path.
-
-> **Not affiliated with Microsoft.** olk is an independent client for the Microsoft Graph API.
-
-## Commands Reference
-
-### Auth
-
-```
-olk auth login [--browser] [--enterprise] [--client-id ID] [--tenant-id ID]  Login via device code (or browser PKCE)
-olk auth logout [EMAIL]                              Remove stored credentials
-olk auth clean --force                               Remove ALL accounts and tokens
-olk auth list                                        List authenticated accounts
-olk auth status                                      Check token validity
-```
-
-### Mail
-
-```
-olk mail list [-n 25] [-f FOLDER] [-u] [--from X] [--after DATE] [--before DATE] [--focused] [--other] [--order newest|oldest] [--select FIELDS]
-# --order cannot be combined with --focused or --other
-olk mail get <ID> [--format full|text|html]
-olk mail batch --id <ID> [--id <ID>]...                  Fetch up to 20 messages in one $batch request
-olk mail thread <CONVERSATION_ID> [-n 50] [--complete]   List messages in a conversation
-olk mail delta [-f FOLDER] [--token TOKEN] [-n N]        Incremental sync; returns changes + next token
-olk mail send --to X --subject Y [--body Z] [--cc X] [--bcc X] [--html] [--attach FILE] [--importance low|normal|high] [--read-receipt]
-olk mail search <QUERY> [-n 25]
-olk mail reply <ID> --body X [--reply-all]
-olk mail forward <ID> --to X [--comment Y]
-olk mail move <ID> <FOLDER>
-olk mail delete <ID> [--force]
-olk mail mark <ID> --read|--unread
-olk mail folders                                     List mail folders
-olk mail folders create -n "Name"                    Create a mail folder
-olk mail folders rename <ID> -n "New Name"           Rename a mail folder
-olk mail folders delete <ID> --force                 Delete a mail folder
-olk mail attachments <ID>                            List attachments
-olk mail attachments <ID> --save [--out DIR]         Download all attachments
-olk mail attachments <ID> --attachment-id X [--out DIR]  Download specific attachment
-olk mail drafts list [-n 25]                         List drafts
-olk mail drafts create --to X --subject Y [--body Z] [--cc X] [--bcc X] [--html]
-olk mail drafts send <DRAFT_ID>                      Send a draft
-olk mail drafts delete <DRAFT_ID> --force            Delete a draft
-olk mail flag <ID> flagged|complete|notFlagged       Set follow-up flag
-olk mail importance <ID> low|normal|high             Set importance
-olk mail categorize <ID> -c "Category Name"          Set categories (use -c none to clear)
-olk mail categories list                             List category definitions
-olk mail categories create -n "Name" [--preset X]    Create a category (preset0-preset24 or none)
-olk mail categories delete <ID> --force              Delete a category
-olk mail ooo get                                     Get auto-reply settings
-olk mail ooo set -m "Message" [--start DATE] [--end DATE] [--audience none|contactsOnly|all]
-olk mail ooo off                                     Disable auto-reply
-olk mail rules list                                  List inbox rules
-olk mail rules create --name X [--from Y] [--subject-contains Z] [--has-attachment] [--move FOLDER] [--mark-read] [--delete] [--forward-to EMAIL] [--set-importance low|normal|high]
-olk mail rules delete <ID> --force                   Delete an inbox rule
-```
-
-### Calendar
-
-```
-olk calendar events [-d 7] [--after DATE] [--before DATE] [--calendar ID] [-n 25] [--body-format text|html]
-olk calendar view [-d 7] [--after DATE] [--before DATE] [--calendar ID] [-n 50] [--body-format text|html]
-olk calendar delta [-d 30] [--after DATE] [--before DATE] [--token TOKEN] [-n N]  Incremental sync of events
-olk calendar get <ID> [--body-format text|html]
-olk calendar create --subject X --start Y --end Z [--calendar ID] [--location L] [--attendees A] [--all-day] [--online-meeting] [--transaction-id ID] [--no-reminder] [-r daily|weekdays|weekly|monthly|yearly]
-olk calendar update <ID> [--subject X] [--start Y] [--end Z] [--location L|none] [--all-day|--timed] [--no-reminder]
-olk calendar delete <ID> [--force]
-olk calendar respond <ID> accept|decline|tentative
-olk calendar calendars
-olk calendar availability --emails X [-d DAYS] [--after DATE] [--before DATE]
-olk calendar find-times --attendees X [--attendees Y] [-d 60] [--after DATE] [--before DATE]
-```
-
-### People
-
-```
-olk people search <QUERY> [-n 25]
-```
-
-### Contacts
-
-```
-olk contacts list [-n 25] [--skip N] [--sort displayName|givenName|surname]
-olk contacts get <ID>
-olk contacts delta [--token TOKEN] [-n N]            Incremental sync of contacts
-olk contacts create --first-name X --last-name Y [-e EMAIL]... [-p MOBILE] [--business-phone P] [--home-phone P] [--company C] [--title T] [--department D] [--manager M] [--birthday YYYY-MM-DD] [--notes N] [--middle-name M] [--nickname N] [-g CATEGORY]... [--street S] [--city C] [--state S] [--postal-code P] [--country C] [--address-type business|home|other]
-olk contacts update <ID> [--first-name X] [--last-name Y] [-e EMAIL]... [-p MOBILE] [--business-phone P] [--home-phone P] [--company C] [--title T] [--department D] [--manager M] [--birthday YYYY-MM-DD] [--notes N] [--middle-name M] [--nickname N] [-g CATEGORY]... [--street S] [--city C] [--state S] [--postal-code P] [--country C] [--address-type business|home|other]
-olk contacts delete <ID> [--force]
-olk contacts search <QUERY> [-n 25]
-```
-
-### Tasks (Microsoft To Do)
-
-```
-olk todo lists                                       List task lists
-olk todo lists create -n "Name"                      Create a task list
-olk todo lists delete <ID> --force                   Delete a task list
-olk todo list [--list ID] [-n 25] [--status STATUS]  List tasks
-olk todo get <TASK_ID> [--list ID]                   Get task details
-olk todo create -t "Title" [--due DATE] [--importance low|normal|high] [--body TEXT] [--list ID] [--start DATE] [--reminder DATETIME] [--recurrence daily|weekdays|weekly|monthly|yearly] [--categories CAT]
-olk todo update <TASK_ID> [--title X] [--due DATE] [--importance low|normal|high] [--body TEXT] [--list ID] [--start DATE] [--reminder DATETIME] [--recurrence daily|weekdays|weekly|monthly|yearly] [--categories CAT]
-olk todo complete <TASK_ID> [--list ID]              Mark task complete
-olk todo delete <TASK_ID> --force [--list ID]        Delete a task
-olk todo checklist list <TASK_ID> [--list ID]        List checklist items
-olk todo checklist create <TASK_ID> -n "Name" [--list ID]  Create a checklist item
-olk todo checklist toggle <TASK_ID> <ITEM_ID> [--list ID]  Toggle checked/unchecked
-olk todo checklist update <TASK_ID> <ITEM_ID> -n "Name" [--list ID]  Update checklist item
-olk todo checklist delete <TASK_ID> <ITEM_ID> --force [--list ID]    Delete checklist item
-olk todo attach list <TASK_ID> [--list ID]           List task attachments
-olk todo attach upload <TASK_ID> <FILE> [--list ID]  Upload a file attachment
-olk todo attach download <TASK_ID> <ATTACHMENT_ID> [--list ID] [--out DIR]  Download an attachment
-olk todo attach delete <TASK_ID> <ATTACHMENT_ID> --force [--list ID]        Delete an attachment
-olk todo links list <TASK_ID> [--list ID]            List linked resources
-olk todo links create <TASK_ID> -n "Name" --url "URL" [--list ID]   Create a linked resource
-olk todo links delete <TASK_ID> <RESOURCE_ID> --force [--list ID]   Delete a linked resource
-```
-
-### OneDrive
-
-```
-olk drive list                                       List available drives
-olk drive info [--drive-id ID]                       Drive details and quota
-olk drive ls [PATH] [--drive-id ID] [-n 50]          List folder contents
-olk drive get <ID> [--drive-id ID]                   Item details
-olk drive search <QUERY> [--drive-id ID] [-n 25]     Search files
-olk drive recent [--drive-id ID]                     Recently accessed files
-olk drive shared [--drive-id ID]                     Files shared with you
-olk drive download <ID> [--out DIR] [--drive-id ID]  Download a file
-olk drive upload <LOCAL> <REMOTE> [--drive-id ID] [--replace]   Upload a file
-olk drive mkdir <PATH> [--drive-id ID]               Create a folder
-olk drive cp <ID> <DEST> [--name NEW_NAME] [--drive-id ID]      Copy a file or folder
-olk drive mv <ID> <DEST> [--drive-id ID]             Move or rename
-olk drive rm <ID> --force [--drive-id ID]            Delete a file or folder
-olk drive share <ID> [--type view|edit] [--scope anonymous|organization] [--drive-id ID]   Create a sharing link
-olk drive versions <ID> [--drive-id ID]              List version history
-```
-
-If `--drive-id` is omitted, your primary drive is used.
-
-### Sync (delta)
-
-```
-olk changes [--mail-token T] [--calendar-token T] [--contacts-token T] [--days 30] [-n N]   Unified delta digest across mail, calendar, and contacts (each with its own token)
-```
-
-Per-resource delta commands live under their service: `olk mail delta`, `olk calendar delta`, `olk contacts delta`. Omit a token for a fresh sync, then pass the returned token next time to get only what changed; deletions are reported as `removed` items.
-
-### Configuration
-
-```
-olk config set timezone America/New_York             Set display timezone
-olk config get timezone                              Get current timezone setting
-```
-
-### User Profile
-
-```
-olk whoami                                           Display current user info
-```
-
-## Configuration
-
-Config is stored in your OS's user-config directory: `~/.config/olk/` on Linux, `~/Library/Application Support/olk/` on macOS, `%AppData%\olk\` on Windows:
-
-```
-<config-dir>/
-├── config.json          # Default account, client IDs
-└── accounts/            # Account metadata (email, display name)
-    └── user@example.com.json
-```
-
-Override the config directory with `OLK_CONFIG_DIR`.
-
-### Timezone
-
-By default, times are displayed in your system's local timezone. You can override this:
-
-```bash
-# Per-command
-olk calendar events --tz America/New_York
-
-# Via environment variable
-export OLK_TIMEZONE=Europe/London
-
-# Persistent (saved to config)
-olk config set timezone America/Chicago
-```
-
-Precedence: `--tz` flag > `OLK_TIMEZONE` env var > config file > system local timezone. JSON output emits UTC timestamps as RFC3339 with a `Z` suffix (e.g. `2026-04-22T15:15:00Z`), so `new Date(...)` parses them correctly; the `timezone` field in the envelope indicates the display timezone.
-
-## Scripting Examples
-
-```bash
-# Count unread messages
-olk mail list --unread --json --results-only | jq length
-
-# Get subjects of today's events
-olk today --json --results-only | jq -r '.[].subject'
-
-# Export contacts as CSV
-olk contacts list --plain --select name,email
-
-# Send from a script
-olk send --to ops@company.com --subject "Deploy complete" --body "$(date): v1.2.3 deployed"
-
-# Process inbox with jq
-olk mail list --json --results-only | jq -r '.[] | select(.isRead == false) | "\(.from): \(.subject)"'
-```
-
-## AI Agent Integration
-
-`olk` ships with a [`SKILL.md`](SKILL.md) that follows the [Agent Skills](https://agentskills.io) open standard. This lets AI coding assistants discover and use `olk` commands on your behalf — checking mail, scheduling meetings, managing contacts, all from within your AI workflow.
-
-> Two ways to give an agent access: the **skill** below (the agent runs `olk` CLI commands directly), or the **[MCP server](#mcp-server-ai-agents)** (`olk mcp`, a curated read-first tool surface for MCP clients like Claude Desktop). Use the skill for coding-assistant workflows in a terminal; use MCP for tool-calling agents.
-
-### Supported Platforms
-
-| Platform | How it works |
-|----------|-------------|
-| [Claude Code](https://claude.com/claude-code) | Copy `SKILL.md` into your Claude skills directory. Invoke with `/olk` or let Claude use it automatically. |
-| [OpenClaw](https://openclaw.ai) | Reads `SKILL.md` with metadata gating (`requires.bins: ["olk"]`). Auto-installs via `go install` if missing. |
-| Other [AgentSkills](https://agentskills.io)-compatible tools | Any tool supporting the Agent Skills standard can pick up the `SKILL.md` for command discovery and usage instructions. |
-
-### Installation
-
-**Claude Code** (personal — available across all projects):
-
-```bash
-mkdir -p ~/.claude/skills/olk
-cp SKILL.md ~/.claude/skills/olk/SKILL.md
-```
-
-**Claude Code** (project-scoped — available only in this repo):
-
-```bash
-mkdir -p .claude/skills/olk
-cp SKILL.md .claude/skills/olk/SKILL.md
-```
-
-**OpenClaw**: Place `SKILL.md` in your OpenClaw skills directory, or point OpenClaw to this repo.
-
-Then ask your AI assistant to "check my inbox" or "send an email" and it will use `olk`.
-
-### What the skill teaches AI agents
-
-- All commands, flags, and output formats
-- When to use `--json --results-only` for programmatic parsing
-- KQL search syntax for mail
-- How to handle auth errors
-- Safety rules (confirm before sending, never guess IDs, use `--force` for deletes)
-
-## Account Compatibility
-
-Most features work with both personal and enterprise accounts. A few features require an enterprise (work/school) account and `olk auth login --enterprise`:
-
-| Feature | Personal | Enterprise |
-|---------|----------|------------|
-| Mail (list, send, search, reply, forward, move, delete) | Yes | Yes |
-| Mail folders (list, create, rename, delete) | Yes | Yes |
-| Mail drafts | Yes | Yes |
-| Flags, importance, categories | Yes | Yes |
-| Calendar (events, create, update, delete, respond) | Yes | Yes |
-| Recurring events | Yes | Yes |
-| Contacts | Yes | Yes |
-| Tasks (Microsoft To Do) | Yes | Yes |
-| People search | Yes | Yes |
-| Out-of-office / auto-reply | No | Yes |
-| Inbox rules | No | Yes |
-| Focused Inbox | Yes | Yes |
-| Availability / free-busy | Yes | Yes |
-| Find meeting times | No | Yes |
-| OneDrive (browse, upload, download, share) | Yes | Yes |
-| Directory search (fallback) | No | Yes |
-
-## Privacy & Security
-
-- **No telemetry**: `olk` collects no analytics, usage data, or crash reports
-- **No third-party services**: All communication is directly between your machine and Microsoft Graph API
-- **Token storage**: OAuth refresh tokens are stored in your OS credential manager (macOS Keychain, Linux Secret Service, Windows Credential Manager) — never in plain-text files. The encrypted file fallback prompts on stderr; set `OLK_KEYRING_PASSWORD` for non-interactive use
-- **PKCE**: Device code flow uses Proof Key for Code Exchange (RFC 7636) for defense-in-depth
-- **Data stays local**: Email bodies, attachments, and contacts are streamed to stdout and never cached to disk
-- **Clean removal**: Run `olk auth clean --force` to remove all stored accounts and tokens
-- **Vulnerability reporting**: See [SECURITY.md](SECURITY.md) for our disclosure policy
-
-## Architecture
-
-```
-olkcli/
-├── cmd/olk/main.go              # Entry point
-├── internal/
-│   ├── cmd/                     # CLI commands (kong)
-│   ├── msauth/                  # Microsoft OAuth2 (device code, token refresh)
-│   ├── graphapi/                # Microsoft Graph API wrapper
-│   ├── config/                  # Configuration management
-│   ├── secrets/                 # OS keyring integration
-│   ├── outfmt/                  # Output formatting (JSON/table/TSV)
-│   └── errfmt/                  # Error formatting
-├── SKILL.md                     # Agent Skills standard — AI assistant integration
-├── Makefile
-├── .goreleaser.yaml
-└── go.mod
-```
-
-## Development
-
-```bash
-make build      # Build to ./bin/olk
-make test       # Run tests
-make lint       # Run golangci-lint
-make install    # Install to $GOPATH/bin
-make clean      # Remove build artifacts
-```
+See [development and releases](docs/development.md) for repository structure,
+validation, CI, and publishing details.
 
 ## License
 
-MIT License. See [LICENSE](LICENSE) for details.
+See [LICENSE](LICENSE).
