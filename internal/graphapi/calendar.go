@@ -189,9 +189,9 @@ func verifyCalendarBody(events []CalendarEvent, preference BodyPreference) error
 	if preference == BodyDefault {
 		return nil
 	}
-	for _, event := range events {
-		if !strings.EqualFold(event.BodyType, string(preference)) {
-			return fmt.Errorf("provider body type = %q, want %q", event.BodyType, preference)
+	for i := range events {
+		if !strings.EqualFold(events[i].BodyType, string(preference)) {
+			return fmt.Errorf("provider body type = %q, want %q", events[i].BodyType, preference)
 		}
 	}
 	return nil
