@@ -24,6 +24,7 @@ go mod tidy         # After changing dependencies
 - **API**: Official `msgraph-sdk-go` wrapped in `internal/graphapi/` for ergonomic access
 - **Secrets**: OS keyring via `github.com/99designs/keyring` (macOS Keychain, Linux Secret Service, Windows WinCred). File-backend password prompt writes to stderr (not stdout) to avoid corrupting piped output. Set `OLK_KEYRING_PASSWORD` for headless/non-interactive use
 - **Output**: JSON envelope (`--json`), aligned table (default), TSV (`--plain`)
+- **Provider parity**: calendar JSON supports opt-in `--body-format text|html`, stable/lifecycle metadata, structured attendee responses, and lossless recurrence details. Mail and contact list/get/delta results expose provider synchronization IDs and timestamps. Calendar writes support `--transaction-id`, `--no-reminder`, `--location none`, and `--all-day`/`--timed` with validation.
 - **MCP server**: `olk mcp` (in `internal/cmd/mcp*.go`) runs a stdio Model Context Protocol server exposing a **curated** allowlist of read-first tools (`curatedTools` in `mcp_server.go`) — NOT the whole command tree. Tool calls reparse a rebuilt argv and run in-process with stdout captured under a mutex (`mcp_capture.go`). Read-only by default; `--allow-write <tool>` exposes a named curated safe-write tool (per-tool opt-in). No HTTP transport
 - **Capability guards**: `--no-write`/`--no-send` are enforced once at the `graphapi.Client` layer (`ensureWritable`/`ensureMaySend`), so the guarantee holds across CLI, MCP, and scripts. `--enable-commands[-exact]`/`--disable-commands` gate dispatch via `commandAllowed()` (`commands.go`), checked in `Execute()` and reused to filter the MCP registry. `--wrap-untrusted` wraps `untrusted:"true"`-tagged struct fields in JSON/plain output (`internal/outfmt/untrusted.go`)
 - **Timezone**: Display-layer conversion via `outfmt.ConvertTime()`. Resolved once per command via `RunContext.Timezone()` (flag > env > config > Local). JSON output emits UTC timestamps as RFC3339 with a `Z` suffix (normalized via `normalizeGraphUTC` — Graph's `DateTimeTimeZone.dateTime` strings lack a zone); envelope includes `timezone` field. IANA db embedded via `import _ "time/tzdata"`
@@ -79,6 +80,8 @@ Add `untrusted:"true"` to the struct tag of any externally-controlled free-text 
 
 ### Changing Graph API calls
 Edit files in `internal/graphapi/` — these wrap the verbose SDK calls into simple methods returning plain structs.
+
+When adding provider metadata, update the relevant `$select` lists for list/get/delta paths, preserve `untrusted:"true"` on externally-authored prose, add fixture coverage under `internal/graphapi`, and advertise stable agent-facing capabilities in `internal/cmd/version.go` when the output contract changes.
 
 ## Release & distribution
 
