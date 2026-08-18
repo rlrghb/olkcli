@@ -34,7 +34,7 @@
 ## Testing Guidelines
 
 - Unit tests: stdlib `testing` package. Test files go next to the code they test (`*_test.go`).
-- Existing coverage: `internal/outfmt` (formatting + untrusted-wrapping), `internal/config`, `internal/msauth/scopes`, `internal/graphapi` (validate + capability guards), and `internal/cmd` (paging filters + mailbox-target validation, MCP server/registry, schema generation, argv building, output capture). Coverage is partial — many command and Graph-wrapper paths remain untested.
+- Existing coverage: `internal/outfmt` (formatting + untrusted-wrapping), `internal/config`, `internal/msauth/scopes`, `internal/graphapi` (validation, capability guards, provider metadata/body contracts, pagination, and security invariants), and `internal/cmd` (paging filters + mailbox-target validation, MCP server/registry, schema generation, argv building, output capture). Coverage is partial — many command and Graph-wrapper paths remain untested.
 - Integration tests require a valid OAuth token + live Graph access — run manually, not in CI.
 - **macOS validation:** each `make build` produces a fresh (ad-hoc) binary identity, so the first run of the new `./bin/olk` that reads stored tokens triggers a macOS Keychain access prompt — a human must click **"Always Allow"**. An automated/agent run can't dismiss the dialog, so a hang on the first post-build command is expected (not a code bug); surface it for manual approval.
 - New tests should run cleanly under `go test -race -count=1 ./...` and pass `golangci-lint run`.
@@ -43,7 +43,7 @@
 
 - `.github/workflows/ci.yml` runs on every pull request and push to `main`.
 - The `test` job runs `go mod tidy` drift check → `go vet ./...` → `go build ./...` → `go test -race -count=1 ./...` on Ubuntu using the Go version pinned in `go.mod`.
-- The `lint` job runs `golangci-lint` v2.5.0 against `.golangci.yml`.
+- The `lint` job runs `golangci-lint` v2.11.4 against `.golangci.yml`.
 - Both jobs use pinned action SHAs to match `release.yml` style.
 
 ## Release & Distribution
@@ -61,6 +61,8 @@
 - **Tenant `common`**: Default tenant accepts both personal and enterprise accounts.
 - **Lazy client init**: `RunContext.GraphClient()` initializes on first call — auth commands don't need a Graph client.
 - **Delegated mailbox routing**: read paths in `internal/graphapi/{mail,calendar,contacts}.go` take a `target string` first parameter and route through `c.targetUser(target)`. Empty target preserves `/me` behavior; a non-empty value hits `/users/{target}/…`. The CLI exposes this as the global `--mailbox` flag (env `OLK_MAILBOX`), validated once via `resolveMailboxTarget` in `internal/cmd/paging.go`. New read methods should follow the same shape; write paths intentionally stay on `/me` for now.
+- **Provider-parity output**: calendar JSON supports opt-in provider body formats (`--body-format text|html`) and additive identity, lifecycle, attendee-response, recurrence, and transaction metadata. Mail and contact list/get/delta outputs include provider synchronization IDs and timestamps when Graph returns them. These fields are additive; concise human-readable output remains stable.
+- **Calendar mutation controls**: `calendar create --transaction-id ID --no-reminder` exposes Graph-native idempotency and reminder control. `calendar update --location none --all-day|--timed --no-reminder` distinguishes clearing from omission and validates all-day times in UTC before sending.
 - **MCP server**: `olk mcp` (`internal/cmd/mcp*.go`) exposes a curated, read-first allowlist of tools over stdio — not the whole CLI. Tool calls reparse argv and run in-process with stdout captured. Read-only by default; `--allow-write <tool>` exposes a named curated safe-write tool (per-tool opt-in). No HTTP transport (deliberate scope choice). To expose a command, add it to `curatedTools` (read or non-destructive write only).
 - **Capability guards**: `--no-write`/`--no-send` enforced once at the `graphapi.Client` layer so the guarantee covers CLI, MCP, and scripts; command allow/deny lists (`--enable-commands[-exact]`, `--disable-commands`) gate dispatch via `commandAllowed()`. `--wrap-untrusted` (forced on under MCP) wraps `untrusted:"true"`-tagged fields for prompt-injection defense.
 
