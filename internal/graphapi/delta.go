@@ -99,7 +99,10 @@ func (c *Client) DeltaMessages(ctx context.Context, target, folderID, token stri
 	var resp users.ItemMailFoldersItemMessagesDeltaGetResponseable
 	var err error
 	if token == "" {
-		cfg := &users.ItemMailFoldersItemMessagesDeltaRequestBuilderGetRequestConfiguration{Headers: maxPageSizeHeaders(top)}
+		cfg := &users.ItemMailFoldersItemMessagesDeltaRequestBuilderGetRequestConfiguration{
+			Headers:         maxPageSizeHeaders(top),
+			QueryParameters: &users.ItemMailFoldersItemMessagesDeltaRequestBuilderGetQueryParameters{Select: []string{"id", "subject", "changeKey", "internetMessageId", "createdDateTime", "lastModifiedDateTime"}},
+		}
 		resp, err = c.targetUser(target).MailFolders().ByMailFolderId(folderID).Messages().Delta().GetAsDeltaGetResponse(ctx, cfg)
 	} else {
 		if err := validateGraphContinuation(token, mailMessagesDeltaScope(target, folderID)); err != nil {
@@ -127,7 +130,7 @@ func (c *Client) DeltaCalendarView(ctx context.Context, target, token string, st
 	if token == "" {
 		s := start.UTC().Format(time.RFC3339)
 		e := end.UTC().Format(time.RFC3339)
-		qp := &users.ItemCalendarViewDeltaRequestBuilderGetQueryParameters{StartDateTime: &s, EndDateTime: &e}
+		qp := &users.ItemCalendarViewDeltaRequestBuilderGetQueryParameters{StartDateTime: &s, EndDateTime: &e, Select: []string{"id", "subject", "changeKey", "iCalUId", "type", "seriesMasterId", "originalStart", "isCancelled", "recurrence", "attendees", "responseStatus"}}
 		cfg := &users.ItemCalendarViewDeltaRequestBuilderGetRequestConfiguration{QueryParameters: qp, Headers: maxPageSizeHeaders(top)}
 		resp, err = c.targetUser(target).CalendarView().Delta().GetAsDeltaGetResponse(ctx, cfg)
 	} else {
@@ -153,7 +156,10 @@ func (c *Client) DeltaContacts(ctx context.Context, target, token string, top in
 	var resp users.ItemContactsDeltaGetResponseable
 	var err error
 	if token == "" {
-		cfg := &users.ItemContactsDeltaRequestBuilderGetRequestConfiguration{Headers: maxPageSizeHeaders(top)}
+		cfg := &users.ItemContactsDeltaRequestBuilderGetRequestConfiguration{
+			Headers:         maxPageSizeHeaders(top),
+			QueryParameters: &users.ItemContactsDeltaRequestBuilderGetQueryParameters{Select: contactSelectFields},
+		}
 		resp, err = c.targetUser(target).Contacts().Delta().GetAsDeltaGetResponse(ctx, cfg)
 	} else {
 		if err := validateGraphContinuation(token, contactsDeltaScope(target)); err != nil {

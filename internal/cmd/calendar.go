@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rlrghb/olkcli/internal/graphapi"
 	"github.com/rlrghb/olkcli/internal/outfmt"
 )
 
@@ -23,11 +24,12 @@ type CalendarCmd struct {
 }
 
 type CalendarEventsCmd struct {
-	Days     int    `help:"Number of days to look ahead" default:"7" short:"d"`
-	After    string `help:"Start date (ISO 8601)"`
-	Before   string `help:"End date (ISO 8601)"`
-	Calendar string `help:"Calendar ID"`
-	Top      int32  `help:"Max events to return" default:"25" short:"n"`
+	Days       int     `help:"Number of days to look ahead" default:"7" short:"d"`
+	After      string  `help:"Start date (ISO 8601)"`
+	Before     string  `help:"End date (ISO 8601)"`
+	Calendar   string  `help:"Calendar ID"`
+	Top        int32   `help:"Max events to return" default:"25" short:"n"`
+	BodyFormat *string `help:"Request provider-returned event body representation" enum:"text,html"`
 }
 
 func (c *CalendarEventsCmd) Run(ctx *RunContext) error {
@@ -72,7 +74,15 @@ func (c *CalendarEventsCmd) Run(ctx *RunContext) error {
 		return err
 	}
 
-	events, err := client.ListEvents(ctx.Ctx, target, start, end, c.Calendar, c.Top)
+	bodyFormat := ""
+	if c.BodyFormat != nil {
+		bodyFormat = *c.BodyFormat
+	}
+	preference, err := graphapi.ParseBodyPreference(bodyFormat)
+	if err != nil {
+		return err
+	}
+	events, err := client.ListEvents(ctx.Ctx, target, start, end, c.Calendar, c.Top, preference)
 	if err != nil {
 		return err
 	}
@@ -98,7 +108,8 @@ func (c *CalendarEventsCmd) Run(ctx *RunContext) error {
 }
 
 type CalendarGetCmd struct {
-	ID string `arg:"" help:"Event ID"`
+	ID         string  `arg:"" help:"Event ID"`
+	BodyFormat *string `help:"Request provider-returned event body representation" enum:"text,html"`
 }
 
 func (c *CalendarGetCmd) Run(ctx *RunContext) error {
@@ -112,7 +123,15 @@ func (c *CalendarGetCmd) Run(ctx *RunContext) error {
 		return err
 	}
 
-	event, err := client.GetEvent(ctx.Ctx, target, c.ID)
+	bodyFormat := ""
+	if c.BodyFormat != nil {
+		bodyFormat = *c.BodyFormat
+	}
+	preference, err := graphapi.ParseBodyPreference(bodyFormat)
+	if err != nil {
+		return err
+	}
+	event, err := client.GetEvent(ctx.Ctx, target, c.ID, preference)
 	if err != nil {
 		return err
 	}
@@ -158,6 +177,8 @@ type CalendarCreateCmd struct {
 	AllDay        bool     `help:"All-day event"`
 	OnlineMeeting bool     `help:"Create online meeting"`
 	Recurrence    string   `help:"Recurrence: daily|weekdays|weekly|monthly|yearly" short:"r"`
+	TransactionID string   `help:"Retry-safe provider transaction ID" name:"transaction-id"`
+	NoReminder    bool     `help:"Disable event reminders" name:"no-reminder"`
 }
 
 func (c *CalendarCreateCmd) Run(ctx *RunContext) error {
@@ -187,7 +208,12 @@ func (c *CalendarCreateCmd) Run(ctx *RunContext) error {
 		return nil
 	}
 
-	event, err := client.CreateEvent(ctx.Ctx, c.Calendar, c.Subject, start, end, c.Location, c.Attendees, c.AllDay, c.OnlineMeeting, c.Recurrence)
+	var reminderOn *bool
+	if c.NoReminder {
+		v := false
+		reminderOn = &v
+	}
+	event, err := client.CreateEvent(ctx.Ctx, c.Calendar, c.Subject, start, end, c.Location, c.Attendees, c.AllDay, c.OnlineMeeting, c.Recurrence, c.TransactionID, reminderOn)
 	if err != nil {
 		return err
 	}
@@ -200,11 +226,14 @@ func (c *CalendarCreateCmd) Run(ctx *RunContext) error {
 }
 
 type CalendarUpdateCmd struct {
-	ID       string `arg:"" help:"Event ID"`
-	Subject  string `help:"New subject" short:"s"`
-	Start    string `help:"New start time (ISO 8601)"`
-	End      string `help:"New end time (ISO 8601)"`
-	Location string `help:"New location" short:"l"`
+	ID         string `arg:"" help:"Event ID"`
+	Subject    string `help:"New subject" short:"s"`
+	Start      string `help:"New start time (ISO 8601)"`
+	End        string `help:"New end time (ISO 8601)"`
+	Location   string `help:"New location" short:"l"`
+	AllDay     *bool  `help:"Convert event to an all-day event" name:"all-day"`
+	Timed      *bool  `help:"Convert event to a timed event"`
+	NoReminder bool   `help:"Disable event reminders" name:"no-reminder"`
 }
 
 func (c *CalendarUpdateCmd) Run(ctx *RunContext) error {
@@ -220,7 +249,11 @@ func (c *CalendarUpdateCmd) Run(ctx *RunContext) error {
 		subject = &c.Subject
 	}
 	if c.Location != "" {
-		location = &c.Location
+		value := c.Location
+		if strings.EqualFold(value, "none") {
+			value = ""
+		}
+		location = &value
 	}
 	if c.Start != "" {
 		t, err := parseTime(c.Start)
@@ -237,7 +270,26 @@ func (c *CalendarUpdateCmd) Run(ctx *RunContext) error {
 		end = &t
 	}
 
-	event, err := client.UpdateEvent(ctx.Ctx, c.ID, subject, start, end, location)
+	if c.AllDay != nil && c.Timed != nil {
+		return fmt.Errorf("--all-day and --timed are mutually exclusive")
+	}
+	var allDay *bool
+	if c.AllDay != nil {
+		allDay = c.AllDay
+	}
+	if c.Timed != nil {
+		v := false
+		allDay = &v
+	}
+	if allDay != nil && *allDay && (start == nil || end == nil || start.UTC().Hour() != 0 || start.UTC().Minute() != 0 || start.UTC().Second() != 0 || end.UTC().Hour() != 0 || end.UTC().Minute() != 0 || end.UTC().Second() != 0 || !end.After(*start)) {
+		return fmt.Errorf("all-day updates require --start and --end at midnight")
+	}
+	var reminderOn *bool
+	if c.NoReminder {
+		v := false
+		reminderOn = &v
+	}
+	event, err := client.UpdateEvent(ctx.Ctx, c.ID, subject, start, end, location, allDay, reminderOn)
 	if err != nil {
 		return err
 	}
