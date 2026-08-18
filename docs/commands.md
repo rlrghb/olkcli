@@ -86,7 +86,7 @@ olk todo list <LIST_ID>
 olk todo get <LIST_ID> <TASK_ID>
 olk todo create|update|complete|delete
 olk todo checklist list|create|toggle|update|delete
-olk todo attachments list|upload|download|delete
+olk todo attach list|upload|download|delete
 olk todo links list|create|delete
 olk drive ls [PATH]
 olk drive get <ID>

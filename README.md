@@ -25,12 +25,13 @@ Keychain access after an upgrade.
 
 ```bash
 olk auth login
-olk mail list
-olk mail get <message-id>
-olk calendar events
-olk calendar create --subject "Standup" \
-  --start 2026-08-18T09:00 --end 2026-08-18T09:30
-olk contacts list
+olk auth status
+olk mail list --json --results-only --select id,subject,from
+olk mail search 'from:person@example.com subject:urgent'
+olk calendar view --days 7
+olk contacts search "Alex"
+olk todo lists list
+olk drive ls
 ```
 
 For work/school accounts and enterprise-only features:
@@ -43,14 +44,14 @@ olk auth login --enterprise
 
 | Need | Command |
 | --- | --- |
+| Check the signed-in account | `olk auth status` or `olk whoami` |
+| Find message IDs and subjects | `olk mail list --json --results-only --select id,subject,from` |
 | Search mail | `olk mail search "from:person@example.com subject:urgent"` |
-| Send mail | `olk mail send --to person@example.com --subject Hi --body Hello` |
-| Read calendar view | `olk calendar view --days 7` |
-| Request text/HTML event bodies | `olk calendar events --body-format text` |
-| Create retry-safe event | `olk calendar create ... --transaction-id ID` |
-| Disable an event reminder | `olk calendar create ... --no-reminder` |
-| Clear an event location | `olk calendar update <ID> --location none` |
-| Convert event representation | `olk calendar update <ID> --all-day` or `--timed` |
+| View the next week | `olk calendar view --days 7` |
+| Search contacts | `olk contacts search "Alex"` |
+| List task lists | `olk todo lists list` |
+| Browse OneDrive | `olk drive ls` |
+| Send mail | `olk mail send --to person@example.com --subject "Hi" --body "Hello"` |
 | Synchronize changes | `olk changes --json` |
 | Use JSON for scripts | `olk mail list --json --results-only` |
 | Use as an MCP server | `olk mcp` |
