@@ -28,6 +28,8 @@ Works with both **personal Microsoft accounts** and **enterprise (Azure AD / Ent
 - **Calendar view** with expanded recurring event occurrences
 - **Recurring events** displayed with human-readable recurrence patterns
 - **Create events** with location, attendees, all-day, online meeting, and recurrence support
+- **Provider event controls** with retry-safe transaction IDs, reminder disabling, location clearing, and all-day/timed updates
+- **Calendar synchronization metadata** including stable IDs, revisions, lifecycle/series state, attendee responses, and structured recurrence
 - **Update and delete** events
 - **Respond** to invitations (accept, decline, tentative)
 - **List calendars** across your account
@@ -519,12 +521,12 @@ olk mail rules delete <ID> --force                   Delete an inbox rule
 ### Calendar
 
 ```
-olk calendar events [-d 7] [--after DATE] [--before DATE] [--calendar ID] [-n 25]
-olk calendar view [-d 7] [--after DATE] [--before DATE] [--calendar ID] [-n 50]
+olk calendar events [-d 7] [--after DATE] [--before DATE] [--calendar ID] [-n 25] [--body-format text|html]
+olk calendar view [-d 7] [--after DATE] [--before DATE] [--calendar ID] [-n 50] [--body-format text|html]
 olk calendar delta [-d 30] [--after DATE] [--before DATE] [--token TOKEN] [-n N]  Incremental sync of events
-olk calendar get <ID>
-olk calendar create --subject X --start Y --end Z [--calendar ID] [--location L] [--attendees A] [--all-day] [--online-meeting] [-r daily|weekdays|weekly|monthly|yearly]
-olk calendar update <ID> [--subject X] [--start Y] [--end Z] [--location L]
+olk calendar get <ID> [--body-format text|html]
+olk calendar create --subject X --start Y --end Z [--calendar ID] [--location L] [--attendees A] [--all-day] [--online-meeting] [--transaction-id ID] [--no-reminder] [-r daily|weekdays|weekly|monthly|yearly]
+olk calendar update <ID> [--subject X] [--start Y] [--end Z] [--location L|none] [--all-day|--timed] [--no-reminder]
 olk calendar delete <ID> [--force]
 olk calendar respond <ID> accept|decline|tentative
 olk calendar calendars

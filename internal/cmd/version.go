@@ -15,6 +15,14 @@ type versionInfo struct {
 }
 
 var advertisedCapabilities = []string{
+	"calendar.provider-body-format-v1",
+	"calendar.provider-metadata-v1",
+	"calendar.structured-recurrence-v1",
+	"calendar.structured-attendance-v1",
+	"calendar.retry-safe-create-v1",
+	"calendar.explicit-update-controls-v1",
+	"mail.provider-metadata-v1",
+	"contacts.provider-metadata-v1",
 	"cli.json-error-v1",
 	"mail.folders.well-known-v1",
 	"mail.get.parent-folder-v1",

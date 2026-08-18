@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/microsoftgraph/msgraph-sdk-go/models"
 	"github.com/microsoftgraph/msgraph-sdk-go/users"
@@ -26,7 +27,7 @@ var contactSelectFields = []string{
 	"emailAddresses", "businessPhones", "homePhones", "mobilePhone", "imAddresses",
 	"companyName", "jobTitle", "department", "officeLocation", "profession", "manager", "assistantName",
 	"birthday", "personalNotes", "spouseName", "children", "categories",
-	"businessHomePage", "businessAddress", "homeAddress", "otherAddress",
+	"businessHomePage", "businessAddress", "homeAddress", "otherAddress", "createdDateTime", "lastModifiedDateTime", "changeKey",
 }
 
 // buildEmailAddresses validates and converts a slice of email strings to Graph EmailAddressable objects.
@@ -84,6 +85,9 @@ type Contact struct {
 	BusinessAddress  *Address `json:"businessAddress,omitempty" concise:"omit"`
 	HomeAddress      *Address `json:"homeAddress,omitempty" concise:"omit"`
 	OtherAddress     *Address `json:"otherAddress,omitempty" concise:"omit"`
+	CreatedAt        string   `json:"createdDateTime,omitempty"`
+	ModifiedAt       string   `json:"lastModifiedDateTime,omitempty"`
+	ChangeKey        string   `json:"changeKey,omitempty"`
 }
 
 // ListContacts returns contacts from the target mailbox, or the signed-in
@@ -600,6 +604,15 @@ func convertContact(ct models.Contactable) Contact {
 	contact := Contact{}
 	if ct.GetId() != nil {
 		contact.ID = *ct.GetId()
+	}
+	if ct.GetCreatedDateTime() != nil {
+		contact.CreatedAt = ct.GetCreatedDateTime().Format(time.RFC3339)
+	}
+	if ct.GetLastModifiedDateTime() != nil {
+		contact.ModifiedAt = ct.GetLastModifiedDateTime().Format(time.RFC3339)
+	}
+	if ct.GetChangeKey() != nil {
+		contact.ChangeKey = *ct.GetChangeKey()
 	}
 	if ct.GetDisplayName() != nil {
 		contact.DisplayName = *ct.GetDisplayName()

@@ -29,7 +29,7 @@ func TestNoWriteGuardBlocksMutations(t *testing.T) {
 		{"CreateMailFolder", func() error { _, err := c.CreateMailFolder(ctx, "n"); return err }},
 		{"CreateUploadSession", func() error { _, err := c.CreateUploadSession(ctx, "d", "p", false); return err }},
 		{"CreateEvent", func() error {
-			_, err := c.CreateEvent(ctx, "", "s", time.Now(), time.Now(), "", []string{"a@b.com"}, false, false, "")
+			_, err := c.CreateEvent(ctx, "", "s", time.Now(), time.Now(), "", []string{"a@b.com"}, false, false, "", "", nil)
 			return err
 		}},
 		{"SendMessage", func() error { return c.SendMessage(ctx, "s", "b", nil, nil, nil, false, nil, "", false) }},
@@ -55,7 +55,7 @@ func TestNoSendGuardBlocksSends(t *testing.T) {
 		{"SendDraft", func() error { return c.SendDraft(ctx, "id") }},
 		{"RespondToEvent", func() error { return c.RespondToEvent(ctx, "id", "accept") }},
 		{"CreateEvent w/ attendees", func() error {
-			_, err := c.CreateEvent(ctx, "", "s", time.Now(), time.Now(), "", []string{"a@b.com"}, false, false, "")
+			_, err := c.CreateEvent(ctx, "", "s", time.Now(), time.Now(), "", []string{"a@b.com"}, false, false, "", "", nil)
 			return err
 		}},
 	}

@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/microsoftgraph/msgraph-sdk-go/models/odataerrors"
 )
@@ -101,6 +102,21 @@ const maxContactNotesLen = 32000
 func ValidateContactFieldLen(value, label string, limit int) error {
 	if len(value) > limit {
 		return fmt.Errorf("%s too long: %d characters (max %d)", label, len(value), limit)
+	}
+	return nil
+}
+
+// ValidateTransactionID bounds the caller-supplied Graph idempotency key and
+// rejects control characters that could corrupt logs or diagnostics.
+func ValidateTransactionID(value string) error {
+	if value == "" {
+		return nil
+	}
+	if len(value) > 255 {
+		return fmt.Errorf("transaction ID too long: %d characters (max 255)", len(value))
+	}
+	if strings.IndexFunc(value, unicode.IsControl) >= 0 {
+		return fmt.Errorf("transaction ID contains control characters")
 	}
 	return nil
 }

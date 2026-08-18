@@ -153,6 +153,18 @@ func TestValidateContactFieldLen(t *testing.T) {
 	}
 }
 
+func TestValidateTransactionID(t *testing.T) {
+	if err := ValidateTransactionID("retry-2026-08-17"); err != nil {
+		t.Fatalf("valid transaction ID rejected: %v", err)
+	}
+	if err := ValidateTransactionID(strings.Repeat("x", 256)); err == nil {
+		t.Fatal("overlong transaction ID accepted")
+	}
+	if err := ValidateTransactionID("retry\nkey"); err == nil {
+		t.Fatal("transaction ID with control character accepted")
+	}
+}
+
 func TestClampTop(t *testing.T) {
 	cases := []struct {
 		in, want int32

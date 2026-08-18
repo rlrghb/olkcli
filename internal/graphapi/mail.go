@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/microsoftgraph/msgraph-sdk-go/models"
 	"github.com/microsoftgraph/msgraph-sdk-go/users"
@@ -49,24 +50,27 @@ var allowedSelectFields = map[string]bool{
 
 // MailMessage is a simplified mail message for output
 type MailMessage struct {
-	ID             string            `json:"id"`
-	ParentFolderID string            `json:"parentFolderId,omitempty"`
-	ChangeKey      string            `json:"changeKey,omitempty"`
-	Subject        string            `json:"subject" untrusted:"true"`
-	From           string            `json:"from" untrusted:"true"`
-	To             []string          `json:"to" untrusted:"true"`
-	Cc             []string          `json:"cc" untrusted:"true"`
-	Bcc            []string          `json:"bcc" untrusted:"true"`
-	ReplyTo        []string          `json:"replyTo" untrusted:"true"`
-	ReceivedAt     string            `json:"receivedDateTime"`
-	IsRead         bool              `json:"isRead"`
-	HasAttachments bool              `json:"hasAttachments"`
-	BodyPreview    string            `json:"bodyPreview,omitempty" untrusted:"true" concise:"omit"`
-	Body           string            `json:"body,omitempty" untrusted:"true" concise:"omit"`
-	BodyType       string            `json:"bodyType,omitempty"`
-	Categories     []string          `json:"categories,omitempty"`
-	ConversationID string            `json:"conversationId,omitempty"`
-	Flag           *MailFollowupFlag `json:"flag,omitempty"`
+	ID                string            `json:"id"`
+	ParentFolderID    string            `json:"parentFolderId,omitempty"`
+	ChangeKey         string            `json:"changeKey,omitempty"`
+	Subject           string            `json:"subject" untrusted:"true"`
+	From              string            `json:"from" untrusted:"true"`
+	To                []string          `json:"to" untrusted:"true"`
+	Cc                []string          `json:"cc" untrusted:"true"`
+	Bcc               []string          `json:"bcc" untrusted:"true"`
+	ReplyTo           []string          `json:"replyTo" untrusted:"true"`
+	ReceivedAt        string            `json:"receivedDateTime"`
+	IsRead            bool              `json:"isRead"`
+	HasAttachments    bool              `json:"hasAttachments"`
+	BodyPreview       string            `json:"bodyPreview,omitempty" untrusted:"true" concise:"omit"`
+	Body              string            `json:"body,omitempty" untrusted:"true" concise:"omit"`
+	BodyType          string            `json:"bodyType,omitempty"`
+	Categories        []string          `json:"categories,omitempty"`
+	ConversationID    string            `json:"conversationId,omitempty"`
+	Flag              *MailFollowupFlag `json:"flag,omitempty"`
+	InternetMessageID string            `json:"internetMessageId,omitempty"`
+	CreatedAt         string            `json:"createdDateTime,omitempty"`
+	ModifiedAt        string            `json:"lastModifiedDateTime,omitempty"`
 }
 
 // MailFollowupFlag is the stable output shape for a provider follow-up flag.
@@ -79,7 +83,7 @@ type MailFollowupFlag struct {
 var messageDetailSelect = []string{
 	"id", "subject", "from", "toRecipients", "ccRecipients", "bccRecipients",
 	"receivedDateTime", "isRead", "hasAttachments", "body", "bodyPreview", "conversationId",
-	"parentFolderId", "changeKey", "flag",
+	"parentFolderId", "changeKey", "flag", "internetMessageId", "createdDateTime", "lastModifiedDateTime",
 }
 
 // MailFolder is a simplified folder representation
@@ -172,6 +176,7 @@ func (c *Client) ListMessages(ctx context.Context, target string, opts *ListMess
 			"id", "subject", "from", "toRecipients", "ccRecipients",
 			"bccRecipients", "replyTo", "receivedDateTime", "isRead",
 			"hasAttachments", "bodyPreview", "categories", "conversationId",
+			"internetMessageId", "createdDateTime", "lastModifiedDateTime",
 		}
 	}
 
@@ -777,6 +782,15 @@ func convertMessage(msg models.Messageable) MailMessage {
 	}
 	if msg.GetChangeKey() != nil {
 		m.ChangeKey = *msg.GetChangeKey()
+	}
+	if msg.GetInternetMessageId() != nil {
+		m.InternetMessageID = *msg.GetInternetMessageId()
+	}
+	if msg.GetCreatedDateTime() != nil {
+		m.CreatedAt = msg.GetCreatedDateTime().Format(time.RFC3339)
+	}
+	if msg.GetLastModifiedDateTime() != nil {
+		m.ModifiedAt = msg.GetLastModifiedDateTime().Format(time.RFC3339)
 	}
 	if msg.GetSubject() != nil {
 		m.Subject = *msg.GetSubject()

@@ -4,15 +4,17 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/rlrghb/olkcli/internal/graphapi"
 	"github.com/rlrghb/olkcli/internal/outfmt"
 )
 
 type CalendarViewCmd struct {
-	Days     int    `help:"Number of days to show" default:"7" short:"d"`
-	After    string `help:"Start date (ISO 8601)"`
-	Before   string `help:"End date (ISO 8601)"`
-	Calendar string `help:"Calendar ID"`
-	Top      int32  `help:"Max events to return" default:"50" short:"n"`
+	Days       int     `help:"Number of days to show" default:"7" short:"d"`
+	After      string  `help:"Start date (ISO 8601)"`
+	Before     string  `help:"End date (ISO 8601)"`
+	Calendar   string  `help:"Calendar ID"`
+	Top        int32   `help:"Max events to return" default:"50" short:"n"`
+	BodyFormat *string `help:"Request provider-returned event body representation" enum:"text,html"`
 }
 
 func (c *CalendarViewCmd) Run(ctx *RunContext) error {
@@ -51,7 +53,15 @@ func (c *CalendarViewCmd) Run(ctx *RunContext) error {
 		return err
 	}
 
-	events, err := client.ListCalendarView(ctx.Ctx, target, start, end, c.Calendar, c.Top)
+	bodyFormat := ""
+	if c.BodyFormat != nil {
+		bodyFormat = *c.BodyFormat
+	}
+	preference, err := graphapi.ParseBodyPreference(bodyFormat)
+	if err != nil {
+		return err
+	}
+	events, err := client.ListCalendarView(ctx.Ctx, target, start, end, c.Calendar, c.Top, preference)
 	if err != nil {
 		return err
 	}

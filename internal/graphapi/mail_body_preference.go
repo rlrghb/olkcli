@@ -13,6 +13,19 @@ const (
 	preferenceAppliedHeader = "Preference-Applied"
 )
 
+// BodyPreference is shared by mail and calendar body requests.
+type BodyPreference = MessageBodyPreference
+
+const (
+	BodyDefault = MessageBodyDefault
+	BodyText    = MessageBodyText
+	BodyHTML    = MessageBodyHTML
+)
+
+func ParseBodyPreference(value string) (BodyPreference, error) {
+	return ParseMessageBodyPreference(value)
+}
+
 // MessageBodyPreference is a typed request for the representation Graph must
 // return for a message body. The zero value preserves Graph's default.
 type MessageBodyPreference string
@@ -71,6 +84,10 @@ func newMessageBodyResponseContract(preference MessageBodyPreference) (*abs.Requ
 		preference: preference,
 		inspection: inspection,
 	}, nil
+}
+
+func newBodyResponseContract(preference BodyPreference) (*abs.RequestHeaders, []abs.RequestOption, *messageBodyResponseContract, error) {
+	return newMessageBodyResponseContract(preference)
 }
 
 func (c *messageBodyResponseContract) verify() error {
