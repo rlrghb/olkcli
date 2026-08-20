@@ -130,14 +130,36 @@ func TestApplyLaunchEnv_CarriesGlobalsAndOnlyTightensGuards(t *testing.T) {
 		t.Fatal("launch guards must apply to every call")
 	}
 
-	explicit := &CLI{}
-	explicit.Account = "other@example.com"
-	explicit.NoSend = true
-	applyLaunchEnv(explicit, callEnv{account: "svc@example.com", noSend: false})
-	if explicit.Account != "other@example.com" {
-		t.Errorf("a per-call account must win, got %q", explicit.Account)
+	// No tool offers an account or a timeout, so a value surviving the per-call
+	// parse came from an ambient OLK_* variable. The operator's command line must
+	// outrank it, or a stray environment variable silently redirects every call to
+	// another identity.
+	ambient := &CLI{}
+	ambient.Account = "personal@example.com"
+	ambient.Timeout = 60
+	applyLaunchEnv(ambient, callEnv{account: "svc@example.com", timeout: 120})
+	if ambient.Account != "svc@example.com" {
+		t.Errorf("account = %q, want the mailbox the server was started with", ambient.Account)
 	}
-	if !explicit.NoSend {
+	if ambient.Timeout != 120 {
+		t.Errorf("timeout = %d, want the launch value", ambient.Timeout)
+	}
+
+	// With nothing set at launch, the ambient environment still applies.
+	envOnly := &CLI{}
+	envOnly.Account = "personal@example.com"
+	envOnly.Timeout = 60
+	applyLaunchEnv(envOnly, callEnv{})
+	if envOnly.Account != "personal@example.com" || envOnly.Timeout != 60 {
+		t.Errorf("account=%q timeout=%d, want the environment's values left alone",
+			envOnly.Account, envOnly.Timeout)
+	}
+
+	// A call must never be able to lift a guard the server was started with.
+	guarded := &CLI{}
+	guarded.NoSend = true
+	applyLaunchEnv(guarded, callEnv{noSend: false})
+	if !guarded.NoSend {
 		t.Error("a call must not be able to lift its own --no-send")
 	}
 }

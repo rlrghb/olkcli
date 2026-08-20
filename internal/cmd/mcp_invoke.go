@@ -103,11 +103,17 @@ func makeHandler(b *toolBinding) mcp.ToolHandler {
 //
 // Mailbox is absent here on purpose: buildArgv resolves it, because only there is
 // a permitted per-call choice distinguishable from the launch default.
+// These values are already launch-resolved, kong having applied flag over
+// environment over default when the server started, so they overwrite rather
+// than fill a gap. Deferring to whatever the per-call parse produced would invert
+// that: no tool offers an account or a timeout, so a value surviving the reparse
+// can only have come from an ambient OLK_* variable, which would then quietly
+// outrank the operator's own command line.
 func applyLaunchEnv(cli *CLI, env callEnv) {
-	if cli.Account == "" {
+	if env.account != "" {
 		cli.Account = env.account
 	}
-	if cli.Timeout <= 0 {
+	if env.timeout > 0 {
 		cli.Timeout = env.timeout
 	}
 	// The guards only ever tighten: a call cannot lift a restriction the server
