@@ -54,10 +54,13 @@ leaving a draft in a shared mailbox needs `Mail.ReadWrite.Shared` and Full
 Access, but not Send As. Sending that draft afterwards does need Send As, since
 creating a draft somewhere confers no right to send it.
 
-Every other command ignores `--mailbox` and acts on the signed-in user's own
-mailbox. That includes `mail reply` and `mail forward`, which will fail to find a
-message ID belonging to a shared mailbox, because IDs are scoped to the mailbox
-they were listed from.
+`mail reply --mailbox EMAIL` and `mail forward --mailbox EMAIL` need the same two
+grants, and read access besides: both read the original from that mailbox before
+sending as it. The message ID must therefore be one listed from that mailbox,
+since IDs are scoped to a mailbox and one taken from your own will not resolve.
+
+Calendar and contact writes remain scoped to the signed-in user; they do not read
+`--mailbox`.
 
 ## macOS Keychain
 

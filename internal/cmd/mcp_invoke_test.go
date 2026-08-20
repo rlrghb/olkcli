@@ -264,7 +264,7 @@ func TestToolSelectorPredicate(t *testing.T) {
 }
 
 func TestBuildMCPServer_AllowToolNarrows(t *testing.T) {
-	_, bindings, err := buildMCPServer(mcpConfig{allowTool: toolSelectorPredicate([]string{"mail_*"})})
+	_, bindings, err := buildMCPServer(&mcpConfig{allowTool: toolSelectorPredicate([]string{"mail_*"})})
 	if err != nil {
 		t.Fatalf("buildMCPServer: %v", err)
 	}

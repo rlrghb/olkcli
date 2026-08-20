@@ -9,6 +9,8 @@ import (
 	"syscall"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+
+	"github.com/rlrghb/olkcli/internal/graphapi"
 )
 
 // MCPCmd runs a stdio MCP server exposing a curated, read-first set of olk
@@ -25,6 +27,32 @@ type MCPCmd struct {
 	AllowDestructive []string `help:"Expose these curated DESTRUCTIVE tools by name (mail_delete, calendar_delete, …). Off by default; each hard-deletes and is vetoed by --no-write." name:"allow-destructive" env:"OLK_MCP_ALLOW_DESTRUCTIVE"`
 	AllowTool        []string `help:"Restrict exposed tools to these selectors: exact name (mail_list), prefix glob (mail_*, mail.*), or category (read, write, all). Repeatable/csv; default exposes all curated tools." name:"allow-tool" env:"OLK_MCP_ALLOW_TOOL"`
 	MaxOutputBytes   int      `help:"Cap a single tool call's output text in bytes (truncated past this; 0 uses the built-in default)." name:"max-output-bytes" env:"OLK_MCP_MAX_OUTPUT_BYTES"`
+	AllowMailbox     []string `help:"Permit agents to direct calls at these delegated mailboxes by name. Repeatable/csv; default permits none, in which case tools act only on the mailbox given by --mailbox at launch." name:"allow-mailbox" env:"OLK_MCP_ALLOW_MAILBOX"`
+}
+
+// resolveAllowMailbox validates the operator's permitted mailboxes. A malformed
+// address is refused outright rather than dropped with a warning: unlike a
+// mistyped tool name, which simply exposes nothing, a mistyped mailbox would
+// leave agents believing a mailbox is reachable when no call can ever name it.
+func resolveAllowMailbox(values []string) ([]string, error) {
+	out := make([]string, 0, len(values))
+	seen := map[string]bool{}
+	for _, v := range values {
+		for _, addr := range strings.Split(v, ",") {
+			addr = strings.TrimSpace(addr)
+			if addr == "" {
+				continue
+			}
+			if err := graphapi.ValidateEmail(addr); err != nil {
+				return nil, fmt.Errorf("invalid --allow-mailbox value %q: %w", addr, err)
+			}
+			if key := strings.ToLower(addr); !seen[key] {
+				seen[key] = true
+				out = append(out, addr)
+			}
+		}
+	}
+	return out, nil
 }
 
 // resolveAllowList validates the named tools against the set eligible for a
@@ -53,7 +81,15 @@ func (c *MCPCmd) Run(ctx *RunContext) error {
 	defer stop()
 
 	flags := ctx.Flags
-	srv, _, err := buildMCPServer(mcpConfig{
+	allowMailbox, err := resolveAllowMailbox(c.AllowMailbox)
+	if err != nil {
+		return err
+	}
+	mailbox, err := resolveMailboxTarget(flags.Mailbox)
+	if err != nil {
+		return err
+	}
+	srv, _, err := buildMCPServer(&mcpConfig{
 		allowWrite:       resolveAllowList(c.AllowWrite, writeToolNames(), "--allow-write"),
 		allowSend:        resolveAllowList(c.AllowSend, sendToolNames(), "--allow-send"),
 		allowDestructive: resolveAllowList(c.AllowDestructive, destructiveToolNames(), "--allow-destructive"),
@@ -62,6 +98,14 @@ func (c *MCPCmd) Run(ctx *RunContext) error {
 		allowed:          func(path []string) bool { return commandAllowed(flags, path) },
 		allowTool:        toolSelectorPredicate(c.AllowTool),
 		maxOutputBytes:   c.MaxOutputBytes,
+		env: callEnv{
+			mailbox:      mailbox,
+			account:      flags.Account,
+			timeout:      flags.Timeout,
+			noWrite:      flags.NoWrite,
+			noSend:       flags.NoSend,
+			allowMailbox: allowMailbox,
+		},
 	})
 	if err != nil {
 		return err

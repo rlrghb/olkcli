@@ -325,9 +325,9 @@ Reads are the common case. **Sending as a shared mailbox is supported**, and nee
 - the `Mail.Send.Shared` scope on the token — `olk auth login --scope Mail.Send.Shared`; and
 - **Send As** or **Send on Behalf Of** on the mailbox in Exchange, which is a different delegation from the Full Access that lets you read it.
 
-Holding one tells you nothing about the other, and `Full Access` grants neither. Without both, `mail send --mailbox` fails with `Access is denied` and names what is missing.
+Holding one tells you nothing about the other, and `Full Access` grants neither. Without both, `mail send --mailbox` fails with `Access is denied` and names what is missing. `mail reply` and `mail forward` need the same two grants, plus read access, because they read the original from that mailbox before sending as it — and the message ID must be one listed from that mailbox, since IDs are scoped to the mailbox they came from.
 
-Sending and the draft commands are the writes that honour `--mailbox`. Everything else ignores it and acts on your own mailbox — including `mail reply` and `mail forward`, which will fail to find a message ID belonging to a shared mailbox, since IDs are scoped to the mailbox they were listed from.
+Sending, replying, forwarding and the draft commands are the writes that honour `--mailbox`. Calendar and contact writes ignore it and act on the signed-in user's own mailbox.
 
 ```bash
 # One-time login with shared scopes
@@ -342,6 +342,11 @@ olk mail folders --mailbox boss@example.com
 # Send as a shared mailbox (needs Mail.Send.Shared + Send As in Exchange)
 olk mail send --mailbox team@example.com --to person@example.com --subject "..." --body "..."
 olk mail send --mailbox team@example.com --to person@example.com --subject "..." --dry-run   # shows the sending address
+
+# Reply or forward as a shared mailbox. Use the ID as listed FROM that mailbox:
+# message IDs are per-mailbox, and one taken from your own will not resolve here.
+olk mail reply <ID> --mailbox team@example.com --body "..."
+olk mail forward <ID> --mailbox team@example.com --to person@example.com
 
 # Leave a draft in a shared mailbox for a human to send (needs Mail.ReadWrite.Shared
 # and Full Access, but NOT Send As) — the lower-privilege alternative

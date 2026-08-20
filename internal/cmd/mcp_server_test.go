@@ -29,7 +29,7 @@ func testBinding(t *testing.T, path ...string) *toolBinding {
 	return &toolBinding{name: strings.Join(path, "_"), path: path, node: leafByPath(t, path...), tier: tierRead}
 }
 
-func bindingsMap(t *testing.T, cfg mcpConfig) map[string]*toolBinding {
+func bindingsMap(t *testing.T, cfg *mcpConfig) map[string]*toolBinding {
 	t.Helper()
 	_, bindings, err := buildMCPServer(cfg)
 	if err != nil {
@@ -55,7 +55,7 @@ func setOf(names ...string) map[string]bool {
 
 func buildBindings(t *testing.T, writes ...string) map[string]*toolBinding {
 	t.Helper()
-	return bindingsMap(t, mcpConfig{allowWrite: setOf(writes...)})
+	return bindingsMap(t, &mcpConfig{allowWrite: setOf(writes...)})
 }
 
 func TestCuratedRegistry_DefaultIsReadOnly(t *testing.T) {
@@ -115,7 +115,7 @@ func TestCuratedRegistry_TierGating(t *testing.T) {
 	}
 
 	// --allow-write exposes safe writes but never send or destructive tools.
-	w := bindingsMap(t, mcpConfig{allowWrite: writeToolNames()})
+	w := bindingsMap(t, &mcpConfig{allowWrite: writeToolNames()})
 	if _, ok := w["mail_flag"]; !ok {
 		t.Error("--allow-write should expose mail_flag")
 	}
@@ -126,7 +126,7 @@ func TestCuratedRegistry_TierGating(t *testing.T) {
 	}
 
 	// --allow-send exposes only the named send tool; not safe writes/destructive.
-	s := bindingsMap(t, mcpConfig{allowSend: setOf("mail_send")})
+	s := bindingsMap(t, &mcpConfig{allowSend: setOf("mail_send")})
 	if _, ok := s["mail_send"]; !ok {
 		t.Error("--allow-send mail_send should expose mail_send")
 	}
@@ -137,7 +137,7 @@ func TestCuratedRegistry_TierGating(t *testing.T) {
 	}
 
 	// --allow-destructive exposes only the named destructive tool.
-	d := bindingsMap(t, mcpConfig{allowDestructive: setOf("mail_delete")})
+	d := bindingsMap(t, &mcpConfig{allowDestructive: setOf("mail_delete")})
 	if _, ok := d["mail_delete"]; !ok {
 		t.Error("--allow-destructive mail_delete should expose mail_delete")
 	}
@@ -150,7 +150,7 @@ func TestCuratedRegistry_TierGating(t *testing.T) {
 // mutating tools even when explicitly named (the capability guard wins).
 func TestCuratedRegistry_GuardsVetoExposure(t *testing.T) {
 	// --no-send hides send tools even if named (safe writes still allowed).
-	ns := bindingsMap(t, mcpConfig{
+	ns := bindingsMap(t, &mcpConfig{
 		noSend:     true,
 		allowSend:  setOf("mail_send"),
 		allowWrite: setOf("mail_flag"),
@@ -163,7 +163,7 @@ func TestCuratedRegistry_GuardsVetoExposure(t *testing.T) {
 	}
 
 	// --no-write hides every mutating tier even when named.
-	nw := bindingsMap(t, mcpConfig{
+	nw := bindingsMap(t, &mcpConfig{
 		noWrite:          true,
 		allowWrite:       writeToolNames(),
 		allowSend:        sendToolNames(),
@@ -180,7 +180,7 @@ func TestCuratedRegistry_GuardsVetoExposure(t *testing.T) {
 // (catches drift if a command is renamed). buildMCPServer errors otherwise.
 func TestCuratedToolsResolve(t *testing.T) {
 	// Expose every curated tool (all tiers named) so resolution covers them all.
-	if _, _, err := buildMCPServer(mcpConfig{
+	if _, _, err := buildMCPServer(&mcpConfig{
 		allowWrite:       writeToolNames(),
 		allowSend:        sendToolNames(),
 		allowDestructive: destructiveToolNames(),
@@ -191,7 +191,7 @@ func TestCuratedToolsResolve(t *testing.T) {
 
 func TestCommandAllowed_FiltersRegistry(t *testing.T) {
 	// Only allow mail.list exactly; the registry should shrink to that one tool.
-	_, bindings, err := buildMCPServer(mcpConfig{
+	_, bindings, err := buildMCPServer(&mcpConfig{
 		allowed: func(path []string) bool {
 			return commandAllowed(&RootFlags{EnableCommandsExact: "mail.list"}, path)
 		},

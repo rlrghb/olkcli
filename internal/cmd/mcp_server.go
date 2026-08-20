@@ -123,13 +123,53 @@ type mcpConfig struct {
 	allowed          func(path []string) bool              // nil = allow all; else command allow/deny lists
 	allowTool        func(name string, readOnly bool) bool // nil = allow all; else --allow-tool selectors
 	maxOutputBytes   int                                   // cap on a single tool call's output text (<=0 = defaultMaxOutputBytes)
+	env              callEnv                               // launch-time context applied to every tool call
+}
+
+// callEnv carries the operator's launch-time context into each tool call.
+//
+// A call re-parses a fresh CLI from a rebuilt argv, so nothing set on the
+// `olk mcp` command line survives on its own: only OLK_* environment variables
+// do, because kong re-reads them on every parse. Left unpropagated, a server
+// started with `--mailbox boss@example.com` silently served the operator's own
+// mailbox instead.
+//
+// The capability guards are carried too. Registration already hides the tools
+// they veto, so this is the second layer: should a tool ever be registered in
+// error, the graphapi guard still refuses the call.
+type callEnv struct {
+	mailbox      string   // --mailbox: default target for mailbox-aware tools
+	account      string   // --account: which signed-in identity to use
+	timeout      int      // --timeout: per-call ceiling, in seconds
+	noWrite      bool     // --no-write
+	noSend       bool     // --no-send
+	allowMailbox []string // --allow-mailbox: mailboxes an agent may name per call
+}
+
+// mailboxAllowed reports whether an agent may direct a call at target. An empty
+// allowlist permits nothing, which is what keeps the argument absent from every
+// schema until the operator opts in.
+func (e callEnv) mailboxAllowed(target string) bool {
+	for _, m := range e.allowMailbox {
+		if strings.EqualFold(m, target) {
+			return true
+		}
+	}
+	return false
+}
+
+// offersMailboxArg reports whether a tool should advertise, and accept, a
+// per-call mailbox: it must honour the flag and the operator must have named
+// mailboxes to choose from.
+func (e callEnv) offersMailboxArg(toolName string) bool {
+	return len(e.allowMailbox) > 0 && mailboxAwareTools[toolName]
 }
 
 // exposes reports whether ct may be registered under cfg: reads always; each
 // mutation tier needs its matching allow-map entry, and send/destructive are
 // additionally gated by the --no-send / --no-write capability guards so a
 // guard-disabled tool is never even advertised.
-func (cfg mcpConfig) exposes(ct curatedTool) bool {
+func (cfg *mcpConfig) exposes(ct curatedTool) bool {
 	switch ct.tier {
 	case tierRead:
 		return true
@@ -157,6 +197,37 @@ const helpFlagName = "help"
 // wouldn't otherwise appear in the tool schema), letting an agent shrink a
 // response per call without affecting tools where the body is the point.
 const conciseArg = "concise"
+
+// mailboxArg is a synthetic string injected into the schema of mailbox-aware
+// tools, but only when the operator has named permitted mailboxes with
+// --allow-mailbox. It maps to olk's global --mailbox flag. Without that flag the
+// property is absent everywhere, so an agent has no way to choose a mailbox and
+// the server behaves exactly as it did before.
+const mailboxArg = "mailbox"
+
+// mailboxAwareTools names the curated tools whose command honours --mailbox.
+// This is deliberately a separate list from curatedTools: whether a command
+// reads the flag is a property of its Run method rather than of its place in the
+// registry, and TestMailboxAwareTools_MatchesSource parses the command sources to
+// keep the two in step. Offering the argument on a tool that ignores it would
+// promise scoping that never happens, which is the same silent mismatch the
+// mailbox work exists to remove.
+// Note what is absent: the calendar and contacts write commands, and the folder
+// write commands, do not read --mailbox at all, so they always act on the
+// signed-in user's own mailbox. That is a wider gap than this list, and it is not
+// addressed here; the list only records the state of things rather than papering
+// over it.
+var mailboxAwareTools = map[string]bool{
+	"mail_list": true, "mail_get": true, "mail_batch": true, "mail_thread": true,
+	"mail_search": true, "mail_folders_list": true, "mail_delta": true,
+	"mail_drafts_create": true, "mail_drafts_send": true,
+	"mail_send": true, "mail_reply": true, "mail_forward": true,
+	"calendar_events": true, "calendar_view": true, "calendar_get": true,
+	"calendar_calendars": true, "calendar_delta": true,
+	"contacts_list": true, "contacts_get": true, "contacts_search": true,
+	"contacts_delta": true,
+	"changes":        true,
+}
 
 // toolNamesForTier returns the set of curated tool names in a given tier — the
 // only names eligible for that tier's allow flag.
@@ -190,6 +261,7 @@ type toolBinding struct {
 	node           *kong.Node
 	tier           toolTier
 	maxOutputBytes int
+	env            callEnv
 }
 
 func (b *toolBinding) readOnly() bool { return b.tier == tierRead }
@@ -209,7 +281,7 @@ func newKongParser(cli *CLI) (*kong.Kong, error) {
 
 // buildMCPServer constructs an MCP server exposing the curated tools the config
 // permits. It returns the bindings so callers (and tests) can inspect the set.
-func buildMCPServer(cfg mcpConfig) (*mcp.Server, []*toolBinding, error) {
+func buildMCPServer(cfg *mcpConfig) (*mcp.Server, []*toolBinding, error) {
 	k, err := newKongParser(&CLI{})
 	if err != nil {
 		return nil, nil, err
@@ -238,7 +310,7 @@ func buildMCPServer(cfg mcpConfig) (*mcp.Server, []*toolBinding, error) {
 		if !ok {
 			return nil, nil, fmt.Errorf("curated MCP tool %q maps to unknown command %q", ct.name, strings.Join(ct.path, " "))
 		}
-		b := &toolBinding{name: ct.name, path: ct.path, node: node, tier: ct.tier, maxOutputBytes: maxOut}
+		b := &toolBinding{name: ct.name, path: ct.path, node: node, tier: ct.tier, maxOutputBytes: maxOut, env: cfg.env}
 		registerTool(srv, b)
 		bindings = append(bindings, b)
 	}
@@ -289,6 +361,19 @@ func toolSchema(b *toolBinding) *jsonschema.Schema {
 		schema.Properties[conciseArg] = &jsonschema.Schema{
 			Type:        "boolean",
 			Description: "Drop large free-text fields (message/event/task bodies, previews, attendee lists) to reduce payload size.",
+		}
+	}
+	if b.env.offersMailboxArg(b.name) {
+		allowed := make([]any, 0, len(b.env.allowMailbox))
+		for _, m := range b.env.allowMailbox {
+			allowed = append(allowed, m)
+		}
+		schema.Properties[mailboxArg] = &jsonschema.Schema{
+			Type: "string",
+			Enum: allowed,
+			Description: "Act on this delegated mailbox instead of the signed-in user's own. " +
+				"Only the listed addresses are permitted; any other value is refused. " +
+				"Omit to use the mailbox the server was started with.",
 		}
 	}
 	return schema

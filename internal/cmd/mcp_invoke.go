@@ -47,6 +47,8 @@ func makeHandler(b *toolBinding) mcp.ToolHandler {
 			return errorResult(fmt.Sprintf("parse error: %v", err)), nil
 		}
 
+		applyLaunchEnv(cli, b.env)
+
 		timeout := cli.Timeout
 		if timeout <= 0 {
 			timeout = 60
@@ -92,6 +94,28 @@ func makeHandler(b *toolBinding) mcp.ToolHandler {
 	}
 }
 
+// applyLaunchEnv restores the operator's launch-time globals onto a per-call CLI.
+//
+// The rebuilt argv carries only the tool's own arguments, so without this a
+// server started with --account or --timeout quietly ignored them. Each field is
+// named explicitly rather than copying the whole flag struct, so adding a global
+// flag never grants it silent passage into tool calls.
+//
+// Mailbox is absent here on purpose: buildArgv resolves it, because only there is
+// a permitted per-call choice distinguishable from the launch default.
+func applyLaunchEnv(cli *CLI, env callEnv) {
+	if cli.Account == "" {
+		cli.Account = env.account
+	}
+	if cli.Timeout <= 0 {
+		cli.Timeout = env.timeout
+	}
+	// The guards only ever tighten: a call cannot lift a restriction the server
+	// was started with.
+	cli.NoWrite = cli.NoWrite || env.noWrite
+	cli.NoSend = cli.NoSend || env.noSend
+}
+
 // rejectUnknownArgs fails the call if args carries a key the tool's schema does
 // not declare (fixed-schema contract).
 func rejectUnknownArgs(b *toolBinding, args map[string]any) error {
@@ -110,6 +134,9 @@ func rejectUnknownArgs(b *toolBinding, args map[string]any) error {
 	}
 	if b.readOnly() {
 		known[conciseArg] = true // synthetic flag injected into read-tool schemas
+	}
+	if b.env.offersMailboxArg(b.name) {
+		known[mailboxArg] = true // synthetic flag injected when --allow-mailbox is set
 	}
 	for k := range args {
 		if !known[k] {
@@ -222,6 +249,26 @@ func buildArgv(b *toolBinding, args map[string]any) ([]string, error) {
 	// layer regardless).
 	if b.tier == tierDestructive {
 		argv = append(argv, "--force")
+	}
+
+	// Resolve the mailbox in one place so precedence is unambiguous: a permitted
+	// per-call choice wins, otherwise the mailbox the server was started with.
+	// The schema advertises the permitted values, but the schema is only advice
+	// to the model — this check is what actually refuses anything else.
+	mailbox := b.env.mailbox
+	if raw, ok := args[mailboxArg]; ok {
+		chosen := strings.TrimSpace(sprintArg(raw))
+		if !b.env.offersMailboxArg(b.name) {
+			return nil, fmt.Errorf("tool %q does not accept a %s argument", b.name, mailboxArg)
+		}
+		if !b.env.mailboxAllowed(chosen) {
+			return nil, fmt.Errorf("mailbox %q is not permitted; this server allows %s",
+				chosen, strings.Join(b.env.allowMailbox, ", "))
+		}
+		mailbox = chosen
+	}
+	if mailbox != "" {
+		argv = append(argv, "--mailbox", mailbox)
 	}
 
 	// Force structured output.

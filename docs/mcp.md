@@ -25,6 +25,31 @@ cap tool output. Unknown arguments are rejected against the generated schema.
 The Graph client independently enforces `--no-write` and `--no-send`, so the
 same safety guarantees apply to CLI, MCP, and scripts.
 
+## Delegated mailboxes
+
+A tool call runs the command against the mailbox the server was started with:
+
+```bash
+olk mcp --mailbox team@example.com
+```
+
+To let an agent choose per call, name the mailboxes it may use. Anything else is
+refused, so an agent cannot reach a mailbox merely because the signed-in user
+can:
+
+```bash
+olk mcp --allow-mailbox team@example.com,support@example.com
+```
+
+Only tools whose command honours `--mailbox` accept the argument, and the
+permitted addresses are listed in the tool schema. Without `--allow-mailbox` the
+argument does not appear at all, and calls act on the launch-time mailbox alone.
+
+Naming a mailbox does not grant any right on it. Reading still needs the
+`.Shared` scope and Exchange delegation, and sending as one still needs
+`Mail.Send.Shared` plus Send As or Send on Behalf Of. `--allow-mailbox` narrows
+what an agent may attempt; it never widens what the signed-in user may do.
+
 ## Adding a tool
 
 Add a carefully reviewed entry to `curatedTools` in
