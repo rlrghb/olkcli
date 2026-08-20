@@ -6,8 +6,8 @@ import "testing"
 // that goes from the wrong mailbox reports success and is only discovered by the
 // recipient.
 func TestDescribeSender_EmptyTargetNamesOwnMailbox(t *testing.T) {
-	if got := describeSender(""); got != "your own mailbox" {
-		t.Fatalf("describeSender(%q) = %q, want %q", "", got, "your own mailbox")
+	if got := describeSender(""); got != ownMailboxLabel {
+		t.Fatalf("describeSender(%q) = %q, want %q", "", got, ownMailboxLabel)
 	}
 }
 

@@ -186,7 +186,7 @@ func (c *MailDraftsDeleteCmd) Run(ctx *RunContext) error {
 // wrong mailbox is invisible to the person waiting for it.
 func describeMailbox(target string) string {
 	if target == "" {
-		return "your own mailbox"
+		return ownMailboxLabel
 	}
 	return target
 }
