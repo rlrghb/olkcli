@@ -283,20 +283,55 @@ func (c *Client) GetMessage(ctx context.Context, target, messageID string, prefe
 	return &m, nil
 }
 
-func (c *Client) SendMessage(ctx context.Context, subject, body string, toRecipients, ccRecipients, bccRecipients []string, isHTML bool, attachments []AttachmentInput, importance string, readReceipt bool) error {
+// SendMessageOptions carries the content of an outgoing message. It exists so
+// that SendMessage can take a mailbox target without growing an eleventh
+// positional parameter.
+type SendMessageOptions struct {
+	Subject     string
+	Body        string
+	To          []string
+	CC          []string
+	BCC         []string
+	IsHTML      bool
+	Attachments []AttachmentInput
+	Importance  string
+	ReadReceipt bool
+}
+
+// SendMessage sends from the target mailbox, or from the signed-in user's own
+// mailbox when target is empty.
+//
+// Sending as another mailbox needs two grants that are easy to confuse, and
+// holding one tells you nothing about the other:
+//
+//   - the token must carry the Mail.Send.Shared scope claim, requested at login
+//     with `--scope Mail.Send.Shared`; and
+//   - the calling user must hold Send As or Send on Behalf Of on the target
+//     mailbox in Exchange, which is a different delegation from the Full Access
+//     that makes reading it work.
+//
+// Before this took a target, a send with --mailbox set silently went out from
+// the caller's own address and still reported success, which is the failure
+// mode this signature exists to prevent.
+func (c *Client) SendMessage(ctx context.Context, target string, opts *SendMessageOptions) error {
 	if err := c.ensureMaySend(); err != nil {
 		return err
 	}
+	if opts == nil {
+		return fmt.Errorf("send options are required")
+	}
+	subject, body := opts.Subject, opts.Body
 	msg := models.NewMessage()
 	msg.SetSubject(&subject)
 
-	if readReceipt {
+	if opts.ReadReceipt {
+		readReceipt := true
 		msg.SetIsReadReceiptRequested(&readReceipt)
 	}
 
 	bodyObj := models.NewItemBody()
 	bodyObj.SetContent(&body)
-	if isHTML {
+	if opts.IsHTML {
 		html := models.HTML_BODYTYPE
 		bodyObj.SetContentType(&html)
 	} else {
@@ -305,29 +340,29 @@ func (c *Client) SendMessage(ctx context.Context, subject, body string, toRecipi
 	}
 	msg.SetBody(bodyObj)
 
-	toR, err := makeRecipients(toRecipients)
+	toR, err := makeRecipients(opts.To)
 	if err != nil {
 		return fmt.Errorf("invalid to recipient: %w", err)
 	}
 	msg.SetToRecipients(toR)
-	if len(ccRecipients) > 0 {
-		ccR, err := makeRecipients(ccRecipients)
+	if len(opts.CC) > 0 {
+		ccR, err := makeRecipients(opts.CC)
 		if err != nil {
 			return fmt.Errorf("invalid cc recipient: %w", err)
 		}
 		msg.SetCcRecipients(ccR)
 	}
-	if len(bccRecipients) > 0 {
-		bccR, err := makeRecipients(bccRecipients)
+	if len(opts.BCC) > 0 {
+		bccR, err := makeRecipients(opts.BCC)
 		if err != nil {
 			return fmt.Errorf("invalid bcc recipient: %w", err)
 		}
 		msg.SetBccRecipients(bccR)
 	}
 
-	if len(attachments) > 0 {
+	if len(opts.Attachments) > 0 {
 		var atts []models.Attachmentable
-		for _, a := range attachments {
+		for _, a := range opts.Attachments {
 			fileAtt := models.NewFileAttachment()
 			odataType := "#microsoft.graph.fileAttachment"
 			fileAtt.SetOdataType(&odataType)
@@ -341,9 +376,9 @@ func (c *Client) SendMessage(ctx context.Context, subject, body string, toRecipi
 		msg.SetAttachments(atts)
 	}
 
-	if importance != "" {
+	if opts.Importance != "" {
 		var imp models.Importance
-		switch importance {
+		switch opts.Importance {
 		case importanceLow:
 			imp = models.LOW_IMPORTANCE
 		case importanceNormal:
@@ -351,7 +386,7 @@ func (c *Client) SendMessage(ctx context.Context, subject, body string, toRecipi
 		case importanceHigh:
 			imp = models.HIGH_IMPORTANCE
 		default:
-			return fmt.Errorf("invalid importance: %q (must be low, normal, or high)", importance)
+			return fmt.Errorf("invalid importance: %q (must be low, normal, or high)", opts.Importance)
 		}
 		msg.SetImportance(&imp)
 	}
@@ -361,7 +396,10 @@ func (c *Client) SendMessage(ctx context.Context, subject, body string, toRecipi
 	saveToSent := true
 	sendBody.SetSaveToSentItems(&saveToSent)
 
-	if err := c.inner.Me().SendMail().Post(ctx, sendBody, nil); err != nil {
+	if err := c.targetUser(target).SendMail().Post(ctx, sendBody, nil); err != nil {
+		if target != "" {
+			return fmt.Errorf("sending message as %s: %w\n\nSending as another mailbox needs both the Mail.Send.Shared scope (sign in again with --scope Mail.Send.Shared) and Send As or Send on Behalf Of on that mailbox in Exchange. Read access to a mailbox does not imply either", target, err)
+		}
 		return fmt.Errorf("sending message: %w", err)
 	}
 	return nil
