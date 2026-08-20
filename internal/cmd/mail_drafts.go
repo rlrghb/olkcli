@@ -143,7 +143,7 @@ func (c *MailDraftsSendCmd) Run(ctx *RunContext) error {
 		return err
 	}
 
-	fmt.Println("Draft sent.")
+	fmt.Printf("Draft sent from %s.\n", describeMailbox(target))
 	return nil
 }
 
@@ -177,7 +177,7 @@ func (c *MailDraftsDeleteCmd) Run(ctx *RunContext) error {
 		return err
 	}
 
-	fmt.Println("Draft deleted.")
+	fmt.Printf("Draft deleted from %s.\n", describeMailbox(target))
 	return nil
 }
 

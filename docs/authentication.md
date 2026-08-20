@@ -47,7 +47,17 @@ on the token **and** Send As or Send on Behalf Of on the mailbox in Exchange —
 a separate delegation from the Full Access that permits reading it. Being able to
 read a shared mailbox therefore does not imply being able to send from it. Confirm
 the sending address with `--dry-run`, which prints the mailbox a send will leave
-from. Other writes remain scoped to the signed-in user.
+from.
+
+The draft commands honour `--mailbox` too, and are the lower-privilege path:
+leaving a draft in a shared mailbox needs `Mail.ReadWrite.Shared` and Full
+Access, but not Send As. Sending that draft afterwards does need Send As, since
+creating a draft somewhere confers no right to send it.
+
+Every other command ignores `--mailbox` and acts on the signed-in user's own
+mailbox. That includes `mail reply` and `mail forward`, which will fail to find a
+message ID belonging to a shared mailbox, because IDs are scoped to the mailbox
+they were listed from.
 
 ## macOS Keychain
 

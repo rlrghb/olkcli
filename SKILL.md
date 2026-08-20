@@ -325,7 +325,9 @@ Reads are the common case. **Sending as a shared mailbox is supported**, and nee
 - the `Mail.Send.Shared` scope on the token — `olk auth login --scope Mail.Send.Shared`; and
 - **Send As** or **Send on Behalf Of** on the mailbox in Exchange, which is a different delegation from the Full Access that lets you read it.
 
-Holding one tells you nothing about the other, and `Full Access` grants neither. Without both, `mail send --mailbox` fails with `Access is denied` and names what is missing. Everything else in a delegated mailbox remains read-only.
+Holding one tells you nothing about the other, and `Full Access` grants neither. Without both, `mail send --mailbox` fails with `Access is denied` and names what is missing.
+
+Sending and the draft commands are the writes that honour `--mailbox`. Everything else ignores it and acts on your own mailbox — including `mail reply` and `mail forward`, which will fail to find a message ID belonging to a shared mailbox, since IDs are scoped to the mailbox they were listed from.
 
 ```bash
 # One-time login with shared scopes
