@@ -32,7 +32,7 @@ func TestNoWriteGuardBlocksMutations(t *testing.T) {
 			_, err := c.CreateEvent(ctx, "", "s", time.Now(), time.Now(), "", []string{"a@b.com"}, false, false, "", "", nil)
 			return err
 		}},
-		{"SendMessage", func() error { return c.SendMessage(ctx, "s", "b", nil, nil, nil, false, nil, "", false) }},
+		{"SendMessage", func() error { return c.SendMessage(ctx, "", &SendMessageOptions{Subject: "s", Body: "b"}) }},
 	}
 	for _, tc := range checks {
 		if err := tc.call(); !errors.Is(err, ErrNoWrite) {
@@ -49,7 +49,7 @@ func TestNoSendGuardBlocksSends(t *testing.T) {
 		name string
 		call func() error
 	}{
-		{"SendMessage", func() error { return c.SendMessage(ctx, "s", "b", nil, nil, nil, false, nil, "", false) }},
+		{"SendMessage", func() error { return c.SendMessage(ctx, "", &SendMessageOptions{Subject: "s", Body: "b"}) }},
 		{"ReplyMessage", func() error { return c.ReplyMessage(ctx, "id", "c", false) }},
 		{"ForwardMessage", func() error { return c.ForwardMessage(ctx, "id", "c", []string{"a@b.com"}) }},
 		{"SendDraft", func() error { return c.SendDraft(ctx, "id") }},

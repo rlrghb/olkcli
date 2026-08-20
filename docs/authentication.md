@@ -40,7 +40,14 @@ olk --account person@example.com mail list
 ```
 
 Delegated mailbox reads use `--mailbox EMAIL` and require the matching `.Shared`
-scope plus Exchange delegation. Writes remain scoped to the signed-in user.
+scope plus Exchange delegation.
+
+`mail send --mailbox EMAIL` sends *as* that mailbox, which needs `Mail.Send.Shared`
+on the token **and** Send As or Send on Behalf Of on the mailbox in Exchange —
+a separate delegation from the Full Access that permits reading it. Being able to
+read a shared mailbox therefore does not imply being able to send from it. Confirm
+the sending address with `--dry-run`, which prints the mailbox a send will leave
+from. Other writes remain scoped to the signed-in user.
 
 ## macOS Keychain
 

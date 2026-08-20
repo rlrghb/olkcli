@@ -318,7 +318,14 @@ olk whoami    # name, email, job title, department, office, phone
 
 ## Delegated Mailbox Access (executive-assistant pattern)
 
-Use when the signed-in account needs to read another user's mailbox under Microsoft 365 mailbox delegation. The signed-in identity is your own (or a service account), Exchange ACLs control which mailboxes you can reach, and the OAuth scope controls what you can do inside them. **Read-only** for now — sending mail or modifying anything in a delegated mailbox is not supported.
+Use when the signed-in account needs to reach another user's mailbox under Microsoft 365 mailbox delegation. The signed-in identity is your own (or a service account), Exchange ACLs control which mailboxes you can reach, and the OAuth scope controls what you can do inside them.
+
+Reads are the common case. **Sending as a shared mailbox is supported**, and needs two grants that are separate from each other and from read access:
+
+- the `Mail.Send.Shared` scope on the token — `olk auth login --scope Mail.Send.Shared`; and
+- **Send As** or **Send on Behalf Of** on the mailbox in Exchange, which is a different delegation from the Full Access that lets you read it.
+
+Holding one tells you nothing about the other, and `Full Access` grants neither. Without both, `mail send --mailbox` fails with `Access is denied` and names what is missing. Everything else in a delegated mailbox remains read-only.
 
 ```bash
 # One-time login with shared scopes
@@ -329,6 +336,10 @@ olk mail list --mailbox boss@example.com
 olk mail get <ID> --mailbox boss@example.com
 olk mail search "from:partner@example.com" --mailbox boss@example.com
 olk mail folders --mailbox boss@example.com
+
+# Send as a shared mailbox (needs Mail.Send.Shared + Send As in Exchange)
+olk mail send --mailbox team@example.com --to person@example.com --subject "..." --body "..."
+olk mail send --mailbox team@example.com --to person@example.com --subject "..." --dry-run   # shows the sending address
 
 # Calendar (also: view, get, calendars)
 olk calendar events --mailbox boss@example.com

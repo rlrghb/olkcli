@@ -4,8 +4,14 @@ import "strings"
 
 // Microsoft Graph API scopes
 const (
-	ScopeMail            = "Mail.ReadWrite"
-	ScopeMailSend        = "Mail.Send"
+	ScopeMail     = "Mail.ReadWrite"
+	ScopeMailSend = "Mail.Send"
+	// ScopeMailSendShared permits sending as a mailbox other than your own.
+	// It is not requested by default: personal Microsoft accounts cannot
+	// consent to it, and it is only useful alongside a Send As or Send on
+	// Behalf Of delegation granted separately in Exchange. Request it at
+	// login with `--scope Mail.Send.Shared`.
+	ScopeMailSendShared  = "Mail.Send.Shared"
 	ScopeCalendar        = "Calendars.ReadWrite"
 	ScopeContacts        = "Contacts.ReadWrite"
 	ScopeTasks           = "Tasks.ReadWrite"
