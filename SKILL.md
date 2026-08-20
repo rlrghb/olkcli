@@ -341,6 +341,11 @@ olk mail folders --mailbox boss@example.com
 olk mail send --mailbox team@example.com --to person@example.com --subject "..." --body "..."
 olk mail send --mailbox team@example.com --to person@example.com --subject "..." --dry-run   # shows the sending address
 
+# Leave a draft in a shared mailbox for a human to send (needs Mail.ReadWrite.Shared
+# and Full Access, but NOT Send As) — the lower-privilege alternative
+olk mail drafts create --mailbox team@example.com --to person@example.com --subject "..." --body "..."
+olk mail drafts list --mailbox team@example.com
+
 # Calendar (also: view, get, calendars)
 olk calendar events --mailbox boss@example.com
 

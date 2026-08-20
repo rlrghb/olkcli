@@ -29,7 +29,12 @@ func (c *MailDraftsListCmd) Run(ctx *RunContext) error {
 		return err
 	}
 
-	drafts, err := client.ListDrafts(ctx.Ctx, c.Top)
+	target, err := resolveMailboxTarget(ctx.Flags.Mailbox)
+	if err != nil {
+		return err
+	}
+
+	drafts, err := client.ListDrafts(ctx.Ctx, target, c.Top)
 	if err != nil {
 		return err
 	}
@@ -69,6 +74,11 @@ func (c *MailDraftsCreateCmd) Run(ctx *RunContext) error {
 		return err
 	}
 
+	target, err := resolveMailboxTarget(ctx.Flags.Mailbox)
+	if err != nil {
+		return err
+	}
+
 	body := c.Body
 	// Read from stdin if no body provided
 	if body == "" {
@@ -93,17 +103,17 @@ func (c *MailDraftsCreateCmd) Run(ctx *RunContext) error {
 	}
 
 	if ctx.Flags.DryRun {
-		fmt.Printf("Would create draft:\n  To: %s\n  Subject: %s\n  Body: %s\n",
-			strings.Join(c.To, ", "), outfmt.Sanitize(c.Subject), outfmt.Sanitize(body))
+		fmt.Printf("Would create draft:\n  In: %s\n  To: %s\n  Subject: %s\n  Body: %s\n",
+			describeMailbox(target), strings.Join(c.To, ", "), outfmt.Sanitize(c.Subject), outfmt.Sanitize(body))
 		return nil
 	}
 
-	draft, err := client.CreateDraft(ctx.Ctx, c.Subject, body, c.To, c.CC, c.BCC, c.HTML)
+	draft, err := client.CreateDraft(ctx.Ctx, target, c.Subject, body, c.To, c.CC, c.BCC, c.HTML)
 	if err != nil {
 		return err
 	}
 
-	fmt.Printf("Draft created: %s (ID: %s)\n", outfmt.Sanitize(draft.Subject), outfmt.Sanitize(draft.ID))
+	fmt.Printf("Draft created in %s: %s (ID: %s)\n", describeMailbox(target), outfmt.Sanitize(draft.Subject), outfmt.Sanitize(draft.ID))
 	return nil
 }
 
@@ -118,12 +128,17 @@ func (c *MailDraftsSendCmd) Run(ctx *RunContext) error {
 		return err
 	}
 
+	target, err := resolveMailboxTarget(ctx.Flags.Mailbox)
+	if err != nil {
+		return err
+	}
+
 	if ctx.Flags.DryRun {
-		fmt.Printf("Would send draft %s\n", outfmt.Sanitize(c.ID))
+		fmt.Printf("Would send draft %s from %s\n", outfmt.Sanitize(c.ID), describeMailbox(target))
 		return nil
 	}
 
-	err = client.SendDraft(ctx.Ctx, c.ID)
+	err = client.SendDraft(ctx.Ctx, target, c.ID)
 	if err != nil {
 		return err
 	}
@@ -143,20 +158,35 @@ func (c *MailDraftsDeleteCmd) Run(ctx *RunContext) error {
 		return err
 	}
 
+	target, err := resolveMailboxTarget(ctx.Flags.Mailbox)
+	if err != nil {
+		return err
+	}
+
 	if !ctx.Flags.Force {
 		return fmt.Errorf("delete draft %s: use --force to confirm deletion", outfmt.Sanitize(c.ID))
 	}
 
 	if ctx.Flags.DryRun {
-		fmt.Printf("Would delete draft %s\n", outfmt.Sanitize(c.ID))
+		fmt.Printf("Would delete draft %s from %s\n", outfmt.Sanitize(c.ID), describeMailbox(target))
 		return nil
 	}
 
-	err = client.DeleteDraft(ctx.Ctx, c.ID)
+	err = client.DeleteDraft(ctx.Ctx, target, c.ID)
 	if err != nil {
 		return err
 	}
 
 	fmt.Println("Draft deleted.")
 	return nil
+}
+
+// describeMailbox names the mailbox an operation acts on, so that output and dry
+// runs distinguish your own Drafts folder from a shared one. A draft left in the
+// wrong mailbox is invisible to the person waiting for it.
+func describeMailbox(target string) string {
+	if target == "" {
+		return "your own mailbox"
+	}
+	return target
 }
