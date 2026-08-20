@@ -68,3 +68,7 @@ func parseDateTime(s string) string {
 	}
 	return ""
 }
+
+// ownMailboxLabel names the signed-in user's own mailbox in command output,
+// distinguishing it from a delegated one.
+const ownMailboxLabel = "your own mailbox"

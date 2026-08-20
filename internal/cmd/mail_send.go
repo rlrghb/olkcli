@@ -140,7 +140,7 @@ func (c *MailSendCmd) Run(ctx *RunContext) error {
 // wrong is silent otherwise: the message simply arrives from the wrong address.
 func describeSender(target string) string {
 	if target == "" {
-		return "your own mailbox"
+		return ownMailboxLabel
 	}
 	return target
 }

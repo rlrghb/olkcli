@@ -5,7 +5,7 @@ import "testing"
 // A draft left in the wrong mailbox is invisible to the person waiting for it,
 // so both the dry run and the success line name the mailbox explicitly.
 func TestDescribeMailbox_EmptyTargetNamesOwnMailbox(t *testing.T) {
-	if got := describeMailbox(""); got != "your own mailbox" {
+	if got := describeMailbox(""); got != ownMailboxLabel {
 		t.Fatalf("describeMailbox(%q) = %q", "", got)
 	}
 }
