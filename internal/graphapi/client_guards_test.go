@@ -33,6 +33,18 @@ func TestNoWriteGuardBlocksMutations(t *testing.T) {
 			return err
 		}},
 		{"SendMessage", func() error { return c.SendMessage(ctx, "", &SendMessageOptions{Subject: "s", Body: "b"}) }},
+		// Draft writes can land in someone else's mailbox now, so the guard
+		// matters more than when they could only touch your own.
+		{"CreateDraft", func() error {
+			_, err := c.CreateDraft(ctx, "", "s", "b", []string{"a@b.com"}, nil, nil, false)
+			return err
+		}},
+		{"CreateDraft into a shared mailbox", func() error {
+			_, err := c.CreateDraft(ctx, "shared@example.com", "s", "b", []string{"a@b.com"}, nil, nil, false)
+			return err
+		}},
+		{"DeleteDraft", func() error { return c.DeleteDraft(ctx, "", "id") }},
+		{"DeleteDraft from a shared mailbox", func() error { return c.DeleteDraft(ctx, "shared@example.com", "id") }},
 	}
 	for _, tc := range checks {
 		if err := tc.call(); !errors.Is(err, ErrNoWrite) {
@@ -52,7 +64,8 @@ func TestNoSendGuardBlocksSends(t *testing.T) {
 		{"SendMessage", func() error { return c.SendMessage(ctx, "", &SendMessageOptions{Subject: "s", Body: "b"}) }},
 		{"ReplyMessage", func() error { return c.ReplyMessage(ctx, "id", "c", false) }},
 		{"ForwardMessage", func() error { return c.ForwardMessage(ctx, "id", "c", []string{"a@b.com"}) }},
-		{"SendDraft", func() error { return c.SendDraft(ctx, "id") }},
+		{"SendDraft", func() error { return c.SendDraft(ctx, "", "id") }},
+		{"SendDraft from a shared mailbox", func() error { return c.SendDraft(ctx, "shared@example.com", "id") }},
 		{"RespondToEvent", func() error { return c.RespondToEvent(ctx, "id", "accept") }},
 		{"CreateEvent w/ attendees", func() error {
 			_, err := c.CreateEvent(ctx, "", "s", time.Now(), time.Now(), "", []string{"a@b.com"}, false, false, "", "", nil)
