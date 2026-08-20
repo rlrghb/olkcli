@@ -398,40 +398,75 @@ func (c *Client) SendMessage(ctx context.Context, target string, opts *SendMessa
 
 	if err := c.targetUser(target).SendMail().Post(ctx, sendBody, nil); err != nil {
 		if target != "" {
-			return fmt.Errorf("sending message as %s: %w\n\nSending as another mailbox needs both the Mail.Send.Shared scope (sign in again with --scope Mail.Send.Shared) and Send As or Send on Behalf Of on that mailbox in Exchange. Read access to a mailbox does not imply either", target, err)
+			return sharedMailboxError("sending message", target, sendGrantHint, err)
 		}
 		return fmt.Errorf("sending message: %w", err)
 	}
 	return nil
 }
 
-func (c *Client) ReplyMessage(ctx context.Context, messageID, comment string, replyAll bool) error {
+// Graph reports a missing scope and a missing Exchange delegation identically,
+// as a bare "Access is denied", which leaves no clue about which of the two
+// independent grants is absent. These hints name both so the reader can check
+// the one they have not already ruled out.
+const (
+	sendGrantHint = "Sending as another mailbox needs both the Mail.Send.Shared scope " +
+		"(sign in again with --scope Mail.Send.Shared) and Send As or Send on Behalf Of on that " +
+		"mailbox in Exchange. Read access to a mailbox does not imply either"
+
+	replyGrantHint = sendGrantHint + ".\n\nReplying and forwarding also read the original from " +
+		"that mailbox, so the message ID must be one listed from it: IDs are scoped to a mailbox, " +
+		"and an ID taken from your own will not resolve in a shared one"
+)
+
+func sharedMailboxError(action, target, hint string, err error) error {
+	return fmt.Errorf("%s as %s: %w\n\n%s", action, target, err, hint)
+}
+
+// ReplyMessage replies to a message in the target mailbox, or in the signed-in
+// user's own mailbox when target is empty.
+//
+// The target selects both the mailbox the original is read from and the identity
+// the reply is sent as, because a message ID only resolves within the mailbox it
+// was listed from. Without a target, an ID belonging to a shared mailbox fails to
+// resolve at all, which is why replying from one was previously impossible rather
+// than merely mis-attributed.
+func (c *Client) ReplyMessage(ctx context.Context, target, messageID, comment string, replyAll bool) error {
 	if err := c.ensureMaySend(); err != nil {
 		return err
 	}
 	if err := validateID(messageID, "message ID"); err != nil {
 		return err
 	}
+	action := "reply"
+	if replyAll {
+		action = "reply all"
+	}
+
+	var err error
 	if replyAll {
 		body := users.NewItemMessagesItemReplyAllPostRequestBody()
 		body.SetComment(&comment)
-		err := c.inner.Me().Messages().ByMessageId(messageID).ReplyAll().Post(ctx, body, nil)
-		if err != nil {
-			return fmt.Errorf("reply all: %w", err)
-		}
-		return nil
+		err = c.targetUser(target).Messages().ByMessageId(messageID).ReplyAll().Post(ctx, body, nil)
+	} else {
+		body := users.NewItemMessagesItemReplyPostRequestBody()
+		body.SetComment(&comment)
+		err = c.targetUser(target).Messages().ByMessageId(messageID).Reply().Post(ctx, body, nil)
 	}
-
-	body := users.NewItemMessagesItemReplyPostRequestBody()
-	body.SetComment(&comment)
-	err := c.inner.Me().Messages().ByMessageId(messageID).Reply().Post(ctx, body, nil)
 	if err != nil {
-		return fmt.Errorf("reply: %w", err)
+		if target != "" {
+			return sharedMailboxError(action, target, replyGrantHint, err)
+		}
+		return fmt.Errorf("%s: %w", action, err)
 	}
 	return nil
 }
 
-func (c *Client) ForwardMessage(ctx context.Context, messageID, comment string, toRecipients []string) error {
+// ForwardMessage forwards a message from the target mailbox, or from the
+// signed-in user's own mailbox when target is empty. As with ReplyMessage, the
+// target selects both the mailbox the original is read from and the sending
+// identity.
+func (c *Client) ForwardMessage(ctx context.Context, target, messageID, comment string, toRecipients []string) error {
 	if err := c.ensureMaySend(); err != nil {
 		return err
 	}
@@ -446,8 +481,11 @@ func (c *Client) ForwardMessage(ctx context.Context, messageID, comment string, 
 	}
 	body.SetToRecipients(fwdR)
 
-	err = c.inner.Me().Messages().ByMessageId(messageID).Forward().Post(ctx, body, nil)
+	err = c.targetUser(target).Messages().ByMessageId(messageID).Forward().Post(ctx, body, nil)
 	if err != nil {
+		if target != "" {
+			return sharedMailboxError("forward", target, replyGrantHint, err)
+		}
 		return fmt.Errorf("forward: %w", err)
 	}
 	return nil

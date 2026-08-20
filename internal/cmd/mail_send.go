@@ -134,13 +134,3 @@ func (c *MailSendCmd) Run(ctx *RunContext) error {
 	fmt.Println("Message sent.")
 	return nil
 }
-
-// describeSender names the mailbox a send will leave from, so that a dry run
-// shows the sending identity rather than only the recipients. Getting this
-// wrong is silent otherwise: the message simply arrives from the wrong address.
-func describeSender(target string) string {
-	if target == "" {
-		return ownMailboxLabel
-	}
-	return target
-}

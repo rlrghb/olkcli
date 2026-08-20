@@ -186,13 +186,3 @@ func (c *MailDraftsDeleteCmd) Run(ctx *RunContext) error {
 	fmt.Printf("Draft deleted from %s.\n", describeMailbox(target))
 	return nil
 }
-
-// describeMailbox names the mailbox an operation acts on, so that output and dry
-// runs distinguish your own Drafts folder from a shared one. A draft left in the
-// wrong mailbox is invisible to the person waiting for it.
-func describeMailbox(target string) string {
-	if target == "" {
-		return ownMailboxLabel
-	}
-	return target
-}

@@ -72,3 +72,14 @@ func parseDateTime(s string) string {
 // ownMailboxLabel names the signed-in user's own mailbox in command output,
 // distinguishing it from a delegated one.
 const ownMailboxLabel = "your own mailbox"
+
+// describeMailbox names the mailbox an operation acts on, so that dry runs and
+// success lines state the sending or receiving identity rather than only the
+// recipients. Getting this wrong is otherwise invisible: a send leaves from the
+// wrong address, and a draft lands where the person waiting for it will not look.
+func describeMailbox(target string) string {
+	if target == "" {
+		return ownMailboxLabel
+	}
+	return target
+}

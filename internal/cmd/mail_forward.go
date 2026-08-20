@@ -20,6 +20,11 @@ func (c *MailForwardCmd) Run(ctx *RunContext) error {
 		return err
 	}
 
+	target, err := resolveMailboxTarget(ctx.Flags.Mailbox)
+	if err != nil {
+		return err
+	}
+
 	for _, addr := range c.To {
 		if err := graphapi.ValidateEmail(addr); err != nil {
 			return err
@@ -27,15 +32,19 @@ func (c *MailForwardCmd) Run(ctx *RunContext) error {
 	}
 
 	if ctx.Flags.DryRun {
-		fmt.Printf("Would forward message %s to %s\n", outfmt.Sanitize(c.ID), strings.Join(c.To, ", "))
+		fmt.Printf("Would forward message %s to %s as %s\n",
+			outfmt.Sanitize(c.ID), strings.Join(c.To, ", "), describeMailbox(target))
 		return nil
 	}
 
-	err = client.ForwardMessage(ctx.Ctx, c.ID, c.Comment, c.To)
-	if err != nil {
+	if err := client.ForwardMessage(ctx.Ctx, target, c.ID, c.Comment, c.To); err != nil {
 		return err
 	}
 
+	if target != "" {
+		fmt.Printf("Message forwarded from %s.\n", target)
+		return nil
+	}
 	fmt.Println("Message forwarded.")
 	return nil
 }
