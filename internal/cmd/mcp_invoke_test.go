@@ -211,8 +211,12 @@ func TestClassifyError_SendAsDeniedNamesTheExchangeGrants(t *testing.T) {
 // throttle into permission problems, and sends an agent to an administrator
 // instead of re-listing or backing off.
 func TestClassifyError_TheGrantHintAloneIsNotARefusal(t *testing.T) {
-	// What sharedMailboxError actually produces: the underlying Graph failure,
-	// then the hint.
+	// The shape sharedMailboxError produces: the Graph failure, then a blank line,
+	// then the hint. Only the ordering and the literals matter to classification,
+	// so the wrapper prefix and the tail of the hint are abbreviated.
+	// TestSharedMailboxErrorCarriesTheGraphCode in the graphapi package covers the
+	// other half — that a real ODataError reaches this string with its code
+	// intact, which is what makes the refusal recognisable at all.
 	decorate := func(graphErr string) string {
 		return "sending message from team@example.com: " + graphErr +
 			"\n\nSending as another mailbox needs three separate grants: the " +

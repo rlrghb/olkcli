@@ -244,11 +244,14 @@ func classifyError(msg string) (code, action string) {
 	// so the hint alone says nothing about why the call failed — a stale ID and a
 	// throttle arrive wearing it too. Pair it with an actual refusal before
 	// reading it as one.
+	// The paired signals are all denials. A bare 403 is not among them: Graph also
+	// uses it for licensing and conditional access, and pairing on it would give
+	// every such failure the three-grant diagnosis.
 	refusedSend := strings.Contains(msg, "ErrorSendAsDenied") ||
 		(strings.Contains(msg, "Mail.Send.Shared") &&
 			(strings.Contains(msg, "Access is denied") ||
 				strings.Contains(msg, "ErrorAccessDenied") ||
-				strings.Contains(msg, "403")))
+				strings.Contains(msg, "Forbidden")))
 
 	switch {
 	case strings.Contains(msg, "no account configured"),
@@ -267,7 +270,7 @@ func classifyError(msg string) (code, action string) {
 	// ErrorSendAsDenied and sometimes only with a bare "Access is denied", which
 	// no other case here matches.
 	case refusedSend:
-		return "forbidden", "sending as another mailbox needs three grants: the Mail.Send.Shared scope, Send As or Send on Behalf Of on that mailbox in Exchange, and Full Access on it. Only the first comes from signing in again; the other two are administrator-managed in Exchange"
+		return "forbidden", "a refused send as another mailbox is usually a missing grant, of which there are three: the Mail.Send.Shared scope, Send As or Send on Behalf Of on that mailbox in Exchange, and Full Access on it. Only the first comes from signing in again; the other two are administrator-managed in Exchange"
 	case strings.Contains(msg, "ErrorAccessDenied"),
 		strings.Contains(msg, "Forbidden"),
 		strings.Contains(msg, "403"):

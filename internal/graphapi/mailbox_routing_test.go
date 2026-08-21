@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+
+	"github.com/microsoftgraph/msgraph-sdk-go/models/odataerrors"
 )
 
 // meBuilderPath is what the SDK's Me() builder emits before the Graph middleware
@@ -156,5 +158,31 @@ func TestDelegatedWritesAddressTheTargetMailbox(t *testing.T) {
 					"wrong path acts on the wrong mailbox and still reports success", got, tc.want)
 			}
 		})
+	}
+}
+
+// A refused delegated send must arrive carrying Graph's error code.
+//
+// ODataError.Error() returns only the provider message, so wrapping one with %w
+// renders prose that names neither the code nor the status. Everything that has
+// to tell a refused send from a stale ID reads this string, so the code has to be
+// in it.
+func TestSharedMailboxErrorCarriesTheGraphCode(t *testing.T) {
+	odataErr := odataerrors.NewODataError()
+	main := odataerrors.NewMainError()
+	code := "ErrorSendAsDenied"
+	// Microsoft's documented message for this failure names neither the code nor
+	// the phrase "access denied", which is exactly why the code must survive.
+	message := "The user account which was used to submit this request does not have " +
+		"the right to send mail on behalf of the specified sending account."
+	main.SetCode(&code)
+	main.SetMessage(&message)
+	odataErr.SetErrorEscaped(main)
+
+	got := sharedMailboxError("sending message", "team@example.com", sendGrantHint, odataErr).Error()
+	for _, want := range []string{"ErrorSendAsDenied", "team@example.com", "Full Access"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("error text does not mention %q:\n%s", want, got)
+		}
 	}
 }
