@@ -33,6 +33,14 @@ A tool call runs the command against the mailbox the server was started with:
 olk mcp --mailbox team@example.com
 ```
 
+Tools that cannot honour that choice are not exposed. Some commands ignore
+`--mailbox` and always act on the signed-in user's own mailbox — the calendar,
+contact and folder writes, and the commands that organise mail in place — so on
+a server started with a mailbox they would quietly act on the wrong one.
+Withholding them costs an agent those tools; offering them would cost the
+operator a message deleted in the wrong mailbox. Tools with no mailbox dimension
+at all, such as OneDrive and To Do, are unaffected.
+
 To let an agent choose per call, name the mailboxes it may use. Anything else is
 refused, so an agent cannot reach a mailbox merely because the signed-in user
 can:

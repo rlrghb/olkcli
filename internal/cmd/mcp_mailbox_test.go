@@ -15,13 +15,13 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-func mailboxEnv(allowed ...string) callEnv {
-	return callEnv{allowMailbox: allowed}
+func mailboxEnv(allowed ...string) *callEnv {
+	return &callEnv{allowMailbox: allowed}
 }
 
-func bindingFor(t *testing.T, name string, env callEnv, path ...string) *toolBinding {
+func bindingFor(t *testing.T, name string, env *callEnv, path ...string) *toolBinding {
 	t.Helper()
-	return &toolBinding{name: name, path: path, node: leafByPath(t, path...), tier: tierRead, env: env}
+	return &toolBinding{name: name, path: path, node: leafByPath(t, path...), tier: tierRead, env: *env}
 }
 
 // Without --allow-mailbox the property must not appear anywhere: the default
@@ -42,7 +42,7 @@ func TestMailboxArg_AbsentWithoutAllowlist(t *testing.T) {
 // permitted values are enumerated in the schema.
 func TestMailboxArg_OnlyOnMailboxAwareTools(t *testing.T) {
 	env := mailboxEnv("team@example.com", "boss@example.com")
-	_, bindings, err := buildMCPServer(&mcpConfig{env: env})
+	_, bindings, err := buildMCPServer(&mcpConfig{env: *env})
 	if err != nil {
 		t.Fatalf("buildMCPServer: %v", err)
 	}
@@ -72,7 +72,7 @@ func TestMailboxArg_OnlyOnMailboxAwareTools(t *testing.T) {
 // the launch-time context exists to fix: the rebuilt argv otherwise carries none
 // of the operator's global flags.
 func TestBuildArgv_LaunchMailboxReachesTheCall(t *testing.T) {
-	b := bindingFor(t, "mail_list", callEnv{mailbox: "boss@example.com"}, "mail", "list")
+	b := bindingFor(t, "mail_list", &callEnv{mailbox: "boss@example.com"}, "mail", "list")
 	argv, err := buildArgv(b, nil)
 	if err != nil {
 		t.Fatalf("buildArgv: %v", err)
@@ -122,7 +122,7 @@ func TestRejectUnknownArgs_MailboxOnlyOnAwareTools(t *testing.T) {
 // the capability guards must only ever tighten.
 func TestApplyLaunchEnv_CarriesGlobalsAndOnlyTightensGuards(t *testing.T) {
 	cli := &CLI{}
-	applyLaunchEnv(cli, callEnv{account: "svc@example.com", timeout: 120, noSend: true, noWrite: true})
+	applyLaunchEnv(cli, &callEnv{account: "svc@example.com", timeout: 120, noSend: true, noWrite: true})
 	if cli.Account != "svc@example.com" || cli.Timeout != 120 {
 		t.Fatalf("account=%q timeout=%d, want the launch values", cli.Account, cli.Timeout)
 	}
@@ -137,7 +137,7 @@ func TestApplyLaunchEnv_CarriesGlobalsAndOnlyTightensGuards(t *testing.T) {
 	ambient := &CLI{}
 	ambient.Account = "personal@example.com"
 	ambient.Timeout = 60
-	applyLaunchEnv(ambient, callEnv{account: "svc@example.com", timeout: 120})
+	applyLaunchEnv(ambient, &callEnv{account: "svc@example.com", timeout: 120})
 	if ambient.Account != "svc@example.com" {
 		t.Errorf("account = %q, want the mailbox the server was started with", ambient.Account)
 	}
@@ -149,7 +149,7 @@ func TestApplyLaunchEnv_CarriesGlobalsAndOnlyTightensGuards(t *testing.T) {
 	envOnly := &CLI{}
 	envOnly.Account = "personal@example.com"
 	envOnly.Timeout = 60
-	applyLaunchEnv(envOnly, callEnv{})
+	applyLaunchEnv(envOnly, &callEnv{})
 	if envOnly.Account != "personal@example.com" || envOnly.Timeout != 60 {
 		t.Errorf("account=%q timeout=%d, want the environment's values left alone",
 			envOnly.Account, envOnly.Timeout)
@@ -158,7 +158,7 @@ func TestApplyLaunchEnv_CarriesGlobalsAndOnlyTightensGuards(t *testing.T) {
 	// A call must never be able to lift a guard the server was started with.
 	guarded := &CLI{}
 	guarded.NoSend = true
-	applyLaunchEnv(guarded, callEnv{noSend: false})
+	applyLaunchEnv(guarded, &callEnv{noSend: false})
 	if !guarded.NoSend {
 		t.Error("a call must not be able to lift its own --no-send")
 	}

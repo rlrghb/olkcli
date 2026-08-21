@@ -104,6 +104,12 @@ func (c *MCPCmd) Run(ctx *RunContext) error {
 			timeout:      flags.Timeout,
 			noWrite:      flags.NoWrite,
 			noSend:       flags.NoSend,
+			dryRun:       flags.DryRun,
+			concise:      flags.Concise,
+			resultsOnly:  flags.ResultsOnly,
+			immutableIDs: flags.ImmutableIDs,
+			timezone:     flags.TimeZone,
+			selectFields: flags.Select,
 			allowMailbox: allowMailbox,
 		},
 	})

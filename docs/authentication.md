@@ -59,8 +59,9 @@ grants, and read access besides: both read the original from that mailbox before
 sending as it. The message ID must therefore be one listed from that mailbox,
 since IDs are scoped to a mailbox and one taken from your own will not resolve.
 
-Calendar and contact writes remain scoped to the signed-in user; they do not read
-`--mailbox`.
+Calendar writes, contact writes, folder writes, and the commands that organise
+mail in place — move, flag, categorise, mark — remain scoped to the signed-in
+user; they do not read `--mailbox`.
 
 ## macOS Keychain
 

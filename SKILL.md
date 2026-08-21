@@ -327,7 +327,7 @@ Reads are the common case. **Sending as a shared mailbox is supported**, and nee
 
 Holding one tells you nothing about the other, and `Full Access` grants neither. Without both, `mail send --mailbox` fails with `Access is denied` and names what is missing. `mail reply` and `mail forward` need the same two grants, plus read access, because they read the original from that mailbox before sending as it — and the message ID must be one listed from that mailbox, since IDs are scoped to the mailbox they came from.
 
-Sending, replying, forwarding and the draft commands are the writes that honour `--mailbox`. Calendar and contact writes ignore it and act on the signed-in user's own mailbox.
+Sending, replying, forwarding and the draft commands are the writes that honour `--mailbox`. The calendar, contact and folder writes ignore it, as do the commands that organise mail in place — move, flag, categorise, mark — and all of them act on the signed-in user's own mailbox.
 
 ```bash
 # One-time login with shared scopes
@@ -364,7 +364,7 @@ export OLK_MAILBOX=boss@example.com
 ```
 
 - The target must have granted **Full Access** via M365 Admin Center → Mailbox permissions; the calling token must carry the matching `.Shared` scope.
-- Write commands (send, reply, move, flag, create event, update contact, etc.) ignore `--mailbox` and always act on the signed-in user's own mailbox.
+- Not every write honours it. Send, reply, forward and the draft commands do; moving, flagging, categorising and marking mail do not, nor do the folder, calendar and contact writes, which always act on the signed-in user's own mailbox.
 
 ## Shortcuts
 

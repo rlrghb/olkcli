@@ -138,18 +138,24 @@ type mcpConfig struct {
 // they veto, so this is the second layer: should a tool ever be registered in
 // error, the graphapi guard still refuses the call.
 type callEnv struct {
-	mailbox      string   // --mailbox: default target for mailbox-aware tools
-	account      string   // --account: which signed-in identity to use
-	timeout      int      // --timeout: per-call ceiling, in seconds
-	noWrite      bool     // --no-write
-	noSend       bool     // --no-send
-	allowMailbox []string // --allow-mailbox: mailboxes an agent may name per call
+	mailbox      string       // --mailbox: default target for mailbox-aware tools
+	account      string       // --account: which signed-in identity to use
+	timeout      int          // --timeout: per-call ceiling, in seconds
+	noWrite      bool         // --no-write
+	noSend       bool         // --no-send
+	dryRun       bool         // --dry-run: describe the mutation instead of making it
+	concise      bool         // --concise: drop large free-text fields from JSON
+	resultsOnly  bool         // --results-only: emit the results array alone
+	immutableIDs bool         // --immutable-ids: request move-stable Outlook IDs
+	timezone     string       // --tz: IANA zone for displayed times
+	selectFields SelectFields // --select: field projection
+	allowMailbox []string     // --allow-mailbox: mailboxes an agent may name per call
 }
 
 // mailboxAllowed reports whether an agent may direct a call at target. An empty
 // allowlist permits nothing, which is what keeps the argument absent from every
 // schema until the operator opts in.
-func (e callEnv) mailboxAllowed(target string) bool {
+func (e *callEnv) mailboxAllowed(target string) bool {
 	for _, m := range e.allowMailbox {
 		if strings.EqualFold(m, target) {
 			return true
@@ -161,7 +167,7 @@ func (e callEnv) mailboxAllowed(target string) bool {
 // offersMailboxArg reports whether a tool should advertise, and accept, a
 // per-call mailbox: it must honour the flag and the operator must have named
 // mailboxes to choose from.
-func (e callEnv) offersMailboxArg(toolName string) bool {
+func (e *callEnv) offersMailboxArg(toolName string) bool {
 	return len(e.allowMailbox) > 0 && mailboxAwareTools[toolName]
 }
 
@@ -170,6 +176,12 @@ func (e callEnv) offersMailboxArg(toolName string) bool {
 // additionally gated by the --no-send / --no-write capability guards so a
 // guard-disabled tool is never even advertised.
 func (cfg *mcpConfig) exposes(ct curatedTool) bool {
+	// A launch mailbox is a statement about which mailbox this server serves.
+	// A tool that cannot honour it would serve the operator's own instead, so
+	// it is withheld rather than offered under a promise it cannot keep.
+	if cfg.env.mailbox != "" && mailboxScopedButUnaware(ct.name) {
+		return false
+	}
 	switch ct.tier {
 	case tierRead:
 		return true
@@ -212,11 +224,9 @@ const mailboxArg = "mailbox"
 // keep the two in step. Offering the argument on a tool that ignores it would
 // promise scoping that never happens, which is the same silent mismatch the
 // mailbox work exists to remove.
-// Note what is absent: the calendar and contacts write commands, and the folder
-// write commands, do not read --mailbox at all, so they always act on the
-// signed-in user's own mailbox. That is a wider gap than this list, and it is not
-// addressed here; the list only records the state of things rather than papering
-// over it.
+// A tool absent from this list is not necessarily safe under a launch mailbox:
+// see mailboxIrrelevantTools for the distinction that decides whether it may be
+// exposed at all.
 var mailboxAwareTools = map[string]bool{
 	"mail_list": true, "mail_get": true, "mail_batch": true, "mail_thread": true,
 	"mail_search": true, "mail_folders_list": true, "mail_delta": true,
@@ -227,6 +237,35 @@ var mailboxAwareTools = map[string]bool{
 	"contacts_list": true, "contacts_get": true, "contacts_search": true,
 	"contacts_delta": true,
 	"changes":        true,
+}
+
+// mailboxIrrelevantTools names the curated tools that have no mailbox dimension
+// at all: OneDrive, To Do, the directory search, and the two meta commands read
+// resources that a mailbox delegation does not scope. Naming a mailbox says
+// nothing about them, so a launch mailbox leaves them exposed and unchanged.
+var mailboxIrrelevantTools = map[string]bool{
+	"drive_ls": true, "drive_get": true, "drive_info": true, "drive_search": true,
+	"drive_recent": true, "drive_shared": true, "drive_versions": true,
+	"todo_lists_list": true, "todo_list": true, "todo_get": true,
+	"todo_checklist_list": true, "todo_links_list": true,
+	"todo_create": true, "todo_update": true, "todo_complete": true,
+	"todo_delete":   true,
+	"people_search": true,
+	"whoami":        true, "version": true,
+}
+
+// mailboxScopedButUnaware reports whether a tool reads or writes mailbox-scoped
+// data yet ignores --mailbox, and so would act on the signed-in user's own
+// mailbox whatever the operator asked for.
+//
+// This is the dangerous third class. A tool that honours the flag serves the
+// named mailbox; a tool with no mailbox dimension is unaffected by the choice;
+// but one of these silently substitutes a different mailbox for the one the
+// operator configured. Deleting a message or creating an event in the wrong
+// mailbox is not a degraded result, it is the wrong action taken, so a server
+// started with --mailbox does not register these at all.
+func mailboxScopedButUnaware(toolName string) bool {
+	return !mailboxAwareTools[toolName] && !mailboxIrrelevantTools[toolName]
 }
 
 // toolNamesForTier returns the set of curated tool names in a given tier — the

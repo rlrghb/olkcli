@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -37,17 +38,14 @@ func makeHandler(b *toolBinding) mcp.ToolHandler {
 			return errorResult(err.Error()), nil
 		}
 
-		cli := &CLI{}
-		k, err := newKongParser(cli)
+		cli, kctx, err := prepareCall(argv, &b.env)
 		if err != nil {
-			return nil, fmt.Errorf("building parser: %w", err)
+			var bad *argvError
+			if errors.As(err, &bad) {
+				return errorResult(fmt.Sprintf("parse error: %v", bad.Unwrap())), nil
+			}
+			return nil, err
 		}
-		kctx, err := k.Parse(argv)
-		if err != nil {
-			return errorResult(fmt.Sprintf("parse error: %v", err)), nil
-		}
-
-		applyLaunchEnv(cli, b.env)
 
 		timeout := cli.Timeout
 		if timeout <= 0 {
@@ -58,12 +56,6 @@ func makeHandler(b *toolBinding) mcp.ToolHandler {
 		}
 		callCtx, cancel := context.WithTimeout(ctx, time.Duration(timeout)*time.Second)
 		defer cancel()
-
-		// Force agent-safe output regardless of what the reparsed argv set:
-		// never block on a prompt, and wrap externally-controlled free text so
-		// the model treats it as data, not instructions.
-		cli.NoInput = true
-		cli.WrapUntrusted = true
 
 		runCtx := &RunContext{Ctx: callCtx, Flags: &cli.RootFlags}
 
@@ -94,6 +86,48 @@ func makeHandler(b *toolBinding) mcp.ToolHandler {
 	}
 }
 
+// prepareCall turns a rebuilt argv into the CLI a tool call runs under: parse it
+// fresh, restore the operator's launch-time globals over the top, then force the
+// two settings no call may choose for itself.
+//
+// It exists as its own function so a test can assert what a call actually runs
+// with. The alternative — reading it back out of a completed call — needs live
+// credentials for any command that touches Graph, which is every command whose
+// launch flags matter.
+//
+// A rejected argv comes back wrapped in argvError, which is what separates the
+// agent's mistake from the server's: the former is a tool result the model can
+// learn from, the latter fails the call outright.
+func prepareCall(argv []string, env *callEnv) (*CLI, *kong.Context, error) {
+	cli := &CLI{}
+	k, err := newKongParser(cli)
+	if err != nil {
+		return nil, nil, fmt.Errorf("building parser: %w", err)
+	}
+	kctx, err := k.Parse(argv)
+	if err != nil {
+		return nil, nil, &argvError{err: err}
+	}
+
+	applyLaunchEnv(cli, env)
+
+	// Force agent-safe output regardless of what the reparsed argv set: never
+	// block on a prompt, and wrap externally-controlled free text so the model
+	// treats it as data, not instructions.
+	cli.NoInput = true
+	cli.WrapUntrusted = true
+
+	return cli, kctx, nil
+}
+
+// argvError marks a failure to parse the argv a tool call was rebuilt into. It
+// is the agent's input that was wrong, so the caller reports it back rather than
+// treating it as the server breaking.
+type argvError struct{ err error }
+
+func (e *argvError) Error() string { return e.err.Error() }
+func (e *argvError) Unwrap() error { return e.err }
+
 // applyLaunchEnv restores the operator's launch-time globals onto a per-call CLI.
 //
 // The rebuilt argv carries only the tool's own arguments, so without this a
@@ -109,15 +143,32 @@ func makeHandler(b *toolBinding) mcp.ToolHandler {
 // that: no tool offers an account or a timeout, so a value surviving the reparse
 // can only have come from an ambient OLK_* variable, which would then quietly
 // outrank the operator's own command line.
-func applyLaunchEnv(cli *CLI, env callEnv) {
+func applyLaunchEnv(cli *CLI, env *callEnv) {
 	if env.account != "" {
 		cli.Account = env.account
 	}
 	if env.timeout > 0 {
 		cli.Timeout = env.timeout
 	}
-	// The guards only ever tighten: a call cannot lift a restriction the server
-	// was started with.
+	if env.timezone != "" {
+		cli.TimeZone = env.timezone
+	}
+	if env.selectFields.Set {
+		cli.Select = env.selectFields
+	}
+	if env.immutableIDs {
+		cli.ImmutableIDs = true
+	}
+	if env.resultsOnly {
+		cli.ResultsOnly = true
+	}
+	// The guards and the two output-narrowing flags only ever tighten: a call
+	// cannot lift a restriction the server was started with. --dry-run belongs
+	// here rather than among the overwrites because it is the strongest of them
+	// — a server started with it must not perform a single mutation, whatever a
+	// call asks for.
+	cli.DryRun = cli.DryRun || env.dryRun
+	cli.Concise = cli.Concise || env.concise
 	cli.NoWrite = cli.NoWrite || env.noWrite
 	cli.NoSend = cli.NoSend || env.noSend
 }
@@ -262,6 +313,13 @@ func buildArgv(b *toolBinding, args map[string]any) ([]string, error) {
 	// The schema advertises the permitted values, but the schema is only advice
 	// to the model — this check is what actually refuses anything else.
 	mailbox := b.env.mailbox
+	if mailbox != "" && mailboxScopedButUnaware(b.name) {
+		// exposes() already withholds these, so reaching here means a tool was
+		// registered in error. Refuse rather than run it against the wrong
+		// mailbox.
+		return nil, fmt.Errorf("tool %q cannot target mailbox %q; it always acts on the signed-in user's own mailbox",
+			b.name, mailbox)
+	}
 	if raw, ok := args[mailboxArg]; ok {
 		chosen := strings.TrimSpace(sprintArg(raw))
 		if !b.env.offersMailboxArg(b.name) {
