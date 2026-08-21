@@ -225,18 +225,30 @@ func TestClassifyError_TheGrantHintAloneIsNotARefusal(t *testing.T) {
 	}
 
 	cases := []struct {
-		graphErr string
-		wantCode string
+		graphErr    string
+		wantCode    string
+		wantGrants  bool
+		explanation string
 	}{
-		{"ErrorItemNotFound", "not_found"},
-		{"TooManyRequests", "rate_limited"},
-		{"ErrorSendAsDenied", "forbidden"},
-		{"Access is denied.", "forbidden"},
+		{"ErrorItemNotFound", "not_found", false, "a stale ID is not a permission problem"},
+		{"TooManyRequests", "rate_limited", false, "a throttle is not a permission problem"},
+		{"ErrorSendAsDenied", "forbidden", true, "Graph naming the refusal outright"},
+		{"Access is denied.", "forbidden", true, "Graph refusing without naming a code"},
+		{"Forbidden", "forbidden", true, "a refusal phrased as Forbidden is still a refusal"},
+		// Graph also answers 403 for licensing and conditional access, so a bare
+		// one does not establish a missing grant. It is still forbidden, but the
+		// three-grant diagnosis would be a guess.
+		{"403", "forbidden", false, "a bare 403 does not name its cause"},
 	}
 	for _, tc := range cases {
-		if code, _ := classifyError(decorate(tc.graphErr)); code != tc.wantCode {
-			t.Errorf("a delegated send failing with %s classified as %q, want %q",
-				tc.graphErr, code, tc.wantCode)
+		code, action := classifyError(decorate(tc.graphErr))
+		if code != tc.wantCode {
+			t.Errorf("a delegated send failing with %s classified as %q, want %q (%s)",
+				tc.graphErr, code, tc.wantCode, tc.explanation)
+		}
+		if got := strings.Contains(action, "Full Access"); got != tc.wantGrants {
+			t.Errorf("a delegated send failing with %s gave grant advice = %v, want %v (%s)\n%s",
+				tc.graphErr, got, tc.wantGrants, tc.explanation, action)
 		}
 	}
 }

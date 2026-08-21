@@ -168,6 +168,27 @@ func graphErrorMessage(err error) string {
 	return "unknown error"
 }
 
+// graphError carries a rendered message alongside the failure it describes.
+//
+// The rendering and the cause have to travel together. A reader needs the
+// provider code in the text, because ODataError.Error() returns only the
+// message, and ErrorMetadata needs the original error still in the chain to read
+// that code and the HTTP status back out for --json. Formatting with %s gives the
+// first and loses the second; wrapping with %w gives the second and loses the
+// first.
+type graphError struct {
+	msg   string
+	cause error
+}
+
+func (e *graphError) Error() string { return e.msg }
+func (e *graphError) Unwrap() error { return e.cause }
+
+// wrapGraph renders a Graph failure while keeping it unwrappable.
+func wrapGraph(cause error, format string, args ...any) error {
+	return &graphError{msg: fmt.Sprintf(format, args...), cause: cause}
+}
+
 // ErrorMetadata returns a stable, message-free code and status for JSON CLI
 // consumers. Graph errors retain their provider code and HTTP status; local
 // command failures use a fixed non-HTTP status.
@@ -198,9 +219,9 @@ func enterpriseError(action string, err error) error {
 		lower == "unknownerror" ||
 		strings.Contains(lower, "mailboxnotenabledforrestapi")
 	if needsEnterprise {
-		return fmt.Errorf("%s: %s\n  Note: this feature requires a work/school (Microsoft 365) account and is not available for personal Microsoft accounts (Outlook.com, Hotmail, Live.com)", action, msg)
+		return wrapGraph(err, "%s: %s\n  Note: this feature requires a work/school (Microsoft 365) account and is not available for personal Microsoft accounts (Outlook.com, Hotmail, Live.com)", action, msg)
 	}
-	return fmt.Errorf("%s: %s", action, msg)
+	return wrapGraph(err, "%s: %s", action, msg)
 }
 
 // scopeUpgradeError wraps a Graph API error with a hint to re-login
@@ -213,9 +234,9 @@ func scopeUpgradeError(action string, err error) error {
 		(strings.Contains(lower, "access") && strings.Contains(lower, "denied")) ||
 		strings.Contains(lower, "authorization_requestdenied")
 	if needsReauth {
-		return fmt.Errorf("%s: %s\n  Hint: you may need to re-login to grant new permissions: olk auth login", action, msg)
+		return wrapGraph(err, "%s: %s\n  Hint: you may need to re-login to grant new permissions: olk auth login", action, msg)
 	}
-	return fmt.Errorf("%s: %s", action, msg)
+	return wrapGraph(err, "%s: %s", action, msg)
 }
 
 // clampTop normalizes the top/limit parameter to a safe range.

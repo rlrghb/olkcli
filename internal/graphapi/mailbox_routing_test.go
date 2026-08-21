@@ -178,11 +178,45 @@ func TestSharedMailboxErrorCarriesTheGraphCode(t *testing.T) {
 	main.SetCode(&code)
 	main.SetMessage(&message)
 	odataErr.SetErrorEscaped(main)
+	odataErr.SetStatusCode(403)
 
-	got := sharedMailboxError("sending message", "team@example.com", sendGrantHint, odataErr).Error()
+	err := sharedMailboxError("sending message", "team@example.com", sendGrantHint, odataErr)
 	for _, want := range []string{"ErrorSendAsDenied", "team@example.com", "Full Access"} {
-		if !strings.Contains(got, want) {
-			t.Errorf("error text does not mention %q:\n%s", want, got)
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error text does not mention %q:\n%s", want, err.Error())
+		}
+	}
+
+	// The rendered text is only half of it. --json reads the code and the HTTP
+	// status back off the original error, so it has to stay in the chain: a
+	// helper that renders by formatting alone reduces every delegated failure to
+	// CommandFailed with no status.
+	if code, status := ErrorMetadata(err); code != "ErrorSendAsDenied" || status != 403 {
+		t.Errorf("ErrorMetadata = (%q, %d), want (ErrorSendAsDenied, 403)", code, status)
+	}
+}
+
+// The same contract for the two older helpers, which had the same defect before
+// graphError existed.
+func TestGraphErrorHelpersStayUnwrappable(t *testing.T) {
+	odataErr := odataerrors.NewODataError()
+	main := odataerrors.NewMainError()
+	code := "ErrorAccessDenied"
+	message := "Access is denied. Check credentials and try again."
+	main.SetCode(&code)
+	main.SetMessage(&message)
+	odataErr.SetErrorEscaped(main)
+	odataErr.SetStatusCode(403)
+
+	for name, err := range map[string]error{
+		"enterpriseError":   enterpriseError("listing messages", odataErr),
+		"scopeUpgradeError": scopeUpgradeError("listing messages", odataErr),
+	} {
+		if !strings.Contains(err.Error(), code) {
+			t.Errorf("%s text does not name the code:\n%s", name, err.Error())
+		}
+		if gotCode, status := ErrorMetadata(err); gotCode != code || status != 403 {
+			t.Errorf("%s: ErrorMetadata = (%q, %d), want (%s, 403)", name, gotCode, status, code)
 		}
 	}
 }

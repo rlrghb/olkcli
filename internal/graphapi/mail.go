@@ -438,11 +438,13 @@ const (
 )
 
 func sharedMailboxError(action, target, hint string, err error) error {
-	// graphErrorMessage rather than %w: ODataError.Error() returns only the
-	// provider message, so wrapping loses the code and the whole failure arrives
-	// as prose. Everything downstream — the reader, and the MCP layer's error
-	// classification — needs the code to tell a refused send from a stale ID.
-	return fmt.Errorf("%s as %s: %s\n\n%s", action, target, graphErrorMessage(err), hint)
+	// graphErrorMessage rather than %w for the text: ODataError.Error() returns
+	// only the provider message, so wrapping alone loses the code and the whole
+	// failure arrives as prose. Everything downstream — the reader, and the MCP
+	// layer's error classification — needs the code to tell a refused send from a
+	// stale ID. wrapGraph keeps the original reachable so --json can still report
+	// the code and the HTTP status.
+	return wrapGraph(err, "%s as %s: %s\n\n%s", action, target, graphErrorMessage(err), hint)
 }
 
 // ReplyMessage replies to a message in the target mailbox, or in the signed-in
