@@ -240,6 +240,16 @@ func errorResult(msg string) *mcp.CallToolResult {
 // Codes mirror common Graph failure modes (auth/scope/not-found/throttling) so
 // agents can branch on `code` instead of pattern-matching prose.
 func classifyError(msg string) (code, action string) {
+	// Every failed delegated send carries the grant hint, which names the scope,
+	// so the hint alone says nothing about why the call failed — a stale ID and a
+	// throttle arrive wearing it too. Pair it with an actual refusal before
+	// reading it as one.
+	refusedSend := strings.Contains(msg, "ErrorSendAsDenied") ||
+		(strings.Contains(msg, "Mail.Send.Shared") &&
+			(strings.Contains(msg, "Access is denied") ||
+				strings.Contains(msg, "ErrorAccessDenied") ||
+				strings.Contains(msg, "403")))
+
 	switch {
 	case strings.Contains(msg, "no account configured"),
 		strings.Contains(msg, "no account"),
@@ -254,10 +264,9 @@ func classifyError(msg string) (code, action string) {
 		return "forbidden", "the signed-in token may lack a required scope; re-run `olk auth login --scope <Scope>` (add --enterprise for work/school-only scopes)"
 	// Sending as another mailbox usually fails on an Exchange delegation rather
 	// than a scope, and no re-login supplies one. Graph sometimes says so with
-	// ErrorSendAsDenied and sometimes only with a bare "Access is denied", in
-	// which case the hint the graphapi layer attached is the thing to match.
-	case strings.Contains(msg, "ErrorSendAsDenied"),
-		strings.Contains(msg, "Mail.Send.Shared"):
+	// ErrorSendAsDenied and sometimes only with a bare "Access is denied", which
+	// no other case here matches.
+	case refusedSend:
 		return "forbidden", "sending as another mailbox needs three grants: the Mail.Send.Shared scope, Send As or Send on Behalf Of on that mailbox in Exchange, and Full Access on it. Only the first comes from signing in again; the other two are administrator-managed in Exchange"
 	case strings.Contains(msg, "ErrorAccessDenied"),
 		strings.Contains(msg, "Forbidden"),

@@ -206,6 +206,37 @@ func TestClassifyError_SendAsDeniedNamesTheExchangeGrants(t *testing.T) {
 	}
 }
 
+// Every failed delegated send is decorated with the grant hint, which names the
+// scope. Reading that name as evidence of a refusal turns a stale ID and a
+// throttle into permission problems, and sends an agent to an administrator
+// instead of re-listing or backing off.
+func TestClassifyError_TheGrantHintAloneIsNotARefusal(t *testing.T) {
+	// What sharedMailboxError actually produces: the underlying Graph failure,
+	// then the hint.
+	decorate := func(graphErr string) string {
+		return "sending message from team@example.com: " + graphErr +
+			"\n\nSending as another mailbox needs three separate grants: the " +
+			"Mail.Send.Shared scope (sign in again with --scope Mail.Send.Shared), " +
+			"Send As or Send on Behalf Of on that mailbox in Exchange, and Full Access on it"
+	}
+
+	cases := []struct {
+		graphErr string
+		wantCode string
+	}{
+		{"ErrorItemNotFound", "not_found"},
+		{"TooManyRequests", "rate_limited"},
+		{"ErrorSendAsDenied", "forbidden"},
+		{"Access is denied.", "forbidden"},
+	}
+	for _, tc := range cases {
+		if code, _ := classifyError(decorate(tc.graphErr)); code != tc.wantCode {
+			t.Errorf("a delegated send failing with %s classified as %q, want %q",
+				tc.graphErr, code, tc.wantCode)
+		}
+	}
+}
+
 func TestErrorResult_StructuredEnvelope(t *testing.T) {
 	res := errorResult("no account configured")
 	if !res.IsError {
