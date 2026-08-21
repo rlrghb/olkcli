@@ -113,7 +113,7 @@ func (c *Client) SendDraft(ctx context.Context, target, draftID string) error {
 	err := c.targetUser(target).Messages().ByMessageId(draftID).Send().Post(ctx, nil)
 	if err != nil {
 		if target != "" {
-			return fmt.Errorf("sending draft from %s: %w\n\nSending a draft that lives in another mailbox needs the Mail.Send.Shared scope (sign in again with --scope Mail.Send.Shared) and Send As or Send on Behalf Of on that mailbox in Exchange. The Full Access that allowed the draft to be created there does not confer the right to send it", target, err)
+			return fmt.Errorf("sending draft from %s: %w\n\nSending a draft that lives in another mailbox needs the Mail.Send.Shared scope (sign in again with --scope Mail.Send.Shared), Send As or Send on Behalf Of on that mailbox in Exchange, and Full Access on it. The Full Access that allowed the draft to be created there is necessary but not sufficient: it confers no right to send", target, err)
 		}
 		return fmt.Errorf("sending draft: %w", err)
 	}

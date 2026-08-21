@@ -326,7 +326,7 @@ Reads are the common case. **Sending as a shared mailbox is supported**, and nee
 - **Send As** or **Send on Behalf Of** on the mailbox in Exchange; and
 - **Full Access** on the mailbox.
 
-Holding one tells you nothing about the others. Full Access alone grants no right to send, and Send As alone is not enough either: `olk` sends through `/users/{mailbox}/sendMail` so the sent copy lands in the shared mailbox's Sent Items rather than yours, and [Microsoft requires Full Access for that form](https://learn.microsoft.com/en-us/graph/outlook-send-mail-from-other-user). Without all three, `mail send --mailbox` fails with `Access is denied` and names what is missing. `mail reply` and `mail forward` need the same three grants because they read the original from that mailbox before sending as it — and the message ID must be one listed from that mailbox, since IDs are scoped to the mailbox they came from.
+Holding one tells you nothing about the others. Full Access alone grants no right to send, and Send As alone is not enough either: [Microsoft requires Full Access for `/users/{mailbox}/sendMail`](https://learn.microsoft.com/en-us/graph/outlook-send-mail-from-other-user), which is the endpoint `olk` uses so that the sent copy lands by default in the shared mailbox's Sent Items rather than yours. Without all three, `mail send --mailbox` fails with `Access is denied` and names what is missing. `mail reply` and `mail forward` need the same three grants because they read the original from that mailbox before sending as it — and the message ID must be one listed from that mailbox, since IDs are scoped to the mailbox they came from.
 
 Sending, replying, forwarding and the draft commands are the writes that honour `--mailbox`. The calendar, contact and folder writes ignore it, as do the commands that organise mail in place — move, flag, categorise, mark — and all of them act on the signed-in user's own mailbox.
 
@@ -340,7 +340,7 @@ olk mail get <ID> --mailbox boss@example.com
 olk mail search "from:partner@example.com" --mailbox boss@example.com
 olk mail folders --mailbox boss@example.com
 
-# Send as a shared mailbox (needs Mail.Send.Shared + Send As in Exchange)
+# Send as a shared mailbox (needs Mail.Send.Shared + Send As + Full Access)
 olk mail send --mailbox team@example.com --to person@example.com --subject "..." --body "..."
 olk mail send --mailbox team@example.com --to person@example.com --subject "..." --dry-run   # shows the sending address
 

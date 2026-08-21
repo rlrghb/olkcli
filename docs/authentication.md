@@ -52,12 +52,14 @@ grants:
 Holding any one of them implies nothing about the others, and being able to read
 a shared mailbox does not imply being able to send from it.
 
-Full Access is on the list because of the endpoint this takes. `olk` sends through
-`/users/{mailbox}/sendMail` rather than `/me/sendMail` with a `from` address, so
-the sent copy lands in the shared mailbox's Sent Items where the rest of the team
-can see it, rather than in yours. Microsoft requires Full Access for that form on
-top of the sending delegation; see
+Full Access is on the list because Microsoft requires it for the endpoint this
+takes — `/users/{mailbox}/sendMail`, over and above the sending delegation; see
 [Send Outlook messages from another user](https://learn.microsoft.com/en-us/graph/outlook-send-mail-from-other-user).
+
+That endpoint is chosen for where it files the sent copy: by default in the shared
+mailbox's Sent Items, where the rest of the team can see it, rather than in yours
+as `/me/sendMail` with a `from` address would. Mailbox configuration can override
+either default, so treat it as the documented default rather than a guarantee.
 Confirm the sending address with `--dry-run`, which prints the mailbox a send will
 leave from.
 

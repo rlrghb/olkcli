@@ -21,12 +21,12 @@ var (
 		"TimeZone":     "display zone for times in tool output",
 		"Select":       "field projection the operator narrowed to",
 		"ImmutableIDs": "ID stability contract the operator opted into",
-		"ResultsOnly":  "envelope suppression, tightening only",
-		"Concise":      "size reduction, tightening only",
+		"ResultsOnly":  "envelope suppression the operator asked for",
+		"Concise":      "size reduction; the only carried flag a call may also set, so it acts as a floor",
 		"Verbose":      "Graph request logging the operator asked for; the handler redacts Authorization",
 		"DryRun":       "describe mutations instead of making them",
-		"NoWrite":      "capability guard, tightening only",
-		"NoSend":       "capability guard, tightening only",
+		"NoWrite":      "capability guard; registration filtered the tool list on this value",
+		"NoSend":       "capability guard; registration filtered the tool list on this value",
 	}
 
 	// Set by the MCP layer itself, whatever the parse or the launch line said.
@@ -174,6 +174,9 @@ func TestApplyLaunchEnv_SnapshotReplacesAmbientValues(t *testing.T) {
 		t.Errorf("account=%q tz=%q select=%q, want all cleared by a launch line that named none",
 			ambient.Account, ambient.TimeZone, ambient.Select.Value)
 	}
+	if ambient.Timeout != 0 {
+		t.Errorf("timeout = %d, want the launch value; the caller applies the default", ambient.Timeout)
+	}
 	if ambient.Verbose || ambient.ImmutableIDs || ambient.ResultsOnly || ambient.DryRun ||
 		ambient.NoWrite || ambient.NoSend {
 		t.Error("a launch line that set none of these must not inherit them from the environment")
@@ -201,6 +204,8 @@ func TestPrepareCall_AmbientEnvironmentCannotOutrankTheLaunchLine(t *testing.T) 
 	t.Setenv("OLK_MAILBOX", "ambient-box@example.com")
 	t.Setenv("OLK_VERBOSE", "true")
 	t.Setenv("OLK_DRY_RUN", "true")
+	t.Setenv("OLK_NO_WRITE", "true")
+	t.Setenv("OLK_NO_SEND", "true")
 
 	b := &toolBinding{
 		name: "mail_list",
@@ -228,6 +233,12 @@ func TestPrepareCall_AmbientEnvironmentCannotOutrankTheLaunchLine(t *testing.T) 
 	}
 	if cli.DryRun {
 		t.Error("an ambient OLK_DRY_RUN must not silently neuter every write")
+	}
+	// The guards matter most: registration filtered the tool list on the launch
+	// values, so enforcement picking up different ones would disagree with what
+	// the agent was told it could call.
+	if cli.NoWrite || cli.NoSend {
+		t.Error("ambient guard variables must not outrank a launch line that set neither")
 	}
 
 	// And the launch line still wins when it does name something.

@@ -119,7 +119,7 @@ func TestRejectUnknownArgs_MailboxOnlyOnAwareTools(t *testing.T) {
 }
 
 // Account and timeout are dropped by the argv rebuild unless carried over, and
-// the capability guards must only ever tighten.
+// the capability guards have to reach the call too.
 func TestApplyLaunchEnv_CarriesGlobals(t *testing.T) {
 	cli := &CLI{}
 	applyLaunchEnv(cli, &callEnv{account: "svc@example.com", timeout: 120, noSend: true, noWrite: true})

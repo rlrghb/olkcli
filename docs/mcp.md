@@ -60,7 +60,7 @@ argument does not appear at all, and calls act on the launch-time mailbox alone.
 
 Naming a mailbox does not grant any right on it. Reading still needs the
 `.Shared` scope and Exchange delegation, and sending as one still needs
-`Mail.Send.Shared` plus Send As or Send on Behalf Of. `--allow-mailbox` narrows
+`Mail.Send.Shared`, Send As or Send on Behalf Of, and Full Access. `--allow-mailbox` narrows
 what an agent may attempt; it never widens what the signed-in user may do.
 
 ## Adding a tool
