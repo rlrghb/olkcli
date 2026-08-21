@@ -158,15 +158,15 @@ func TestClassifyError(t *testing.T) {
 		msg      string
 		wantCode string
 	}{
-		{"no account configured", "unauthenticated"},
-		{"error: InsufficientScope: Read.Shared required", "forbidden"},
-		{"ErrorItemNotFound", "not_found"},
-		{"TooManyRequests", "rate_limited"},
-		{"unknown argument \"x\"", "invalid_input"},
-		{"some other failure", "error"},
+		{"no account configured", codeUnauthenticated},
+		{"error: InsufficientScope: Read.Shared required", codeForbidden},
+		{"ErrorItemNotFound", codeNotFound},
+		{"TooManyRequests", codeRateLimited},
+		{"unknown argument \"x\"", codeInvalidInput},
+		{"some other failure", codeUnclassified},
 		// A refused delegated send is a Graph failure with its own code, and
 		// classifying it as a bare error leaves an agent nothing to act on.
-		{"sending message from team@example.com: ErrorSendAsDenied", "forbidden"},
+		{"sending message from team@example.com: ErrorSendAsDenied", codeForbidden},
 	}
 	for _, tc := range cases {
 		if code, _ := classifyError(tc.msg); code != tc.wantCode {
@@ -187,7 +187,7 @@ func TestClassifyError_SendAsDeniedNamesTheExchangeGrants(t *testing.T) {
 			"mailbox needs three separate grants: the Mail.Send.Shared scope",
 	} {
 		code, action := classifyError(msg)
-		if code != "forbidden" {
+		if code != codeForbidden {
 			t.Errorf("classifyError(%q) code = %q, want forbidden", msg, code)
 		}
 		for _, want := range []string{"Send As", "Full Access", "Mail.Send.Shared"} {
@@ -230,15 +230,15 @@ func TestClassifyError_TheGrantHintAloneIsNotARefusal(t *testing.T) {
 		wantGrants  bool
 		explanation string
 	}{
-		{"ErrorItemNotFound", "not_found", false, "a stale ID is not a permission problem"},
-		{"TooManyRequests", "rate_limited", false, "a throttle is not a permission problem"},
-		{"ErrorSendAsDenied", "forbidden", true, "Graph naming the refusal outright"},
-		{"Access is denied.", "forbidden", true, "Graph refusing without naming a code"},
-		{"Forbidden", "forbidden", true, "a refusal phrased as Forbidden is still a refusal"},
+		{"ErrorItemNotFound", codeNotFound, false, "a stale ID is not a permission problem"},
+		{"TooManyRequests", codeRateLimited, false, "a throttle is not a permission problem"},
+		{"ErrorSendAsDenied", codeForbidden, true, "Graph naming the refusal outright"},
+		{"Access is denied.", codeForbidden, true, "Graph refusing without naming a code"},
+		{"Forbidden", codeForbidden, true, "a refusal phrased as Forbidden is still a refusal"},
 		// Graph also answers 403 for licensing and conditional access, so a bare
 		// one does not establish a missing grant. It is still forbidden, but the
 		// three-grant diagnosis would be a guess.
-		{"403", "forbidden", false, "a bare 403 does not name its cause"},
+		{"403", codeForbidden, false, "a bare 403 does not name its cause"},
 	}
 	for _, tc := range cases {
 		code, action := classifyError(decorate(tc.graphErr))
@@ -373,5 +373,22 @@ func TestBuildArgv_DestructiveForcesConfirmation(t *testing.T) {
 	argv2, _ := buildArgv(send, map[string]any{"id": "AAA"})
 	if contains(argv2, "--force") {
 		t.Errorf("send tool argv must not include --force, got %v", argv2)
+	}
+}
+
+// The codes are the tool contract: an agent branches on them, so renaming one is
+// a breaking change and has to be a deliberate edit here as well.
+func TestClassificationCodesAreStable(t *testing.T) {
+	for got, want := range map[string]string{
+		codeUnauthenticated: "unauthenticated",
+		codeForbidden:       "forbidden",
+		codeNotFound:        "not_found",
+		codeRateLimited:     "rate_limited",
+		codeInvalidInput:    "invalid_input",
+		codeUnclassified:    "error",
+	} {
+		if got != want {
+			t.Errorf("classification code = %q, want %q", got, want)
+		}
 	}
 }

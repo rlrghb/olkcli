@@ -236,6 +236,22 @@ func errorResult(msg string) *mcp.CallToolResult {
 	}
 }
 
+// The stable codes an agent may branch on. They are part of the tool contract,
+// so they are named once here rather than repeated at each return.
+const (
+	codeUnauthenticated = "unauthenticated"
+	codeForbidden       = "forbidden"
+	codeNotFound        = "not_found"
+	codeRateLimited     = "rate_limited"
+	codeInvalidInput    = "invalid_input"
+	codeUnclassified    = "error"
+)
+
+// missingScopeAction is the advice for a failure a fresh login can fix, as
+// distinct from an Exchange delegation, which it cannot.
+const missingScopeAction = "the signed-in token may lack a required scope; " +
+	"re-run `olk auth login --scope <Scope>` (add --enterprise for work/school-only scopes)"
+
 // classifyError maps a free-text error into a stable code and a recovery action.
 // Codes mirror common Graph failure modes (auth/scope/not-found/throttling) so
 // agents can branch on `code` instead of pattern-matching prose.
@@ -258,38 +274,38 @@ func classifyError(msg string) (code, action string) {
 		strings.Contains(msg, "no account"),
 		strings.Contains(msg, "InvalidAuthenticationToken"),
 		strings.Contains(msg, "401"):
-		return "unauthenticated", "run `olk auth login` first (or re-run it if the token expired)"
+		return codeUnauthenticated, "run `olk auth login` first (or re-run it if the token expired)"
 	// A scope Graph names outright is fixable by signing in again, so it is
 	// matched before the delegated-send case below, which mentions scope names
 	// in its own advice and would otherwise swallow it.
 	case strings.Contains(msg, "InsufficientScope"),
 		strings.Contains(msg, "Read.Shared"):
-		return "forbidden", "the signed-in token may lack a required scope; re-run `olk auth login --scope <Scope>` (add --enterprise for work/school-only scopes)"
+		return codeForbidden, missingScopeAction
 	// Sending as another mailbox usually fails on an Exchange delegation rather
 	// than a scope, and no re-login supplies one. Graph sometimes says so with
 	// ErrorSendAsDenied and sometimes only with a bare "Access is denied", which
 	// no other case here matches.
 	case refusedSend:
-		return "forbidden", "a refused send as another mailbox is usually a missing grant, of which there are three: the Mail.Send.Shared scope, Send As or Send on Behalf Of on that mailbox in Exchange, and Full Access on it. Only the first comes from signing in again; the other two are administrator-managed in Exchange"
+		return codeForbidden, "a refused send as another mailbox is usually a missing grant, of which there are three: the Mail.Send.Shared scope, Send As or Send on Behalf Of on that mailbox in Exchange, and Full Access on it. Only the first comes from signing in again; the other two are administrator-managed in Exchange"
 	case strings.Contains(msg, "ErrorAccessDenied"),
 		strings.Contains(msg, "Forbidden"),
 		strings.Contains(msg, "403"):
-		return "forbidden", "the signed-in token may lack a required scope; re-run `olk auth login --scope <Scope>` (add --enterprise for work/school-only scopes)"
+		return codeForbidden, missingScopeAction
 	case strings.Contains(msg, "ErrorItemNotFound"),
 		strings.Contains(msg, "ResourceNotFound"),
 		strings.Contains(msg, "404"):
-		return "not_found", "the id may be stale; re-list to get a current id"
+		return codeNotFound, "the id may be stale; re-list to get a current id"
 	case strings.Contains(msg, "TooManyRequests"),
 		strings.Contains(msg, "throttl"),
 		strings.Contains(msg, "429"):
-		return "rate_limited", "back off and retry after a short delay"
+		return codeRateLimited, "back off and retry after a short delay"
 	case strings.Contains(msg, "unknown argument"),
 		strings.Contains(msg, "invalid arguments"),
 		strings.Contains(msg, "parse error"),
 		strings.Contains(msg, "missing required argument"):
-		return "invalid_input", "check the tool's input schema and retry with valid arguments"
+		return codeInvalidInput, "check the tool's input schema and retry with valid arguments"
 	}
-	return "error", ""
+	return codeUnclassified, ""
 }
 
 // buildArgv reconstructs a CLI argv from a tool's arguments. Ordering is
