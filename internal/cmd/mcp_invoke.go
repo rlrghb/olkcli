@@ -246,9 +246,20 @@ func classifyError(msg string) (code, action string) {
 		strings.Contains(msg, "InvalidAuthenticationToken"),
 		strings.Contains(msg, "401"):
 		return "unauthenticated", "run `olk auth login` first (or re-run it if the token expired)"
-	case strings.Contains(msg, "Read.Shared"),
-		strings.Contains(msg, "InsufficientScope"),
-		strings.Contains(msg, "ErrorAccessDenied"),
+	// A scope Graph names outright is fixable by signing in again, so it is
+	// matched before the delegated-send case below, which mentions scope names
+	// in its own advice and would otherwise swallow it.
+	case strings.Contains(msg, "InsufficientScope"),
+		strings.Contains(msg, "Read.Shared"):
+		return "forbidden", "the signed-in token may lack a required scope; re-run `olk auth login --scope <Scope>` (add --enterprise for work/school-only scopes)"
+	// Sending as another mailbox usually fails on an Exchange delegation rather
+	// than a scope, and no re-login supplies one. Graph sometimes says so with
+	// ErrorSendAsDenied and sometimes only with a bare "Access is denied", in
+	// which case the hint the graphapi layer attached is the thing to match.
+	case strings.Contains(msg, "ErrorSendAsDenied"),
+		strings.Contains(msg, "Mail.Send.Shared"):
+		return "forbidden", "sending as another mailbox needs three grants: the Mail.Send.Shared scope, Send As or Send on Behalf Of on that mailbox in Exchange, and Full Access on it. Only the first comes from signing in again; the other two are administrator-managed in Exchange"
+	case strings.Contains(msg, "ErrorAccessDenied"),
 		strings.Contains(msg, "Forbidden"),
 		strings.Contains(msg, "403"):
 		return "forbidden", "the signed-in token may lack a required scope; re-run `olk auth login --scope <Scope>` (add --enterprise for work/school-only scopes)"

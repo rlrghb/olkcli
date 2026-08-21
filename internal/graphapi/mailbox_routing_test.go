@@ -3,6 +3,7 @@ package graphapi
 import (
 	"context"
 	"net/http"
+	"strings"
 	"testing"
 )
 
@@ -87,6 +88,31 @@ func TestDelegatedWritesAddressTheTargetMailbox(t *testing.T) {
 			},
 		},
 		{
+			name:   "reply-all from the caller's own mailbox",
+			target: "",
+			want:   meBuilderPath + "/messages/AAA/replyAll",
+			call: func(c *Client, ctx context.Context, target string) error {
+				return c.ReplyMessage(ctx, target, "AAA", "body", true)
+			},
+		},
+		{
+			name:   "create a draft in the caller's own mailbox",
+			target: "",
+			want:   meBuilderPath + "/messages",
+			call: func(c *Client, ctx context.Context, target string) error {
+				_, err := c.CreateDraft(ctx, target, "s", "b", []string{"person@example.com"}, nil, nil, false)
+				return err
+			},
+		},
+		{
+			name:   "send a draft from the caller's own mailbox",
+			target: "",
+			want:   meBuilderPath + "/messages/AAA/send",
+			call: func(c *Client, ctx context.Context, target string) error {
+				return c.SendDraft(ctx, target, "AAA")
+			},
+		},
+		{
 			name:   "create a draft in a shared mailbox",
 			target: "team@example.com",
 			want:   "/v1.0/users/team@example.com/messages",
@@ -112,7 +138,8 @@ func TestDelegatedWritesAddressTheTargetMailbox(t *testing.T) {
 			client := testGraphClient(t, func(req *http.Request) *http.Response {
 				calls++
 				got = req.URL.Path
-				if req.Method == http.MethodPost && tc.want == "/v1.0/users/team@example.com/messages" {
+				// Draft creation is the one call here that reads its response.
+				if strings.HasSuffix(req.URL.Path, "/messages") {
 					return graphJSONResponse(req, `{"id":"draft-id","subject":"s"}`)
 				}
 				return graphEmptyResponse(req)

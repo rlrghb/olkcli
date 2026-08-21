@@ -164,11 +164,45 @@ func TestClassifyError(t *testing.T) {
 		{"TooManyRequests", "rate_limited"},
 		{"unknown argument \"x\"", "invalid_input"},
 		{"some other failure", "error"},
+		// A refused delegated send is a Graph failure with its own code, and
+		// classifying it as a bare error leaves an agent nothing to act on.
+		{"sending message from team@example.com: ErrorSendAsDenied", "forbidden"},
 	}
 	for _, tc := range cases {
 		if code, _ := classifyError(tc.msg); code != tc.wantCode {
 			t.Errorf("classifyError(%q) code = %q, want %q", tc.msg, code, tc.wantCode)
 		}
+	}
+}
+
+// A missing Exchange delegation is not a missing scope, and no re-login supplies
+// it. The action must not send an agent round that loop.
+func TestClassifyError_SendAsDeniedNamesTheExchangeGrants(t *testing.T) {
+	for _, msg := range []string{
+		// Graph naming the refusal outright.
+		"sending message from team@example.com: ErrorSendAsDenied",
+		// Graph saying only "Access is denied", with the hint the graphapi layer
+		// attaches supplying the scope name that identifies the failure.
+		"sending message from team@example.com: Access is denied.\n\nSending as another " +
+			"mailbox needs three separate grants: the Mail.Send.Shared scope",
+	} {
+		code, action := classifyError(msg)
+		if code != "forbidden" {
+			t.Errorf("classifyError(%q) code = %q, want forbidden", msg, code)
+		}
+		for _, want := range []string{"Send As", "Full Access", "Mail.Send.Shared"} {
+			if !strings.Contains(action, want) {
+				t.Errorf("action for %q does not mention %q: %s", msg, want, action)
+			}
+		}
+	}
+
+	// A scope Graph names outright is fixable by signing in again, and must not
+	// be swallowed by the branch above just because the advice there also names
+	// scopes.
+	_, action := classifyError("InsufficientScope: Mail.Send.Shared required")
+	if !strings.Contains(action, "auth login") {
+		t.Errorf("a named missing scope should still point at re-login: %s", action)
 	}
 }
 
