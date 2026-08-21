@@ -137,43 +137,38 @@ func (e *argvError) Unwrap() error { return e.err }
 //
 // Mailbox is absent here on purpose: buildArgv resolves it, because only there is
 // a permitted per-call choice distinguishable from the launch default.
-// These values are already launch-resolved, kong having applied flag over
-// environment over default when the server started, so they overwrite rather
-// than fill a gap. Deferring to whatever the per-call parse produced would invert
-// that: no tool offers an account or a timeout, so a value surviving the reparse
-// can only have come from an ambient OLK_* variable, which would then quietly
-// outrank the operator's own command line.
+// The launch values are a complete snapshot: kong applied flag over environment
+// over default when the server started, so an empty or false one means the
+// operator's command line resolved to exactly that. Each is therefore restored
+// unconditionally rather than only when set.
+//
+// Restoring conditionally looks safer and is not. No tool offers an account, a
+// timeout or a mailbox, so a value surviving the reparse can only have come from
+// an ambient OLK_* variable, which kong re-reads every time. Skipping the empty
+// case lets that variable through: a server started with `--account=` against an
+// ambient OLK_ACCOUNT ran every call as the ambient identity, and `--verbose=false`
+// against an ambient OLK_VERBOSE logged anyway. The guards matter most here,
+// because registration already filtered the tool list using the launch values —
+// restoring anything else would leave enforcement disagreeing with what was
+// advertised.
+//
+// --concise is the one exception. It is the only one of these a tool call can
+// legitimately set for itself, through the synthetic argument injected into every
+// read tool's schema, so the launch value acts as a floor rather than a
+// replacement.
 func applyLaunchEnv(cli *CLI, env *callEnv) {
-	if env.account != "" {
-		cli.Account = env.account
-	}
-	if env.timeout > 0 {
-		cli.Timeout = env.timeout
-	}
-	if env.timezone != "" {
-		cli.TimeZone = env.timezone
-	}
-	if env.selectFields.Set {
-		cli.Select = env.selectFields
-	}
-	if env.immutableIDs {
-		cli.ImmutableIDs = true
-	}
-	if env.verbose {
-		cli.Verbose = true
-	}
-	if env.resultsOnly {
-		cli.ResultsOnly = true
-	}
-	// The guards and the two output-narrowing flags only ever tighten: a call
-	// cannot lift a restriction the server was started with. --dry-run belongs
-	// here rather than among the overwrites because it is the strongest of them
-	// — a server started with it must not perform a single mutation, whatever a
-	// call asks for.
-	cli.DryRun = cli.DryRun || env.dryRun
+	cli.Account = env.account
+	cli.Timeout = env.timeout
+	cli.TimeZone = env.timezone
+	cli.Select = env.selectFields
+	cli.ImmutableIDs = env.immutableIDs
+	cli.Verbose = env.verbose
+	cli.ResultsOnly = env.resultsOnly
+	cli.DryRun = env.dryRun
+	cli.NoWrite = env.noWrite
+	cli.NoSend = env.noSend
+
 	cli.Concise = cli.Concise || env.concise
-	cli.NoWrite = cli.NoWrite || env.noWrite
-	cli.NoSend = cli.NoSend || env.noSend
 }
 
 // rejectUnknownArgs fails the call if args carries a key the tool's schema does
@@ -334,12 +329,13 @@ func buildArgv(b *toolBinding, args map[string]any) ([]string, error) {
 		}
 		mailbox = chosen
 	}
-	if mailbox != "" {
-		argv = append(argv, "--mailbox", mailbox)
-	}
-
-	// Force structured output.
-	argv = append(argv, "--json")
+	// Appended even when empty. Kong re-reads OLK_MAILBOX on every parse, so
+	// omitting the flag is not the same as clearing it: a server launched with no
+	// mailbox would otherwise inherit whatever the operator's shell happened to
+	// export.
+	//
+	// --json forces structured output whatever the command would default to.
+	argv = append(argv, "--mailbox", mailbox, "--json")
 
 	pos := make([]string, 0, len(b.node.Positional))
 	for _, p := range b.node.Positional {

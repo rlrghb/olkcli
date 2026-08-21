@@ -151,96 +151,97 @@ func TestApplyLaunchEnv_CarriesEveryClassifiedField(t *testing.T) {
 	}
 }
 
-// The tightening fields must never be lowered by a call, and the overwriting
-// fields must leave an ambient value alone when the server set nothing.
-func TestApplyLaunchEnv_TighteningAndAbsence(t *testing.T) {
-	tightened := &CLI{}
-	tightened.DryRun = true
-	tightened.Concise = true
-	tightened.ResultsOnly = true
-	tightened.ImmutableIDs = true
-	tightened.NoWrite = true
-	tightened.NoSend = true
-	applyLaunchEnv(tightened, &callEnv{})
-	if !tightened.DryRun || !tightened.Concise || !tightened.ResultsOnly ||
-		!tightened.ImmutableIDs || !tightened.NoWrite || !tightened.NoSend {
-		t.Error("a launch env that sets nothing must not lower a value the call already had")
+// The launch snapshot replaces rather than supplements. An empty or false launch
+// value is the operator's answer, so it must clear whatever the per-call parse
+// picked up from the environment — which is where the ambient OLK_* variables
+// re-enter. --concise is the exception, being the one flag a call may set itself.
+func TestApplyLaunchEnv_SnapshotReplacesAmbientValues(t *testing.T) {
+	ambient := &CLI{}
+	ambient.Account = "personal@example.com"
+	ambient.Timeout = 30
+	ambient.TimeZone = "UTC"
+	ambient.Select = SelectFields{Value: "id", Set: true}
+	ambient.Verbose = true
+	ambient.ImmutableIDs = true
+	ambient.ResultsOnly = true
+	ambient.DryRun = true
+	ambient.NoWrite = true
+	ambient.NoSend = true
+
+	applyLaunchEnv(ambient, &callEnv{})
+
+	if ambient.Account != "" || ambient.TimeZone != "" || ambient.Select.Value != "" {
+		t.Errorf("account=%q tz=%q select=%q, want all cleared by a launch line that named none",
+			ambient.Account, ambient.TimeZone, ambient.Select.Value)
+	}
+	if ambient.Verbose || ambient.ImmutableIDs || ambient.ResultsOnly || ambient.DryRun ||
+		ambient.NoWrite || ambient.NoSend {
+		t.Error("a launch line that set none of these must not inherit them from the environment")
 	}
 
-	envOnly := &CLI{}
-	envOnly.Account = "personal@example.com"
-	envOnly.TimeZone = "UTC"
-	envOnly.Select = SelectFields{Value: "id", Set: true}
-	applyLaunchEnv(envOnly, &callEnv{})
-	if envOnly.Account != "personal@example.com" || envOnly.TimeZone != "UTC" ||
-		envOnly.Select.Value != "id" {
-		t.Error("with nothing set at launch, the ambient environment must still apply")
+	// --concise is the one a tool call may set for itself, so the launch value is
+	// a floor rather than a replacement.
+	perCall := &CLI{}
+	perCall.Concise = true
+	applyLaunchEnv(perCall, &callEnv{})
+	if !perCall.Concise {
+		t.Error("a call that asked to be concise must stay concise")
+	}
+	floor := &CLI{}
+	applyLaunchEnv(floor, &callEnv{concise: true})
+	if !floor.Concise {
+		t.Error("a server started with --concise must apply it to a call that did not ask")
 	}
 }
 
-// The two prior tests start from a callEnv, which is one step past where the
-// original bug lived: the flag was lost between the operator's command line and
-// the callEnv, not after it. This drives the whole chain — RootFlags through
-// launchEnv and applyLaunchEnv — so dropping an assignment at either boundary
-// fails here.
-func TestLaunchFlagsSurviveFromCommandLineToCall(t *testing.T) {
-	flags := &RootFlags{
-		Account:      "svc@example.com",
-		Timeout:      120,
-		TimeZone:     "America/New_York",
-		Select:       SelectFields{Value: "id,subject", Set: true},
-		ImmutableIDs: true,
-		ResultsOnly:  true,
-		Concise:      true,
-		DryRun:       true,
-		Verbose:      true,
-		NoWrite:      true,
-		NoSend:       true,
+// The same thing through a real parse, which is where the ambient variables
+// actually arrive: kong re-reads every OLK_* on each tool call.
+func TestPrepareCall_AmbientEnvironmentCannotOutrankTheLaunchLine(t *testing.T) {
+	t.Setenv("OLK_ACCOUNT", "ambient@example.com")
+	t.Setenv("OLK_MAILBOX", "ambient-box@example.com")
+	t.Setenv("OLK_VERBOSE", "true")
+	t.Setenv("OLK_DRY_RUN", "true")
+
+	b := &toolBinding{
+		name: "mail_list",
+		path: []string{"mail", "list"},
+		node: leafByPath(t, "mail", "list"),
+		tier: tierRead,
+		env:  callEnv{}, // an operator who named nothing on the command line
+	}
+	argv, err := buildArgv(b, map[string]any{})
+	if err != nil {
+		t.Fatalf("buildArgv: %v", err)
+	}
+	cli, _, err := prepareCall(argv, &b.env)
+	if err != nil {
+		t.Fatalf("prepareCall: %v", err)
+	}
+	if cli.Account != "" {
+		t.Errorf("account = %q; an ambient OLK_ACCOUNT must not outrank a launch line that named none", cli.Account)
+	}
+	if cli.Mailbox != "" {
+		t.Errorf("mailbox = %q; an ambient OLK_MAILBOX must not redirect a call", cli.Mailbox)
+	}
+	if cli.Verbose {
+		t.Error("an ambient OLK_VERBOSE must not enable logging the operator turned off")
+	}
+	if cli.DryRun {
+		t.Error("an ambient OLK_DRY_RUN must not silently neuter every write")
 	}
 
-	env := launchEnv(flags, "team@example.com", []string{"team@example.com"})
-	if env.mailbox != "team@example.com" {
-		t.Fatalf("launch mailbox = %q, want team@example.com", env.mailbox)
+	// And the launch line still wins when it does name something.
+	b.env = callEnv{account: "svc@example.com", mailbox: "team@example.com"}
+	argv, err = buildArgv(b, map[string]any{})
+	if err != nil {
+		t.Fatalf("buildArgv: %v", err)
 	}
-
-	cli := &CLI{}
-	applyLaunchEnv(cli, &env)
-
-	got := map[string]any{
-		"Account":      cli.Account,
-		"Timeout":      cli.Timeout,
-		"TimeZone":     cli.TimeZone,
-		"Select":       cli.Select.Value,
-		"ImmutableIDs": cli.ImmutableIDs,
-		"ResultsOnly":  cli.ResultsOnly,
-		"Concise":      cli.Concise,
-		"DryRun":       cli.DryRun,
-		"Verbose":      cli.Verbose,
-		"NoWrite":      cli.NoWrite,
-		"NoSend":       cli.NoSend,
+	cli, _, err = prepareCall(argv, &b.env)
+	if err != nil {
+		t.Fatalf("prepareCall: %v", err)
 	}
-	want := map[string]any{
-		"Account":      "svc@example.com",
-		"Timeout":      120,
-		"TimeZone":     "America/New_York",
-		"Select":       "id,subject",
-		"ImmutableIDs": true,
-		"ResultsOnly":  true,
-		"Concise":      true,
-		"DryRun":       true,
-		"Verbose":      true,
-		"NoWrite":      true,
-		"NoSend":       true,
-	}
-	for field := range launchCarriedFlags {
-		if _, ok := got[field]; !ok {
-			t.Errorf("%s is classified as carried but this test does not follow it "+
-				"from the command line; add it here and to launchEnv", field)
-			continue
-		}
-		if got[field] != want[field] {
-			t.Errorf("%s reached the call as %v, want the operator's %v", field, got[field], want[field])
-		}
+	if cli.Account != "svc@example.com" || cli.Mailbox != "team@example.com" {
+		t.Errorf("account=%q mailbox=%q, want the launch values", cli.Account, cli.Mailbox)
 	}
 }
 

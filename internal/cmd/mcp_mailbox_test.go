@@ -120,7 +120,7 @@ func TestRejectUnknownArgs_MailboxOnlyOnAwareTools(t *testing.T) {
 
 // Account and timeout are dropped by the argv rebuild unless carried over, and
 // the capability guards must only ever tighten.
-func TestApplyLaunchEnv_CarriesGlobalsAndOnlyTightensGuards(t *testing.T) {
+func TestApplyLaunchEnv_CarriesGlobals(t *testing.T) {
 	cli := &CLI{}
 	applyLaunchEnv(cli, &callEnv{account: "svc@example.com", timeout: 120, noSend: true, noWrite: true})
 	if cli.Account != "svc@example.com" || cli.Timeout != 120 {
@@ -133,34 +133,17 @@ func TestApplyLaunchEnv_CarriesGlobalsAndOnlyTightensGuards(t *testing.T) {
 	// No tool offers an account or a timeout, so a value surviving the per-call
 	// parse came from an ambient OLK_* variable. The operator's command line must
 	// outrank it, or a stray environment variable silently redirects every call to
-	// another identity.
+	// another identity. TestApplyLaunchEnv_SnapshotReplacesAmbientValues covers the
+	// harder half of that: an empty launch value must clear the ambient one too.
 	ambient := &CLI{}
 	ambient.Account = "personal@example.com"
 	ambient.Timeout = 60
 	applyLaunchEnv(ambient, &callEnv{account: "svc@example.com", timeout: 120})
 	if ambient.Account != "svc@example.com" {
-		t.Errorf("account = %q, want the mailbox the server was started with", ambient.Account)
+		t.Errorf("account = %q, want the account the server was started with", ambient.Account)
 	}
 	if ambient.Timeout != 120 {
 		t.Errorf("timeout = %d, want the launch value", ambient.Timeout)
-	}
-
-	// With nothing set at launch, the ambient environment still applies.
-	envOnly := &CLI{}
-	envOnly.Account = "personal@example.com"
-	envOnly.Timeout = 60
-	applyLaunchEnv(envOnly, &callEnv{})
-	if envOnly.Account != "personal@example.com" || envOnly.Timeout != 60 {
-		t.Errorf("account=%q timeout=%d, want the environment's values left alone",
-			envOnly.Account, envOnly.Timeout)
-	}
-
-	// A call must never be able to lift a guard the server was started with.
-	guarded := &CLI{}
-	guarded.NoSend = true
-	applyLaunchEnv(guarded, &callEnv{noSend: false})
-	if !guarded.NoSend {
-		t.Error("a call must not be able to lift its own --no-send")
 	}
 }
 

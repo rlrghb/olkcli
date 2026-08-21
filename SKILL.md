@@ -320,12 +320,13 @@ olk whoami    # name, email, job title, department, office, phone
 
 Use when the signed-in account needs to reach another user's mailbox under Microsoft 365 mailbox delegation. The signed-in identity is your own (or a service account), Exchange ACLs control which mailboxes you can reach, and the OAuth scope controls what you can do inside them.
 
-Reads are the common case. **Sending as a shared mailbox is supported**, and needs two grants that are separate from each other and from read access:
+Reads are the common case. **Sending as a shared mailbox is supported**, and needs three grants that are separate from each other:
 
-- the `Mail.Send.Shared` scope on the token — `olk auth login --scope Mail.Send.Shared`; and
-- **Send As** or **Send on Behalf Of** on the mailbox in Exchange, which is a different delegation from the Full Access that lets you read it.
+- the `Mail.Send.Shared` scope on the token — `olk auth login --scope Mail.Send.Shared`;
+- **Send As** or **Send on Behalf Of** on the mailbox in Exchange; and
+- **Full Access** on the mailbox.
 
-Holding one tells you nothing about the other, and `Full Access` grants neither. Without both, `mail send --mailbox` fails with `Access is denied` and names what is missing. `mail reply` and `mail forward` need the same two grants, plus read access, because they read the original from that mailbox before sending as it — and the message ID must be one listed from that mailbox, since IDs are scoped to the mailbox they came from.
+Holding one tells you nothing about the others. Full Access alone grants no right to send, and Send As alone is not enough either: `olk` sends through `/users/{mailbox}/sendMail` so the sent copy lands in the shared mailbox's Sent Items rather than yours, and [Microsoft requires Full Access for that form](https://learn.microsoft.com/en-us/graph/outlook-send-mail-from-other-user). Without all three, `mail send --mailbox` fails with `Access is denied` and names what is missing. `mail reply` and `mail forward` need the same three grants because they read the original from that mailbox before sending as it — and the message ID must be one listed from that mailbox, since IDs are scoped to the mailbox they came from.
 
 Sending, replying, forwarding and the draft commands are the writes that honour `--mailbox`. The calendar, contact and folder writes ignore it, as do the commands that organise mail in place — move, flag, categorise, mark — and all of them act on the signed-in user's own mailbox.
 

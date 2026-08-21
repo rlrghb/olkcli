@@ -301,14 +301,21 @@ type SendMessageOptions struct {
 // SendMessage sends from the target mailbox, or from the signed-in user's own
 // mailbox when target is empty.
 //
-// Sending as another mailbox needs two grants that are easy to confuse, and
-// holding one tells you nothing about the other:
+// Sending as another mailbox needs three grants that are easy to confuse, and
+// holding one tells you nothing about the others:
 //
 //   - the token must carry the Mail.Send.Shared scope claim, requested at login
-//     with `--scope Mail.Send.Shared`; and
+//     with `--scope Mail.Send.Shared`;
 //   - the calling user must hold Send As or Send on Behalf Of on the target
-//     mailbox in Exchange, which is a different delegation from the Full Access
-//     that makes reading it work.
+//     mailbox in Exchange; and
+//   - the calling user must hold Full Access on it as well.
+//
+// The third is a consequence of the endpoint. Posting to /users/{target}/sendMail
+// saves the sent copy in the target's Sent Items, which is what a shared mailbox
+// is for — the alternative, /me/sendMail with a from address, needs no Full Access
+// but leaves the copy in the caller's own Sent Items where the team cannot see it.
+// Microsoft requires Full Access for the form used here:
+// https://learn.microsoft.com/en-us/graph/outlook-send-mail-from-other-user
 //
 // Before this took a target, a send with --mailbox set silently went out from
 // the caller's own address and still reported success, which is the failure
@@ -406,13 +413,21 @@ func (c *Client) SendMessage(ctx context.Context, target string, opts *SendMessa
 }
 
 // Graph reports a missing scope and a missing Exchange delegation identically,
-// as a bare "Access is denied", which leaves no clue about which of the two
-// independent grants is absent. These hints name both so the reader can check
-// the one they have not already ruled out.
+// as a bare "Access is denied", which leaves no clue about which of the three
+// independent grants is absent. These hints name all of them so the reader can
+// check the one they have not already ruled out.
+//
+// Full Access belongs in the list because of the endpoint this takes: sending
+// through /users/{target}/sendMail rather than /me/sendMail with a from address
+// leaves the sent copy in the target's Sent Items, which is what a shared mailbox
+// wants, and Microsoft requires Full Access for that form on top of the sending
+// delegation. See "Send Outlook messages from another user":
+// https://learn.microsoft.com/en-us/graph/outlook-send-mail-from-other-user
 const (
-	sendGrantHint = "Sending as another mailbox needs both the Mail.Send.Shared scope " +
-		"(sign in again with --scope Mail.Send.Shared) and Send As or Send on Behalf Of on that " +
-		"mailbox in Exchange. Read access to a mailbox does not imply either"
+	sendGrantHint = "Sending as another mailbox needs three separate grants: the Mail.Send.Shared " +
+		"scope (sign in again with --scope Mail.Send.Shared), Send As or Send on Behalf Of on that " +
+		"mailbox in Exchange, and Full Access on it. Full Access is needed because the sent copy is " +
+		"saved to that mailbox's Sent Items. Holding any one of the three implies nothing about the others"
 
 	replyGrantHint = sendGrantHint + ".\n\nReplying and forwarding also read the original from " +
 		"that mailbox, so the message ID must be one listed from it: IDs are scoped to a mailbox, " +
