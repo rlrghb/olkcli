@@ -35,11 +35,16 @@ olk mcp --mailbox team@example.com
 
 Tools that cannot honour that choice are not exposed. Some commands ignore
 `--mailbox` and always act on the signed-in user's own mailbox — the calendar,
-contact and folder writes, and the commands that organise mail in place — so on
-a server started with a mailbox they would quietly act on the wrong one.
-Withholding them costs an agent those tools; offering them would cost the
-operator a message deleted in the wrong mailbox. Tools with no mailbox dimension
-at all, such as OneDrive and To Do, are unaffected.
+contact and folder writes, the commands that organise mail in place, the To Do
+commands, and the people search — so on a server started with a mailbox they
+would quietly act on the wrong one. Withholding them costs an agent those tools;
+offering them would cost the operator a task or a message deleted in the wrong
+mailbox.
+
+To Do is included because its lists live in the mailbox even though it looks like
+a separate service, and the people search because `/me/people` ranks by the
+signed-in user's own correspondence. OneDrive is genuinely separate, and is
+unaffected.
 
 To let an agent choose per call, name the mailboxes it may use. Anything else is
 refused, so an agent cannot reach a mailbox merely because the signed-in user

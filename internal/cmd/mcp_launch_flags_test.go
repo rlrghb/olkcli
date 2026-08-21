@@ -23,6 +23,7 @@ var (
 		"ImmutableIDs": "ID stability contract the operator opted into",
 		"ResultsOnly":  "envelope suppression, tightening only",
 		"Concise":      "size reduction, tightening only",
+		"Verbose":      "Graph request logging the operator asked for; the handler redacts Authorization",
 		"DryRun":       "describe mutations instead of making them",
 		"NoWrite":      "capability guard, tightening only",
 		"NoSend":       "capability guard, tightening only",
@@ -50,9 +51,8 @@ var (
 
 	// Deliberately not carried.
 	launchIgnoredFlags = map[string]string{
-		"Plain":   "the forced --json outranks it in NewPrinter, so it cannot take effect",
-		"Verbose": "Graph request logging goes to stderr, which is captured into the agent's result",
-		"Color":   "output is captured, never a terminal, so colour never applies",
+		"Plain": "the forced --json outranks it in NewPrinter, so it cannot take effect",
+		"Color": "output is captured, never a terminal, so colour never applies",
 	}
 )
 
@@ -111,6 +111,7 @@ func TestApplyLaunchEnv_CarriesEveryClassifiedField(t *testing.T) {
 		timezone:     "America/New_York",
 		selectFields: SelectFields{Value: "id,subject", Set: true},
 		immutableIDs: true,
+		verbose:      true,
 		resultsOnly:  true,
 		concise:      true,
 		dryRun:       true,
@@ -131,6 +132,7 @@ func TestApplyLaunchEnv_CarriesEveryClassifiedField(t *testing.T) {
 		"TimeZone":     {ambient.TimeZone, "America/New_York"},
 		"Select":       {ambient.Select.Value, "id,subject"},
 		"ImmutableIDs": {ambient.ImmutableIDs, true},
+		"Verbose":      {ambient.Verbose, true},
 		"ResultsOnly":  {ambient.ResultsOnly, true},
 		"Concise":      {ambient.Concise, true},
 		"DryRun":       {ambient.DryRun, true},
@@ -173,6 +175,72 @@ func TestApplyLaunchEnv_TighteningAndAbsence(t *testing.T) {
 	if envOnly.Account != "personal@example.com" || envOnly.TimeZone != "UTC" ||
 		envOnly.Select.Value != "id" {
 		t.Error("with nothing set at launch, the ambient environment must still apply")
+	}
+}
+
+// The two prior tests start from a callEnv, which is one step past where the
+// original bug lived: the flag was lost between the operator's command line and
+// the callEnv, not after it. This drives the whole chain — RootFlags through
+// launchEnv and applyLaunchEnv — so dropping an assignment at either boundary
+// fails here.
+func TestLaunchFlagsSurviveFromCommandLineToCall(t *testing.T) {
+	flags := &RootFlags{
+		Account:      "svc@example.com",
+		Timeout:      120,
+		TimeZone:     "America/New_York",
+		Select:       SelectFields{Value: "id,subject", Set: true},
+		ImmutableIDs: true,
+		ResultsOnly:  true,
+		Concise:      true,
+		DryRun:       true,
+		Verbose:      true,
+		NoWrite:      true,
+		NoSend:       true,
+	}
+
+	env := launchEnv(flags, "team@example.com", []string{"team@example.com"})
+	if env.mailbox != "team@example.com" {
+		t.Fatalf("launch mailbox = %q, want team@example.com", env.mailbox)
+	}
+
+	cli := &CLI{}
+	applyLaunchEnv(cli, &env)
+
+	got := map[string]any{
+		"Account":      cli.Account,
+		"Timeout":      cli.Timeout,
+		"TimeZone":     cli.TimeZone,
+		"Select":       cli.Select.Value,
+		"ImmutableIDs": cli.ImmutableIDs,
+		"ResultsOnly":  cli.ResultsOnly,
+		"Concise":      cli.Concise,
+		"DryRun":       cli.DryRun,
+		"Verbose":      cli.Verbose,
+		"NoWrite":      cli.NoWrite,
+		"NoSend":       cli.NoSend,
+	}
+	want := map[string]any{
+		"Account":      "svc@example.com",
+		"Timeout":      120,
+		"TimeZone":     "America/New_York",
+		"Select":       "id,subject",
+		"ImmutableIDs": true,
+		"ResultsOnly":  true,
+		"Concise":      true,
+		"DryRun":       true,
+		"Verbose":      true,
+		"NoWrite":      true,
+		"NoSend":       true,
+	}
+	for field := range launchCarriedFlags {
+		if _, ok := got[field]; !ok {
+			t.Errorf("%s is classified as carried but this test does not follow it "+
+				"from the command line; add it here and to launchEnv", field)
+			continue
+		}
+		if got[field] != want[field] {
+			t.Errorf("%s reached the call as %v, want the operator's %v", field, got[field], want[field])
+		}
 	}
 }
 

@@ -159,6 +159,9 @@ func applyLaunchEnv(cli *CLI, env *callEnv) {
 	if env.immutableIDs {
 		cli.ImmutableIDs = true
 	}
+	if env.verbose {
+		cli.Verbose = true
+	}
 	if env.resultsOnly {
 		cli.ResultsOnly = true
 	}

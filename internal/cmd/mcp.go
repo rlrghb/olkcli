@@ -74,6 +74,31 @@ func resolveAllowList(names []string, eligible map[string]bool, flagName string)
 	return out
 }
 
+// launchEnv captures the operator's command line for the life of the server.
+//
+// Kong re-reads OLK_* variables on every parse but nothing else survives, so a
+// flag missing from here is a flag the operator set and every tool call then
+// ignored. That is how --dry-run came to be dropped by a server started with it.
+// The one test that can catch such an omission has to start from RootFlags, so
+// this is a function rather than a literal inside Run.
+func launchEnv(flags *RootFlags, mailbox string, allowMailbox []string) callEnv {
+	return callEnv{
+		mailbox:      mailbox,
+		account:      flags.Account,
+		timeout:      flags.Timeout,
+		noWrite:      flags.NoWrite,
+		noSend:       flags.NoSend,
+		verbose:      flags.Verbose,
+		dryRun:       flags.DryRun,
+		concise:      flags.Concise,
+		resultsOnly:  flags.ResultsOnly,
+		immutableIDs: flags.ImmutableIDs,
+		timezone:     flags.TimeZone,
+		selectFields: flags.Select,
+		allowMailbox: allowMailbox,
+	}
+}
+
 func (c *MCPCmd) Run(ctx *RunContext) error {
 	// The MCP server is long-running, so it must not inherit the per-command
 	// timeout that Execute applies to ctx.Ctx. Run until interrupted instead.
@@ -98,20 +123,7 @@ func (c *MCPCmd) Run(ctx *RunContext) error {
 		allowed:          func(path []string) bool { return commandAllowed(flags, path) },
 		allowTool:        toolSelectorPredicate(c.AllowTool),
 		maxOutputBytes:   c.MaxOutputBytes,
-		env: callEnv{
-			mailbox:      mailbox,
-			account:      flags.Account,
-			timeout:      flags.Timeout,
-			noWrite:      flags.NoWrite,
-			noSend:       flags.NoSend,
-			dryRun:       flags.DryRun,
-			concise:      flags.Concise,
-			resultsOnly:  flags.ResultsOnly,
-			immutableIDs: flags.ImmutableIDs,
-			timezone:     flags.TimeZone,
-			selectFields: flags.Select,
-			allowMailbox: allowMailbox,
-		},
+		env:              launchEnv(flags, mailbox, allowMailbox),
 	})
 	if err != nil {
 		return err

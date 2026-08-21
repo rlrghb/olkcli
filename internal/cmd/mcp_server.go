@@ -143,6 +143,7 @@ type callEnv struct {
 	timeout      int          // --timeout: per-call ceiling, in seconds
 	noWrite      bool         // --no-write
 	noSend       bool         // --no-send
+	verbose      bool         // --verbose: log Graph requests, Authorization redacted
 	dryRun       bool         // --dry-run: describe the mutation instead of making it
 	concise      bool         // --concise: drop large free-text fields from JSON
 	resultsOnly  bool         // --results-only: emit the results array alone
@@ -240,18 +241,22 @@ var mailboxAwareTools = map[string]bool{
 }
 
 // mailboxIrrelevantTools names the curated tools that have no mailbox dimension
-// at all: OneDrive, To Do, the directory search, and the two meta commands read
-// resources that a mailbox delegation does not scope. Naming a mailbox says
-// nothing about them, so a launch mailbox leaves them exposed and unchanged.
+// at all. OneDrive is a separate service that an Exchange mailbox delegation does
+// not reach, and the two meta commands describe the session and the binary rather
+// than any mailbox. Naming a mailbox says nothing about these, so a launch
+// mailbox leaves them exposed and unchanged.
+//
+// The list is short on purpose. To Do looks like a separate service and is not:
+// its lists live in the user's mailbox, and Graph exposes them under
+// /users/{id}/todo, so a task deleted through /me/todo is deleted from the wrong
+// mailbox exactly as a message would be. The people search is the same shape —
+// /me/people ranks by the signed-in user's own correspondence, so under a
+// delegated server it answers from the operator's mailbox while appearing to
+// answer for the delegated one. Both are therefore scoped-but-unaware.
 var mailboxIrrelevantTools = map[string]bool{
 	"drive_ls": true, "drive_get": true, "drive_info": true, "drive_search": true,
 	"drive_recent": true, "drive_shared": true, "drive_versions": true,
-	"todo_lists_list": true, "todo_list": true, "todo_get": true,
-	"todo_checklist_list": true, "todo_links_list": true,
-	"todo_create": true, "todo_update": true, "todo_complete": true,
-	"todo_delete":   true,
-	"people_search": true,
-	"whoami":        true, "version": true,
+	"whoami": true, "version": true,
 }
 
 // mailboxScopedButUnaware reports whether a tool reads or writes mailbox-scoped

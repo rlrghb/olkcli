@@ -24,6 +24,11 @@ var mailboxScopedUnawareTools = map[string]bool{
 	"calendar_respond": true, "calendar_create": true, "calendar_update": true,
 	"calendar_delete": true,
 	"contacts_create": true, "contacts_update": true, "contacts_delete": true,
+	"todo_lists_list": true, "todo_list": true, "todo_get": true,
+	"todo_checklist_list": true, "todo_links_list": true,
+	"todo_create": true, "todo_update": true, "todo_complete": true,
+	"todo_delete":   true,
+	"people_search": true,
 }
 
 // Each curated tool belongs to exactly one class. A new tool that nobody
@@ -108,7 +113,7 @@ func TestLaunchMailboxWithholdsToolsThatCannotHonourIt(t *testing.T) {
 			t.Errorf("tool %q honours --mailbox and should still be exposed", want)
 		}
 	}
-	for _, want := range []string{"drive_ls", "todo_create", "todo_delete", "people_search", "whoami"} {
+	for _, want := range []string{"drive_ls", "drive_search", "whoami", "version"} {
 		if !exposed[want] {
 			t.Errorf("tool %q has no mailbox dimension and should be unaffected", want)
 		}
@@ -124,7 +129,7 @@ func TestLaunchMailboxWithholdsToolsThatCannotHonourIt(t *testing.T) {
 	if err != nil {
 		t.Fatalf("buildMCPServer: %v", err)
 	}
-	for _, want := range []string{"mail_flag", "contacts_create", "calendar_create", "mail_delete"} {
+	for _, want := range []string{"mail_flag", "contacts_create", "calendar_create", "mail_delete", "todo_create", "todo_delete"} {
 		found := false
 		for _, b := range plain {
 			if b.name == want {
