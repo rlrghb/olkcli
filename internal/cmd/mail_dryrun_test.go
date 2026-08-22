@@ -27,6 +27,7 @@ func TestDryRunPreviewsShowAllRecipientClasses(t *testing.T) {
 				"--body", "Body",
 			},
 			expected: "Would send email:\n" +
+				"  From: your own mailbox\n" +
 				"  To: to-one@example.com, to-two@example.com\n" +
 				"  Cc: cc@example.com\n" +
 				"  Bcc: bcc@example.com\n" +
@@ -42,6 +43,7 @@ func TestDryRunPreviewsShowAllRecipientClasses(t *testing.T) {
 				"--body", "Body",
 			},
 			expected: "Would send email:\n" +
+				"  From: your own mailbox\n" +
 				"  To: to-one@example.com\n" +
 				"  Subject: Preview\n" +
 				"  Body: Body\n",
@@ -56,6 +58,7 @@ func TestDryRunPreviewsShowAllRecipientClasses(t *testing.T) {
 				"--body", "Body",
 			},
 			expected: "Would send email:\n" +
+				"  From: your own mailbox\n" +
 				"  To: to-one@example.com\n" +
 				"  Cc: cc@example.com\n" +
 				"  Subject: Preview\n" +
@@ -72,6 +75,7 @@ func TestDryRunPreviewsShowAllRecipientClasses(t *testing.T) {
 				"--body", "Body",
 			},
 			expected: "Would create draft:\n" +
+				"  In: your own mailbox\n" +
 				"  To: to-one@example.com, to-two@example.com\n" +
 				"  Cc: cc-one@example.com, cc-two@example.com\n" +
 				"  Bcc: bcc@example.com\n" +
@@ -87,6 +91,7 @@ func TestDryRunPreviewsShowAllRecipientClasses(t *testing.T) {
 				"--body", "Body",
 			},
 			expected: "Would create draft:\n" +
+				"  In: your own mailbox\n" +
 				"  To: to-one@example.com\n" +
 				"  Subject: Preview\n" +
 				"  Body: Body\n",
@@ -101,6 +106,7 @@ func TestDryRunPreviewsShowAllRecipientClasses(t *testing.T) {
 				"--body", "Body",
 			},
 			expected: "Would create draft:\n" +
+				"  In: your own mailbox\n" +
 				"  To: to-one@example.com\n" +
 				"  Bcc: bcc-one@example.com, bcc-two@example.com\n" +
 				"  Subject: Preview\n" +

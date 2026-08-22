@@ -98,7 +98,7 @@ func (c *MailSendCmd) Run(ctx *RunContext) error {
 	}
 
 	if ctx.Flags.DryRun {
-		fmt.Printf("Would send email:\n  From: %s\n  To: %s\n", describeSender(target), strings.Join(c.To, ", "))
+		fmt.Printf("Would send email:\n  From: %s\n  To: %s\n", describeMailbox(target), strings.Join(c.To, ", "))
 		if len(c.CC) > 0 {
 			fmt.Printf("  Cc: %s\n", strings.Join(c.CC, ", "))
 		}
