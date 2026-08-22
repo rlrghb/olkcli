@@ -196,6 +196,63 @@ func TestSharedMailboxErrorCarriesTheGraphCode(t *testing.T) {
 	}
 }
 
+func TestSharedMailboxErrorOnlyAddsRelevantGuidance(t *testing.T) {
+	cases := []struct {
+		name       string
+		code       string
+		status     int
+		message    string
+		hint       string
+		want       string
+		wantAbsent string
+	}{
+		{
+			name:       "stale reply ID gets mailbox ID guidance only",
+			code:       "ErrorItemNotFound",
+			status:     404,
+			message:    "The item could not be found.",
+			hint:       replyGrantHint,
+			want:       replyIDHint,
+			wantAbsent: "Mail.Send.Shared",
+		},
+		{
+			name:       "throttle gets no permission guidance",
+			code:       "TooManyRequests",
+			status:     429,
+			message:    "Too many requests.",
+			hint:       sendGrantHint,
+			wantAbsent: "Mail.Send.Shared",
+		},
+		{
+			name:    "send refusal gets grant guidance",
+			code:    "ErrorSendAsDenied",
+			status:  403,
+			message: "The user does not have the right to send as this mailbox.",
+			hint:    sendGrantHint,
+			want:    "Full Access",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			odataErr := odataerrors.NewODataError()
+			main := odataerrors.NewMainError()
+			main.SetCode(&tc.code)
+			main.SetMessage(&tc.message)
+			odataErr.SetErrorEscaped(main)
+			odataErr.SetStatusCode(tc.status)
+
+			err := sharedMailboxError("sending message", "team@example.com", tc.hint, odataErr)
+			if tc.want != "" && !strings.Contains(err.Error(), tc.want) {
+				t.Errorf("error does not mention %q:\n%s", tc.want, err)
+			}
+			if tc.wantAbsent != "" && strings.Contains(err.Error(), tc.wantAbsent) {
+				t.Errorf("error unexpectedly contains %q:\n%s", tc.wantAbsent, err)
+			}
+		})
+	}
+}
+
 // The same contract for the two older helpers, which had the same defect before
 // graphError existed.
 func TestGraphErrorHelpersStayUnwrappable(t *testing.T) {

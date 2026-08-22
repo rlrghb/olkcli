@@ -427,14 +427,17 @@ func (c *Client) SendMessage(ctx context.Context, target string, opts *SendMessa
 // Outlook messages from another user":
 // https://learn.microsoft.com/en-us/graph/outlook-send-mail-from-other-user
 const (
+	errorSendAsDeniedCode = "ErrorSendAsDenied"
+
 	sendGrantHint = "Sending as another mailbox needs three separate grants: the Mail.Send.Shared " +
 		"scope (sign in again with --scope Mail.Send.Shared), Send As or Send on Behalf Of on that " +
 		"mailbox in Exchange, and Full Access on it. Holding any one of the three implies nothing " +
 		"about the others"
 
-	replyGrantHint = sendGrantHint + ".\n\nReplying and forwarding also read the original from " +
+	replyIDHint = "Replying and forwarding also read the original from " +
 		"that mailbox, so the message ID must be one listed from it: IDs are scoped to a mailbox, " +
 		"and an ID taken from your own will not resolve in a shared one"
+	replyGrantHint = sendGrantHint + ".\n\n" + replyIDHint
 )
 
 func sharedMailboxError(action, target, hint string, err error) error {
@@ -444,7 +447,34 @@ func sharedMailboxError(action, target, hint string, err error) error {
 	// layer's error classification — needs the code to tell a refused send from a
 	// stale ID. wrapGraph keeps the original reachable so --json can still report
 	// the code and the HTTP status.
-	return wrapGraph(err, "%s as %s: %s\n\n%s", action, target, graphErrorMessage(err), hint)
+	message := graphErrorMessage(err)
+	guidance := ""
+	if delegatedPermissionRefusal(err, message) {
+		guidance = hint
+	} else if hint == replyGrantHint && delegatedMessageNotFound(err, message) {
+		guidance = replyIDHint
+	}
+	format := "%s as %s: %s"
+	if guidance != "" {
+		return wrapGraph(err, format+"\n\n%s", action, target, message, guidance)
+	}
+	return wrapGraph(err, format, action, target, message)
+}
+
+func delegatedPermissionRefusal(err error, message string) bool {
+	code, status := ErrorMetadata(err)
+	lower := strings.ToLower(message)
+	return code == errorSendAsDeniedCode || code == "ErrorAccessDenied" ||
+		strings.Contains(lower, "access is denied") ||
+		strings.Contains(lower, "forbidden") ||
+		(status == 403 && strings.Contains(lower, "denied"))
+}
+
+func delegatedMessageNotFound(err error, message string) bool {
+	code, status := ErrorMetadata(err)
+	lower := strings.ToLower(message)
+	return code == "ErrorItemNotFound" || code == "ResourceNotFound" ||
+		strings.Contains(lower, "item not found") || status == 404
 }
 
 // ReplyMessage replies to a message in the target mailbox, or in the signed-in
