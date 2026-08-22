@@ -37,6 +37,11 @@ func (c *MailSendCmd) Run(ctx *RunContext) error {
 		return err
 	}
 
+	target, err := resolveMailboxTarget(ctx.Flags.Mailbox)
+	if err != nil {
+		return err
+	}
+
 	body := c.Body
 	// Read from stdin if no body provided
 	if body == "" {
@@ -93,7 +98,7 @@ func (c *MailSendCmd) Run(ctx *RunContext) error {
 	}
 
 	if ctx.Flags.DryRun {
-		fmt.Printf("Would send email:\n  To: %s\n", strings.Join(c.To, ", "))
+		fmt.Printf("Would send email:\n  From: %s\n  To: %s\n", describeMailbox(target), strings.Join(c.To, ", "))
 		if len(c.CC) > 0 {
 			fmt.Printf("  Cc: %s\n", strings.Join(c.CC, ", "))
 		}
@@ -107,11 +112,25 @@ func (c *MailSendCmd) Run(ctx *RunContext) error {
 		return nil
 	}
 
-	err = client.SendMessage(ctx.Ctx, c.Subject, body, c.To, c.CC, c.BCC, c.HTML, attachments, c.Importance, c.ReadReceipt)
+	err = client.SendMessage(ctx.Ctx, target, &graphapi.SendMessageOptions{
+		Subject:     c.Subject,
+		Body:        body,
+		To:          c.To,
+		CC:          c.CC,
+		BCC:         c.BCC,
+		IsHTML:      c.HTML,
+		Attachments: attachments,
+		Importance:  c.Importance,
+		ReadReceipt: c.ReadReceipt,
+	})
 	if err != nil {
 		return err
 	}
 
+	if target != "" {
+		fmt.Printf("Message sent from %s.\n", target)
+		return nil
+	}
 	fmt.Println("Message sent.")
 	return nil
 }

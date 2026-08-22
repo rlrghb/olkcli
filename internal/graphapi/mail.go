@@ -283,20 +283,66 @@ func (c *Client) GetMessage(ctx context.Context, target, messageID string, prefe
 	return &m, nil
 }
 
-func (c *Client) SendMessage(ctx context.Context, subject, body string, toRecipients, ccRecipients, bccRecipients []string, isHTML bool, attachments []AttachmentInput, importance string, readReceipt bool) error {
+// SendMessageOptions carries the content of an outgoing message. It exists so
+// that SendMessage can take a mailbox target without growing an eleventh
+// positional parameter.
+type SendMessageOptions struct {
+	Subject     string
+	Body        string
+	To          []string
+	CC          []string
+	BCC         []string
+	IsHTML      bool
+	Attachments []AttachmentInput
+	Importance  string
+	ReadReceipt bool
+}
+
+// SendMessage sends from the target mailbox, or from the signed-in user's own
+// mailbox when target is empty.
+//
+// Sending as another mailbox needs three grants that are easy to confuse, and
+// holding one tells you nothing about the others:
+//
+//   - the token must carry the Mail.Send.Shared scope claim, requested at login
+//     with `--scope Mail.Send.Shared`;
+//   - the calling user must hold Send As or Send on Behalf Of on the target
+//     mailbox in Exchange; and
+//   - the calling user must hold Full Access on it as well.
+//
+// The third comes with the endpoint. Microsoft requires Full Access for
+// /users/{target}/sendMail specifically, over and above the sending delegation:
+// https://learn.microsoft.com/en-us/graph/outlook-send-mail-from-other-user
+//
+// That endpoint is chosen for where it files the sent copy. Posting to
+// /users/{target}/sendMail saves it by default in the target's Sent Items, which
+// is what a shared mailbox is for; the alternative, /me/sendMail with a from
+// address, needs no Full Access but files the copy in the caller's own Sent Items
+// where the team cannot see it. Either default can be overridden by mailbox
+// configuration, so treat it as the documented default rather than a guarantee.
+//
+// Before this took a target, a send with --mailbox set silently went out from
+// the caller's own address and still reported success, which is the failure
+// mode this signature exists to prevent.
+func (c *Client) SendMessage(ctx context.Context, target string, opts *SendMessageOptions) error {
 	if err := c.ensureMaySend(); err != nil {
 		return err
 	}
+	if opts == nil {
+		return fmt.Errorf("send options are required")
+	}
+	subject, body := opts.Subject, opts.Body
 	msg := models.NewMessage()
 	msg.SetSubject(&subject)
 
-	if readReceipt {
+	if opts.ReadReceipt {
+		readReceipt := true
 		msg.SetIsReadReceiptRequested(&readReceipt)
 	}
 
 	bodyObj := models.NewItemBody()
 	bodyObj.SetContent(&body)
-	if isHTML {
+	if opts.IsHTML {
 		html := models.HTML_BODYTYPE
 		bodyObj.SetContentType(&html)
 	} else {
@@ -305,29 +351,29 @@ func (c *Client) SendMessage(ctx context.Context, subject, body string, toRecipi
 	}
 	msg.SetBody(bodyObj)
 
-	toR, err := makeRecipients(toRecipients)
+	toR, err := makeRecipients(opts.To)
 	if err != nil {
 		return fmt.Errorf("invalid to recipient: %w", err)
 	}
 	msg.SetToRecipients(toR)
-	if len(ccRecipients) > 0 {
-		ccR, err := makeRecipients(ccRecipients)
+	if len(opts.CC) > 0 {
+		ccR, err := makeRecipients(opts.CC)
 		if err != nil {
 			return fmt.Errorf("invalid cc recipient: %w", err)
 		}
 		msg.SetCcRecipients(ccR)
 	}
-	if len(bccRecipients) > 0 {
-		bccR, err := makeRecipients(bccRecipients)
+	if len(opts.BCC) > 0 {
+		bccR, err := makeRecipients(opts.BCC)
 		if err != nil {
 			return fmt.Errorf("invalid bcc recipient: %w", err)
 		}
 		msg.SetBccRecipients(bccR)
 	}
 
-	if len(attachments) > 0 {
+	if len(opts.Attachments) > 0 {
 		var atts []models.Attachmentable
-		for _, a := range attachments {
+		for _, a := range opts.Attachments {
 			fileAtt := models.NewFileAttachment()
 			odataType := "#microsoft.graph.fileAttachment"
 			fileAtt.SetOdataType(&odataType)
@@ -341,9 +387,9 @@ func (c *Client) SendMessage(ctx context.Context, subject, body string, toRecipi
 		msg.SetAttachments(atts)
 	}
 
-	if importance != "" {
+	if opts.Importance != "" {
 		var imp models.Importance
-		switch importance {
+		switch opts.Importance {
 		case importanceLow:
 			imp = models.LOW_IMPORTANCE
 		case importanceNormal:
@@ -351,7 +397,7 @@ func (c *Client) SendMessage(ctx context.Context, subject, body string, toRecipi
 		case importanceHigh:
 			imp = models.HIGH_IMPORTANCE
 		default:
-			return fmt.Errorf("invalid importance: %q (must be low, normal, or high)", importance)
+			return fmt.Errorf("invalid importance: %q (must be low, normal, or high)", opts.Importance)
 		}
 		msg.SetImportance(&imp)
 	}
@@ -361,39 +407,120 @@ func (c *Client) SendMessage(ctx context.Context, subject, body string, toRecipi
 	saveToSent := true
 	sendBody.SetSaveToSentItems(&saveToSent)
 
-	if err := c.inner.Me().SendMail().Post(ctx, sendBody, nil); err != nil {
+	if err := c.targetUser(target).SendMail().Post(ctx, sendBody, nil); err != nil {
+		if target != "" {
+			return sharedMailboxError("sending message", target, sendGrantHint, err)
+		}
 		return fmt.Errorf("sending message: %w", err)
 	}
 	return nil
 }
 
-func (c *Client) ReplyMessage(ctx context.Context, messageID, comment string, replyAll bool) error {
+// A missing scope and a missing Exchange delegation are hard to tell apart from
+// what Graph returns: often a bare "Access is denied" naming neither, and even
+// the clearer ErrorSendAsDenied speaks only to the sending delegation. These
+// hints name all three grants so the reader can check the one they have not
+// already ruled out.
+//
+// Full Access is on the list because Microsoft requires it for the endpoint this
+// takes, /users/{target}/sendMail, on top of the sending delegation. See "Send
+// Outlook messages from another user":
+// https://learn.microsoft.com/en-us/graph/outlook-send-mail-from-other-user
+const (
+	errorSendAsDeniedCode = "ErrorSendAsDenied"
+
+	sendGrantHint = "Sending as another mailbox needs three separate grants: the Mail.Send.Shared " +
+		"scope (sign in again with --scope Mail.Send.Shared), Send As or Send on Behalf Of on that " +
+		"mailbox in Exchange, and Full Access on it. Holding any one of the three implies nothing " +
+		"about the others"
+
+	replyIDHint = "Replying and forwarding also read the original from " +
+		"that mailbox, so the message ID must be one listed from it: IDs are scoped to a mailbox, " +
+		"and an ID taken from your own will not resolve in a shared one"
+	replyGrantHint = sendGrantHint + ".\n\n" + replyIDHint
+)
+
+func sharedMailboxError(action, target, hint string, err error) error {
+	// graphErrorMessage rather than %w for the text: ODataError.Error() returns
+	// only the provider message, so wrapping alone loses the code and the whole
+	// failure arrives as prose. Everything downstream — the reader, and the MCP
+	// layer's error classification — needs the code to tell a refused send from a
+	// stale ID. wrapGraph keeps the original reachable so --json can still report
+	// the code and the HTTP status.
+	message := graphErrorMessage(err)
+	guidance := ""
+	if delegatedPermissionRefusal(err, message) {
+		guidance = hint
+	} else if hint == replyGrantHint && delegatedMessageNotFound(err, message) {
+		guidance = replyIDHint
+	}
+	format := "%s as %s: %s"
+	if guidance != "" {
+		return wrapGraph(err, format+"\n\n%s", action, target, message, guidance)
+	}
+	return wrapGraph(err, format, action, target, message)
+}
+
+func delegatedPermissionRefusal(err error, message string) bool {
+	code, status := ErrorMetadata(err)
+	lower := strings.ToLower(message)
+	return code == errorSendAsDeniedCode || code == "ErrorAccessDenied" ||
+		strings.Contains(lower, "access is denied") ||
+		strings.Contains(lower, "forbidden") ||
+		(status == 403 && strings.Contains(lower, "denied"))
+}
+
+func delegatedMessageNotFound(err error, message string) bool {
+	code, status := ErrorMetadata(err)
+	lower := strings.ToLower(message)
+	return code == "ErrorItemNotFound" || code == "ResourceNotFound" ||
+		strings.Contains(lower, "item not found") || status == 404
+}
+
+// ReplyMessage replies to a message in the target mailbox, or in the signed-in
+// user's own mailbox when target is empty.
+//
+// The target selects both the mailbox the original is read from and the identity
+// the reply is sent as, because a message ID only resolves within the mailbox it
+// was listed from. Without a target, an ID belonging to a shared mailbox fails to
+// resolve at all, which is why replying from one was previously impossible rather
+// than merely mis-attributed.
+func (c *Client) ReplyMessage(ctx context.Context, target, messageID, comment string, replyAll bool) error {
 	if err := c.ensureMaySend(); err != nil {
 		return err
 	}
 	if err := validateID(messageID, "message ID"); err != nil {
 		return err
 	}
+	action := "reply"
+	if replyAll {
+		action = "reply all"
+	}
+
+	var err error
 	if replyAll {
 		body := users.NewItemMessagesItemReplyAllPostRequestBody()
 		body.SetComment(&comment)
-		err := c.inner.Me().Messages().ByMessageId(messageID).ReplyAll().Post(ctx, body, nil)
-		if err != nil {
-			return fmt.Errorf("reply all: %w", err)
-		}
-		return nil
+		err = c.targetUser(target).Messages().ByMessageId(messageID).ReplyAll().Post(ctx, body, nil)
+	} else {
+		body := users.NewItemMessagesItemReplyPostRequestBody()
+		body.SetComment(&comment)
+		err = c.targetUser(target).Messages().ByMessageId(messageID).Reply().Post(ctx, body, nil)
 	}
-
-	body := users.NewItemMessagesItemReplyPostRequestBody()
-	body.SetComment(&comment)
-	err := c.inner.Me().Messages().ByMessageId(messageID).Reply().Post(ctx, body, nil)
 	if err != nil {
-		return fmt.Errorf("reply: %w", err)
+		if target != "" {
+			return sharedMailboxError(action, target, replyGrantHint, err)
+		}
+		return fmt.Errorf("%s: %w", action, err)
 	}
 	return nil
 }
 
-func (c *Client) ForwardMessage(ctx context.Context, messageID, comment string, toRecipients []string) error {
+// ForwardMessage forwards a message from the target mailbox, or from the
+// signed-in user's own mailbox when target is empty. As with ReplyMessage, the
+// target selects both the mailbox the original is read from and the sending
+// identity.
+func (c *Client) ForwardMessage(ctx context.Context, target, messageID, comment string, toRecipients []string) error {
 	if err := c.ensureMaySend(); err != nil {
 		return err
 	}
@@ -408,8 +535,11 @@ func (c *Client) ForwardMessage(ctx context.Context, messageID, comment string, 
 	}
 	body.SetToRecipients(fwdR)
 
-	err = c.inner.Me().Messages().ByMessageId(messageID).Forward().Post(ctx, body, nil)
+	err = c.targetUser(target).Messages().ByMessageId(messageID).Forward().Post(ctx, body, nil)
 	if err != nil {
+		if target != "" {
+			return sharedMailboxError("forward", target, replyGrantHint, err)
+		}
 		return fmt.Errorf("forward: %w", err)
 	}
 	return nil

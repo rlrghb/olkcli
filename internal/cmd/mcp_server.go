@@ -123,13 +123,66 @@ type mcpConfig struct {
 	allowed          func(path []string) bool              // nil = allow all; else command allow/deny lists
 	allowTool        func(name string, readOnly bool) bool // nil = allow all; else --allow-tool selectors
 	maxOutputBytes   int                                   // cap on a single tool call's output text (<=0 = defaultMaxOutputBytes)
+	env              callEnv                               // launch-time context applied to every tool call
+}
+
+// callEnv carries the operator's launch-time context into each tool call.
+//
+// A call re-parses a fresh CLI from a rebuilt argv, so nothing set on the
+// `olk mcp` command line survives on its own: only OLK_* environment variables
+// do, because kong re-reads them on every parse. Left unpropagated, a server
+// started with `--mailbox boss@example.com` silently served the operator's own
+// mailbox instead.
+//
+// The capability guards are carried too. Registration already hides the tools
+// they veto, so this is the second layer: should a tool ever be registered in
+// error, the graphapi guard still refuses the call.
+type callEnv struct {
+	mailbox      string       // --mailbox: default target for mailbox-aware tools
+	account      string       // --account: which signed-in identity to use
+	timeout      int          // --timeout: per-call ceiling, in seconds
+	noWrite      bool         // --no-write
+	noSend       bool         // --no-send
+	verbose      bool         // --verbose: log Graph requests, Authorization redacted
+	dryRun       bool         // --dry-run: describe the mutation instead of making it
+	concise      bool         // --concise: drop large free-text fields from JSON
+	resultsOnly  bool         // --results-only: emit the results array alone
+	immutableIDs bool         // --immutable-ids: request move-stable Outlook IDs
+	timezone     string       // --tz: IANA zone for displayed times
+	selectFields SelectFields // --select: field projection
+	allowMailbox []string     // --allow-mailbox: mailboxes an agent may name per call
+}
+
+// mailboxAllowed reports whether an agent may direct a call at target. An empty
+// allowlist permits nothing, which is what keeps the argument absent from every
+// schema until the operator opts in.
+func (e *callEnv) mailboxAllowed(target string) bool {
+	for _, m := range e.allowMailbox {
+		if strings.EqualFold(m, target) {
+			return true
+		}
+	}
+	return false
+}
+
+// offersMailboxArg reports whether a tool should advertise, and accept, a
+// per-call mailbox: it must honour the flag and the operator must have named
+// mailboxes to choose from.
+func (e *callEnv) offersMailboxArg(toolName string) bool {
+	return len(e.allowMailbox) > 0 && mailboxAwareTools[toolName]
 }
 
 // exposes reports whether ct may be registered under cfg: reads always; each
 // mutation tier needs its matching allow-map entry, and send/destructive are
 // additionally gated by the --no-send / --no-write capability guards so a
 // guard-disabled tool is never even advertised.
-func (cfg mcpConfig) exposes(ct curatedTool) bool {
+func (cfg *mcpConfig) exposes(ct curatedTool) bool {
+	// A launch mailbox is a statement about which mailbox this server serves.
+	// A tool that cannot honour it would serve the operator's own instead, so
+	// it is withheld rather than offered under a promise it cannot keep.
+	if cfg.env.mailbox != "" && mailboxScopedButUnaware(ct.name) {
+		return false
+	}
 	switch ct.tier {
 	case tierRead:
 		return true
@@ -157,6 +210,68 @@ const helpFlagName = "help"
 // wouldn't otherwise appear in the tool schema), letting an agent shrink a
 // response per call without affecting tools where the body is the point.
 const conciseArg = "concise"
+
+// mailboxArg is a synthetic string injected into the schema of mailbox-aware
+// tools, but only when the operator has named permitted mailboxes with
+// --allow-mailbox. It maps to olk's global --mailbox flag. Without that flag the
+// property is absent everywhere, so an agent has no way to choose a mailbox and
+// the server behaves exactly as it did before.
+const mailboxArg = "mailbox"
+
+// mailboxAwareTools names the curated tools whose command honours --mailbox.
+// This is deliberately a separate list from curatedTools: whether a command
+// reads the flag is a property of its Run method rather than of its place in the
+// registry, and TestMailboxAwareTools_MatchesSource parses the command sources to
+// keep the two in step. Offering the argument on a tool that ignores it would
+// promise scoping that never happens, which is the same silent mismatch the
+// mailbox work exists to remove.
+// A tool absent from this list is not necessarily safe under a launch mailbox:
+// see mailboxIrrelevantTools for the distinction that decides whether it may be
+// exposed at all.
+var mailboxAwareTools = map[string]bool{
+	"mail_list": true, "mail_get": true, "mail_batch": true, "mail_thread": true,
+	"mail_search": true, "mail_folders_list": true, "mail_delta": true,
+	"mail_drafts_create": true, "mail_drafts_send": true,
+	"mail_send": true, "mail_reply": true, "mail_forward": true,
+	"calendar_events": true, "calendar_view": true, "calendar_get": true,
+	"calendar_calendars": true, "calendar_delta": true,
+	"contacts_list": true, "contacts_get": true, "contacts_search": true,
+	"contacts_delta": true,
+	"changes":        true,
+}
+
+// mailboxIrrelevantTools names the curated tools that have no mailbox dimension
+// at all. OneDrive is a separate service that an Exchange mailbox delegation does
+// not reach, and the two meta commands describe the session and the binary rather
+// than any mailbox. Naming a mailbox says nothing about these, so a launch
+// mailbox leaves them exposed and unchanged.
+//
+// The list is short on purpose. To Do looks like a separate service and is not:
+// its lists live in the user's mailbox, and Graph exposes them under
+// /users/{id}/todo, so a task deleted through /me/todo is deleted from the wrong
+// mailbox exactly as a message would be. The people search is the same shape —
+// /me/people ranks by the signed-in user's own correspondence, so under a
+// delegated server it answers from the operator's mailbox while appearing to
+// answer for the delegated one. Both are therefore scoped-but-unaware.
+var mailboxIrrelevantTools = map[string]bool{
+	"drive_ls": true, "drive_get": true, "drive_info": true, "drive_search": true,
+	"drive_recent": true, "drive_shared": true, "drive_versions": true,
+	"whoami": true, "version": true,
+}
+
+// mailboxScopedButUnaware reports whether a tool reads or writes mailbox-scoped
+// data yet ignores --mailbox, and so would act on the signed-in user's own
+// mailbox whatever the operator asked for.
+//
+// This is the dangerous third class. A tool that honours the flag serves the
+// named mailbox; a tool with no mailbox dimension is unaffected by the choice;
+// but one of these silently substitutes a different mailbox for the one the
+// operator configured. Deleting a message or creating an event in the wrong
+// mailbox is not a degraded result, it is the wrong action taken, so a server
+// started with --mailbox does not register these at all.
+func mailboxScopedButUnaware(toolName string) bool {
+	return !mailboxAwareTools[toolName] && !mailboxIrrelevantTools[toolName]
+}
 
 // toolNamesForTier returns the set of curated tool names in a given tier — the
 // only names eligible for that tier's allow flag.
@@ -190,6 +305,7 @@ type toolBinding struct {
 	node           *kong.Node
 	tier           toolTier
 	maxOutputBytes int
+	env            callEnv
 }
 
 func (b *toolBinding) readOnly() bool { return b.tier == tierRead }
@@ -209,7 +325,7 @@ func newKongParser(cli *CLI) (*kong.Kong, error) {
 
 // buildMCPServer constructs an MCP server exposing the curated tools the config
 // permits. It returns the bindings so callers (and tests) can inspect the set.
-func buildMCPServer(cfg mcpConfig) (*mcp.Server, []*toolBinding, error) {
+func buildMCPServer(cfg *mcpConfig) (*mcp.Server, []*toolBinding, error) {
 	k, err := newKongParser(&CLI{})
 	if err != nil {
 		return nil, nil, err
@@ -238,7 +354,7 @@ func buildMCPServer(cfg mcpConfig) (*mcp.Server, []*toolBinding, error) {
 		if !ok {
 			return nil, nil, fmt.Errorf("curated MCP tool %q maps to unknown command %q", ct.name, strings.Join(ct.path, " "))
 		}
-		b := &toolBinding{name: ct.name, path: ct.path, node: node, tier: ct.tier, maxOutputBytes: maxOut}
+		b := &toolBinding{name: ct.name, path: ct.path, node: node, tier: ct.tier, maxOutputBytes: maxOut, env: cfg.env}
 		registerTool(srv, b)
 		bindings = append(bindings, b)
 	}
@@ -289,6 +405,19 @@ func toolSchema(b *toolBinding) *jsonschema.Schema {
 		schema.Properties[conciseArg] = &jsonschema.Schema{
 			Type:        "boolean",
 			Description: "Drop large free-text fields (message/event/task bodies, previews, attendee lists) to reduce payload size.",
+		}
+	}
+	if b.env.offersMailboxArg(b.name) {
+		allowed := make([]any, 0, len(b.env.allowMailbox))
+		for _, m := range b.env.allowMailbox {
+			allowed = append(allowed, m)
+		}
+		schema.Properties[mailboxArg] = &jsonschema.Schema{
+			Type: "string",
+			Enum: allowed,
+			Description: "Act on this delegated mailbox instead of the signed-in user's own. " +
+				"Only the listed addresses are permitted; any other value is refused. " +
+				"Omit to use the mailbox the server was started with.",
 		}
 	}
 	return schema

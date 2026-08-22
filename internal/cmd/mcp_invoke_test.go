@@ -158,16 +158,97 @@ func TestClassifyError(t *testing.T) {
 		msg      string
 		wantCode string
 	}{
-		{"no account configured", "unauthenticated"},
-		{"error: InsufficientScope: Read.Shared required", "forbidden"},
-		{"ErrorItemNotFound", "not_found"},
-		{"TooManyRequests", "rate_limited"},
-		{"unknown argument \"x\"", "invalid_input"},
-		{"some other failure", "error"},
+		{"no account configured", codeUnauthenticated},
+		{"error: InsufficientScope: Read.Shared required", codeForbidden},
+		{"ErrorItemNotFound", codeNotFound},
+		{"TooManyRequests", codeRateLimited},
+		{"unknown argument \"x\"", codeInvalidInput},
+		{"some other failure", codeUnclassified},
+		// A refused delegated send is a Graph failure with its own code, and
+		// classifying it as a bare error leaves an agent nothing to act on.
+		{"sending message from team@example.com: ErrorSendAsDenied", codeForbidden},
 	}
 	for _, tc := range cases {
 		if code, _ := classifyError(tc.msg); code != tc.wantCode {
 			t.Errorf("classifyError(%q) code = %q, want %q", tc.msg, code, tc.wantCode)
+		}
+	}
+}
+
+// A missing Exchange delegation is not a missing scope, and no re-login supplies
+// it. The action must not send an agent round that loop.
+func TestClassifyError_SendAsDeniedNamesTheExchangeGrants(t *testing.T) {
+	for _, msg := range []string{
+		// Graph naming the refusal outright.
+		"sending message from team@example.com: ErrorSendAsDenied",
+		// Graph saying only "Access is denied", with the hint the graphapi layer
+		// attaches supplying the scope name that identifies the failure.
+		"sending message from team@example.com: Access is denied.\n\nSending as another " +
+			"mailbox needs three separate grants: the Mail.Send.Shared scope",
+	} {
+		code, action := classifyError(msg)
+		if code != codeForbidden {
+			t.Errorf("classifyError(%q) code = %q, want forbidden", msg, code)
+		}
+		for _, want := range []string{"Send As", "Full Access", "Mail.Send.Shared"} {
+			if !strings.Contains(action, want) {
+				t.Errorf("action for %q does not mention %q: %s", msg, want, action)
+			}
+		}
+	}
+
+	// A scope Graph names outright is fixable by signing in again, and must not
+	// be swallowed by the branch above just because the advice there also names
+	// scopes.
+	_, action := classifyError("InsufficientScope: Mail.Send.Shared required")
+	if !strings.Contains(action, "auth login") {
+		t.Errorf("a named missing scope should still point at re-login: %s", action)
+	}
+}
+
+// Every failed delegated send is decorated with the grant hint, which names the
+// scope. Reading that name as evidence of a refusal turns a stale ID and a
+// throttle into permission problems, and sends an agent to an administrator
+// instead of re-listing or backing off.
+func TestClassifyError_TheGrantHintAloneIsNotARefusal(t *testing.T) {
+	// The shape sharedMailboxError produces: the Graph failure, then a blank line,
+	// then the hint. Only the ordering and the literals matter to classification,
+	// so the wrapper prefix and the tail of the hint are abbreviated.
+	// TestSharedMailboxErrorCarriesTheGraphCode in the graphapi package covers the
+	// other half — that a real ODataError reaches this string with its code
+	// intact, which is what makes the refusal recognisable at all.
+	decorate := func(graphErr string) string {
+		return "sending message from team@example.com: " + graphErr +
+			"\n\nSending as another mailbox needs three separate grants: the " +
+			"Mail.Send.Shared scope (sign in again with --scope Mail.Send.Shared), " +
+			"Send As or Send on Behalf Of on that mailbox in Exchange, and Full Access on it"
+	}
+
+	cases := []struct {
+		graphErr    string
+		wantCode    string
+		wantGrants  bool
+		explanation string
+	}{
+		{"ErrorItemNotFound", codeNotFound, false, "a stale ID is not a permission problem"},
+		{"TooManyRequests", codeRateLimited, false, "a throttle is not a permission problem"},
+		{"ErrorSendAsDenied", codeForbidden, true, "Graph naming the refusal outright"},
+		{"Access is denied.", codeForbidden, true, "Graph refusing without naming a code"},
+		{"Forbidden", codeForbidden, true, "a refusal phrased as Forbidden is still a refusal"},
+		// Graph also answers 403 for licensing and conditional access, so a bare
+		// one does not establish a missing grant. It is still forbidden, but the
+		// three-grant diagnosis would be a guess.
+		{"403", codeForbidden, false, "a bare 403 does not name its cause"},
+	}
+	for _, tc := range cases {
+		code, action := classifyError(decorate(tc.graphErr))
+		if code != tc.wantCode {
+			t.Errorf("a delegated send failing with %s classified as %q, want %q (%s)",
+				tc.graphErr, code, tc.wantCode, tc.explanation)
+		}
+		if got := strings.Contains(action, "Full Access"); got != tc.wantGrants {
+			t.Errorf("a delegated send failing with %s gave grant advice = %v, want %v (%s)\n%s",
+				tc.graphErr, got, tc.wantGrants, tc.explanation, action)
 		}
 	}
 }
@@ -264,7 +345,7 @@ func TestToolSelectorPredicate(t *testing.T) {
 }
 
 func TestBuildMCPServer_AllowToolNarrows(t *testing.T) {
-	_, bindings, err := buildMCPServer(mcpConfig{allowTool: toolSelectorPredicate([]string{"mail_*"})})
+	_, bindings, err := buildMCPServer(&mcpConfig{allowTool: toolSelectorPredicate([]string{"mail_*"})})
 	if err != nil {
 		t.Fatalf("buildMCPServer: %v", err)
 	}
@@ -292,5 +373,22 @@ func TestBuildArgv_DestructiveForcesConfirmation(t *testing.T) {
 	argv2, _ := buildArgv(send, map[string]any{"id": "AAA"})
 	if contains(argv2, "--force") {
 		t.Errorf("send tool argv must not include --force, got %v", argv2)
+	}
+}
+
+// The codes are the tool contract: an agent branches on them, so renaming one is
+// a breaking change and has to be a deliberate edit here as well.
+func TestClassificationCodesAreStable(t *testing.T) {
+	for got, want := range map[string]string{
+		codeUnauthenticated: "unauthenticated",
+		codeForbidden:       "forbidden",
+		codeNotFound:        "not_found",
+		codeRateLimited:     "rate_limited",
+		codeInvalidInput:    "invalid_input",
+		codeUnclassified:    "error",
+	} {
+		if got != want {
+			t.Errorf("classification code = %q, want %q", got, want)
+		}
 	}
 }

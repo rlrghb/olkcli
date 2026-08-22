@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -37,14 +38,13 @@ func makeHandler(b *toolBinding) mcp.ToolHandler {
 			return errorResult(err.Error()), nil
 		}
 
-		cli := &CLI{}
-		k, err := newKongParser(cli)
+		cli, kctx, err := prepareCall(argv, &b.env)
 		if err != nil {
-			return nil, fmt.Errorf("building parser: %w", err)
-		}
-		kctx, err := k.Parse(argv)
-		if err != nil {
-			return errorResult(fmt.Sprintf("parse error: %v", err)), nil
+			var bad *argvError
+			if errors.As(err, &bad) {
+				return errorResult(fmt.Sprintf("parse error: %v", bad.Unwrap())), nil
+			}
+			return nil, err
 		}
 
 		timeout := cli.Timeout
@@ -56,12 +56,6 @@ func makeHandler(b *toolBinding) mcp.ToolHandler {
 		}
 		callCtx, cancel := context.WithTimeout(ctx, time.Duration(timeout)*time.Second)
 		defer cancel()
-
-		// Force agent-safe output regardless of what the reparsed argv set:
-		// never block on a prompt, and wrap externally-controlled free text so
-		// the model treats it as data, not instructions.
-		cli.NoInput = true
-		cli.WrapUntrusted = true
 
 		runCtx := &RunContext{Ctx: callCtx, Flags: &cli.RootFlags}
 
@@ -92,6 +86,91 @@ func makeHandler(b *toolBinding) mcp.ToolHandler {
 	}
 }
 
+// prepareCall turns a rebuilt argv into the CLI a tool call runs under: parse it
+// fresh, restore the operator's launch-time globals over the top, then force the
+// two settings no call may choose for itself.
+//
+// It exists as its own function so a test can assert what a call actually runs
+// with. The alternative — reading it back out of a completed call — needs live
+// credentials for any command that touches Graph, which is every command whose
+// launch flags matter.
+//
+// A rejected argv comes back wrapped in argvError, which is what separates the
+// agent's mistake from the server's: the former is a tool result the model can
+// learn from, the latter fails the call outright.
+func prepareCall(argv []string, env *callEnv) (*CLI, *kong.Context, error) {
+	cli := &CLI{}
+	k, err := newKongParser(cli)
+	if err != nil {
+		return nil, nil, fmt.Errorf("building parser: %w", err)
+	}
+	kctx, err := k.Parse(argv)
+	if err != nil {
+		return nil, nil, &argvError{err: err}
+	}
+
+	applyLaunchEnv(cli, env)
+
+	// Force agent-safe output regardless of what the reparsed argv set: never
+	// block on a prompt, and wrap externally-controlled free text so the model
+	// treats it as data, not instructions.
+	cli.NoInput = true
+	cli.WrapUntrusted = true
+
+	return cli, kctx, nil
+}
+
+// argvError marks a failure to parse the argv a tool call was rebuilt into. It
+// is the agent's input that was wrong, so the caller reports it back rather than
+// treating it as the server breaking.
+type argvError struct{ err error }
+
+func (e *argvError) Error() string { return e.err.Error() }
+func (e *argvError) Unwrap() error { return e.err }
+
+// applyLaunchEnv restores the operator's launch-time globals onto a per-call CLI.
+//
+// The rebuilt argv carries only the tool's own arguments, so without this a
+// server started with --account or --timeout quietly ignored them. Each field is
+// named explicitly rather than copying the whole flag struct, so adding a global
+// flag never grants it silent passage into tool calls.
+//
+// Mailbox is absent here on purpose: buildArgv resolves it, because only there is
+// a permitted per-call choice distinguishable from the launch default.
+// The launch values are a complete snapshot: kong applied flag over environment
+// over default when the server started, so an empty or false one means the
+// operator's command line resolved to exactly that. Each is therefore restored
+// unconditionally rather than only when set.
+//
+// Restoring conditionally looks safer and is not. No tool offers an account, a
+// timeout or a mailbox, so a value surviving the reparse can only have come from
+// an ambient OLK_* variable, which kong re-reads every time. Skipping the empty
+// case lets that variable through: a server started with `--account=` against an
+// ambient OLK_ACCOUNT ran every call as the ambient identity, and `--verbose=false`
+// against an ambient OLK_VERBOSE logged anyway. The guards matter most here,
+// because registration already filtered the tool list using the launch values —
+// restoring anything else would leave enforcement disagreeing with what was
+// advertised.
+//
+// --concise is the one exception. It is the only one of these a tool call can
+// legitimately set for itself, through the synthetic argument injected into every
+// read tool's schema, so the launch value acts as a floor rather than a
+// replacement.
+func applyLaunchEnv(cli *CLI, env *callEnv) {
+	cli.Account = env.account
+	cli.Timeout = env.timeout
+	cli.TimeZone = env.timezone
+	cli.Select = env.selectFields
+	cli.ImmutableIDs = env.immutableIDs
+	cli.Verbose = env.verbose
+	cli.ResultsOnly = env.resultsOnly
+	cli.DryRun = env.dryRun
+	cli.NoWrite = env.noWrite
+	cli.NoSend = env.noSend
+
+	cli.Concise = cli.Concise || env.concise
+}
+
 // rejectUnknownArgs fails the call if args carries a key the tool's schema does
 // not declare (fixed-schema contract).
 func rejectUnknownArgs(b *toolBinding, args map[string]any) error {
@@ -110,6 +189,9 @@ func rejectUnknownArgs(b *toolBinding, args map[string]any) error {
 	}
 	if b.readOnly() {
 		known[conciseArg] = true // synthetic flag injected into read-tool schemas
+	}
+	if b.env.offersMailboxArg(b.name) {
+		known[mailboxArg] = true // synthetic flag injected when --allow-mailbox is set
 	}
 	for k := range args {
 		if !known[k] {
@@ -154,37 +236,76 @@ func errorResult(msg string) *mcp.CallToolResult {
 	}
 }
 
+// The stable codes an agent may branch on. They are part of the tool contract,
+// so they are named once here rather than repeated at each return.
+const (
+	codeUnauthenticated = "unauthenticated"
+	codeForbidden       = "forbidden"
+	codeNotFound        = "not_found"
+	codeRateLimited     = "rate_limited"
+	codeInvalidInput    = "invalid_input"
+	codeUnclassified    = "error"
+)
+
+// missingScopeAction is the advice for a failure a fresh login can fix, as
+// distinct from an Exchange delegation, which it cannot.
+const missingScopeAction = "the signed-in token may lack a required scope; " +
+	"re-run `olk auth login --scope <Scope>` (add --enterprise for work/school-only scopes)"
+
 // classifyError maps a free-text error into a stable code and a recovery action.
 // Codes mirror common Graph failure modes (auth/scope/not-found/throttling) so
 // agents can branch on `code` instead of pattern-matching prose.
 func classifyError(msg string) (code, action string) {
+	// Every failed delegated send carries the grant hint, which names the scope,
+	// so the hint alone says nothing about why the call failed — a stale ID and a
+	// throttle arrive wearing it too. Pair it with an actual refusal before
+	// reading it as one.
+	// The paired signals are all denials. A bare 403 is not among them: Graph also
+	// uses it for licensing and conditional access, and pairing on it would give
+	// every such failure the three-grant diagnosis.
+	refusedSend := strings.Contains(msg, "ErrorSendAsDenied") ||
+		(strings.Contains(msg, "Mail.Send.Shared") &&
+			(strings.Contains(msg, "Access is denied") ||
+				strings.Contains(msg, "ErrorAccessDenied") ||
+				strings.Contains(msg, "Forbidden")))
+
 	switch {
 	case strings.Contains(msg, "no account configured"),
 		strings.Contains(msg, "no account"),
 		strings.Contains(msg, "InvalidAuthenticationToken"),
 		strings.Contains(msg, "401"):
-		return "unauthenticated", "run `olk auth login` first (or re-run it if the token expired)"
-	case strings.Contains(msg, "Read.Shared"),
-		strings.Contains(msg, "InsufficientScope"),
-		strings.Contains(msg, "ErrorAccessDenied"),
+		return codeUnauthenticated, "run `olk auth login` first (or re-run it if the token expired)"
+	// A scope Graph names outright is fixable by signing in again, so it is
+	// matched before the delegated-send case below, which mentions scope names
+	// in its own advice and would otherwise swallow it.
+	case strings.Contains(msg, "InsufficientScope"),
+		strings.Contains(msg, "Read.Shared"):
+		return codeForbidden, missingScopeAction
+	// Sending as another mailbox usually fails on an Exchange delegation rather
+	// than a scope, and no re-login supplies one. Graph sometimes says so with
+	// ErrorSendAsDenied and sometimes only with a bare "Access is denied", which
+	// no other case here matches.
+	case refusedSend:
+		return codeForbidden, "a refused send as another mailbox is usually a missing grant, of which there are three: the Mail.Send.Shared scope, Send As or Send on Behalf Of on that mailbox in Exchange, and Full Access on it. Only the first comes from signing in again; the other two are administrator-managed in Exchange"
+	case strings.Contains(msg, "ErrorAccessDenied"),
 		strings.Contains(msg, "Forbidden"),
 		strings.Contains(msg, "403"):
-		return "forbidden", "the signed-in token may lack a required scope; re-run `olk auth login --scope <Scope>` (add --enterprise for work/school-only scopes)"
+		return codeForbidden, missingScopeAction
 	case strings.Contains(msg, "ErrorItemNotFound"),
 		strings.Contains(msg, "ResourceNotFound"),
 		strings.Contains(msg, "404"):
-		return "not_found", "the id may be stale; re-list to get a current id"
+		return codeNotFound, "the id may be stale; re-list to get a current id"
 	case strings.Contains(msg, "TooManyRequests"),
 		strings.Contains(msg, "throttl"),
 		strings.Contains(msg, "429"):
-		return "rate_limited", "back off and retry after a short delay"
+		return codeRateLimited, "back off and retry after a short delay"
 	case strings.Contains(msg, "unknown argument"),
 		strings.Contains(msg, "invalid arguments"),
 		strings.Contains(msg, "parse error"),
 		strings.Contains(msg, "missing required argument"):
-		return "invalid_input", "check the tool's input schema and retry with valid arguments"
+		return codeInvalidInput, "check the tool's input schema and retry with valid arguments"
 	}
-	return "error", ""
+	return codeUnclassified, ""
 }
 
 // buildArgv reconstructs a CLI argv from a tool's arguments. Ordering is
@@ -224,8 +345,36 @@ func buildArgv(b *toolBinding, args map[string]any) ([]string, error) {
 		argv = append(argv, "--force")
 	}
 
-	// Force structured output.
-	argv = append(argv, "--json")
+	// Resolve the mailbox in one place so precedence is unambiguous: a permitted
+	// per-call choice wins, otherwise the mailbox the server was started with.
+	// The schema advertises the permitted values, but the schema is only advice
+	// to the model — this check is what actually refuses anything else.
+	mailbox := b.env.mailbox
+	if mailbox != "" && mailboxScopedButUnaware(b.name) {
+		// exposes() already withholds these, so reaching here means a tool was
+		// registered in error. Refuse rather than run it against the wrong
+		// mailbox.
+		return nil, fmt.Errorf("tool %q cannot target mailbox %q; it always acts on the signed-in user's own mailbox",
+			b.name, mailbox)
+	}
+	if raw, ok := args[mailboxArg]; ok {
+		chosen := strings.TrimSpace(sprintArg(raw))
+		if !b.env.offersMailboxArg(b.name) {
+			return nil, fmt.Errorf("tool %q does not accept a %s argument", b.name, mailboxArg)
+		}
+		if !b.env.mailboxAllowed(chosen) {
+			return nil, fmt.Errorf("mailbox %q is not permitted; this server allows %s",
+				chosen, strings.Join(b.env.allowMailbox, ", "))
+		}
+		mailbox = chosen
+	}
+	// Appended even when empty. Kong re-reads OLK_MAILBOX on every parse, so
+	// omitting the flag is not the same as clearing it: a server launched with no
+	// mailbox would otherwise inherit whatever the operator's shell happened to
+	// export.
+	//
+	// --json forces structured output whatever the command would default to.
+	argv = append(argv, "--mailbox", mailbox, "--json")
 
 	pos := make([]string, 0, len(b.node.Positional))
 	for _, p := range b.node.Positional {

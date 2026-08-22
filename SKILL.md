@@ -318,7 +318,17 @@ olk whoami    # name, email, job title, department, office, phone
 
 ## Delegated Mailbox Access (executive-assistant pattern)
 
-Use when the signed-in account needs to read another user's mailbox under Microsoft 365 mailbox delegation. The signed-in identity is your own (or a service account), Exchange ACLs control which mailboxes you can reach, and the OAuth scope controls what you can do inside them. **Read-only** for now — sending mail or modifying anything in a delegated mailbox is not supported.
+Use when the signed-in account needs to reach another user's mailbox under Microsoft 365 mailbox delegation. The signed-in identity is your own (or a service account), Exchange ACLs control which mailboxes you can reach, and the OAuth scope controls what you can do inside them.
+
+Reads are the common case. **Sending as a shared mailbox is supported**, and needs three grants that are separate from each other:
+
+- the `Mail.Send.Shared` scope on the token — `olk auth login --scope Mail.Send.Shared`;
+- **Send As** or **Send on Behalf Of** on the mailbox in Exchange; and
+- **Full Access** on the mailbox.
+
+Holding one tells you nothing about the others. Full Access alone grants no right to send, and Send As alone is not enough either: [Microsoft requires Full Access for `/users/{mailbox}/sendMail`](https://learn.microsoft.com/en-us/graph/outlook-send-mail-from-other-user), which is the endpoint `olk` uses so that the sent copy lands by default in the shared mailbox's Sent Items rather than yours. Without all three, `mail send --mailbox` fails. Which one is missing is usually not recoverable from the error — Graph often answers a bare `Access is denied`, and even the more specific `ErrorSendAsDenied` speaks only to the sending delegation — so the failure lists all three for you to check against. `mail reply` and `mail forward` need the same three grants because they read the original from that mailbox before sending as it — and the message ID must be one listed from that mailbox, since IDs are scoped to the mailbox they came from.
+
+Sending, replying, forwarding and the draft commands are the writes that honour `--mailbox`. The calendar, contact and folder writes ignore it, as do the commands that organise mail in place — move, flag, categorise, mark — and all of them act on the signed-in user's own mailbox.
 
 ```bash
 # One-time login with shared scopes
@@ -329,6 +339,20 @@ olk mail list --mailbox boss@example.com
 olk mail get <ID> --mailbox boss@example.com
 olk mail search "from:partner@example.com" --mailbox boss@example.com
 olk mail folders --mailbox boss@example.com
+
+# Send as a shared mailbox (needs Mail.Send.Shared + Send As + Full Access)
+olk mail send --mailbox team@example.com --to person@example.com --subject "..." --body "..."
+olk mail send --mailbox team@example.com --to person@example.com --subject "..." --dry-run   # shows the sending address
+
+# Reply or forward as a shared mailbox. Use the ID as listed FROM that mailbox:
+# message IDs are per-mailbox, and one taken from your own will not resolve here.
+olk mail reply <ID> --mailbox team@example.com --body "..."
+olk mail forward <ID> --mailbox team@example.com --to person@example.com
+
+# Leave a draft in a shared mailbox for a human to send (needs Mail.ReadWrite.Shared
+# and Full Access, but NOT Send As) — the lower-privilege alternative
+olk mail drafts create --mailbox team@example.com --to person@example.com --subject "..." --body "..."
+olk mail drafts list --mailbox team@example.com
 
 # Calendar (also: view, get, calendars)
 olk calendar events --mailbox boss@example.com
@@ -341,7 +365,7 @@ export OLK_MAILBOX=boss@example.com
 ```
 
 - The target must have granted **Full Access** via M365 Admin Center → Mailbox permissions; the calling token must carry the matching `.Shared` scope.
-- Write commands (send, reply, move, flag, create event, update contact, etc.) ignore `--mailbox` and always act on the signed-in user's own mailbox.
+- Not every write honours it. Send, reply, forward and the draft commands do; moving, flagging, categorising and marking mail do not, nor do the folder, calendar and contact writes, which always act on the signed-in user's own mailbox.
 
 ## Shortcuts
 

@@ -18,20 +18,29 @@ func (c *MailReplyCmd) Run(ctx *RunContext) error {
 		return err
 	}
 
-	if ctx.Flags.DryRun {
-		action := "reply"
-		if c.ReplyAll {
-			action = "reply-all"
-		}
-		fmt.Printf("Would %s to message %s\n", action, outfmt.Sanitize(c.ID))
-		return nil
-	}
-
-	err = client.ReplyMessage(ctx.Ctx, c.ID, c.Body, c.ReplyAll)
+	target, err := resolveMailboxTarget(ctx.Flags.Mailbox)
 	if err != nil {
 		return err
 	}
 
+	action := "reply"
+	if c.ReplyAll {
+		action = "reply-all"
+	}
+
+	if ctx.Flags.DryRun {
+		fmt.Printf("Would %s to message %s as %s\n", action, outfmt.Sanitize(c.ID), describeMailbox(target))
+		return nil
+	}
+
+	if err := client.ReplyMessage(ctx.Ctx, target, c.ID, c.Body, c.ReplyAll); err != nil {
+		return err
+	}
+
+	if target != "" {
+		fmt.Printf("Reply sent from %s.\n", target)
+		return nil
+	}
 	if c.ReplyAll {
 		fmt.Println("Reply-all sent.")
 	} else {

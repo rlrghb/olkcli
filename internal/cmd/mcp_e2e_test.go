@@ -18,7 +18,7 @@ func connectE2E(t *testing.T, writes ...string) *mcp.ClientSession {
 	for _, w := range writes {
 		aw[w] = true
 	}
-	srv, _, err := buildMCPServer(mcpConfig{allowWrite: aw})
+	srv, _, err := buildMCPServer(&mcpConfig{allowWrite: aw})
 	if err != nil {
 		t.Fatalf("buildMCPServer: %v", err)
 	}
