@@ -93,8 +93,14 @@ func (c *MailDraftsCreateCmd) Run(ctx *RunContext) error {
 	}
 
 	if ctx.Flags.DryRun {
-		fmt.Printf("Would create draft:\n  To: %s\n  Subject: %s\n  Body: %s\n",
-			strings.Join(c.To, ", "), outfmt.Sanitize(c.Subject), outfmt.Sanitize(body))
+		fmt.Printf("Would create draft:\n  To: %s\n", strings.Join(c.To, ", "))
+		if len(c.CC) > 0 {
+			fmt.Printf("  Cc: %s\n", strings.Join(c.CC, ", "))
+		}
+		if len(c.BCC) > 0 {
+			fmt.Printf("  Bcc: %s\n", strings.Join(c.BCC, ", "))
+		}
+		fmt.Printf("  Subject: %s\n  Body: %s\n", outfmt.Sanitize(c.Subject), outfmt.Sanitize(body))
 		return nil
 	}
 
