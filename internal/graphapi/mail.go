@@ -88,12 +88,13 @@ var messageDetailSelect = []string{
 
 // MailFolder is a simplified folder representation
 type MailFolder struct {
-	ID             string `json:"id"`
-	WellKnownName  string `json:"wellKnownName,omitempty"`
-	DisplayName    string `json:"displayName" untrusted:"true"`
-	TotalCount     int32  `json:"totalItemCount"`
-	UnreadCount    int32  `json:"unreadItemCount"`
-	ParentFolderID string `json:"parentFolderId,omitempty"`
+	ID               string `json:"id"`
+	WellKnownName    string `json:"wellKnownName,omitempty"`
+	DisplayName      string `json:"displayName" untrusted:"true"`
+	TotalCount       int32  `json:"totalItemCount"`
+	UnreadCount      int32  `json:"unreadItemCount"`
+	ChildFolderCount int32  `json:"childFolderCount"`
+	ParentFolderID   string `json:"parentFolderId,omitempty"`
 }
 
 // protectedWellKnownMailFolders is the canonical folder set used by guarded
@@ -437,7 +438,22 @@ const (
 	replyIDHint = "Replying and forwarding also read the original from " +
 		"that mailbox, so the message ID must be one listed from it: IDs are scoped to a mailbox, " +
 		"and an ID taken from your own will not resolve in a shared one"
+	delegatedMailboxNotFoundHint = "The target mailbox or item was not found. With delegated access, " +
+		"this may mean the mailbox is unavailable or Full Access is missing, or that the ID is stale or " +
+		"belongs to another mailbox. Verify Full Access and re-list the message from the target mailbox " +
+		"before retrying"
 	replyGrantHint = sendGrantHint + ".\n\n" + replyIDHint
+
+	replyDraftGrantHint = "Creating a reply draft in another mailbox needs the Mail.ReadWrite.Shared " +
+		"scope (sign in again with --scope Mail.ReadWrite.Shared) and Full Access on that mailbox in " +
+		"Exchange. It does not require Mail.Send.Shared, Send As, or Send on Behalf Of because the " +
+		"draft is not sent"
+	replyDraftIDHint = "Creating a reply draft reads the original from that mailbox, so the message " +
+		"ID must be one listed from it: IDs are scoped to a mailbox, and an ID taken from your own " +
+		"will not resolve in a shared one"
+	draftGrantHint = "Creating or modifying a draft in another mailbox needs the Mail.ReadWrite.Shared " +
+		"scope and Full Access on that mailbox in Exchange. It does not require Mail.Send.Shared, " +
+		"Send As, or Send on Behalf Of because the draft is not sent"
 )
 
 func sharedMailboxError(action, target, hint string, err error) error {
@@ -451,14 +467,49 @@ func sharedMailboxError(action, target, hint string, err error) error {
 	guidance := ""
 	if delegatedPermissionRefusal(err, message) {
 		guidance = hint
-	} else if hint == replyGrantHint && delegatedMessageNotFound(err, message) {
-		guidance = replyIDHint
+	} else if delegatedMessageNotFound(err, message) {
+		guidance = delegatedMailboxNotFoundHint
 	}
 	format := "%s as %s: %s"
 	if guidance != "" {
 		return wrapGraph(err, format+"\n\n%s", action, target, message, guidance)
 	}
 	return wrapGraph(err, format, action, target, message)
+}
+
+func sharedMailboxReplyDraftError(action, target string, err error) error {
+	message := graphErrorMessage(err)
+	guidance := ""
+	if delegatedPermissionRefusal(err, message) {
+		guidance = replyDraftGrantHint
+	} else if delegatedMessageNotFound(err, message) {
+		guidance = delegatedMailboxNotFoundHint
+	}
+	format := "%s in %s: %s"
+	if guidance != "" {
+		return wrapGraph(err, format+"\n\n%s", action, target, message, guidance)
+	}
+	return wrapGraph(err, format, action, target, message)
+}
+
+func sharedMailboxDraftError(action, target string, err error) error {
+	message := graphErrorMessage(err)
+	format := "%s in %s: %s"
+	if delegatedPermissionRefusal(err, message) {
+		return wrapGraph(err, format+"\n\n%s", action, target, message, draftGrantHint)
+	}
+	if delegatedMessageNotFound(err, message) {
+		return wrapGraph(err, format+"\n\n%s", action, target, message, delegatedMailboxNotFoundHint)
+	}
+	return wrapGraph(err, format, action, target, message)
+}
+
+func sharedMailboxReadError(action, target string, err error) error {
+	message := graphErrorMessage(err)
+	if target != "" && delegatedMessageNotFound(err, message) {
+		return wrapGraph(err, "%s in %s: %s\n\n%s", action, target, message, delegatedMailboxNotFoundHint)
+	}
+	return wrapGraph(err, "%s: %s", action, message)
 }
 
 func delegatedPermissionRefusal(err error, message string) bool {
@@ -485,7 +536,7 @@ func delegatedMessageNotFound(err error, message string) bool {
 // was listed from. Without a target, an ID belonging to a shared mailbox fails to
 // resolve at all, which is why replying from one was previously impossible rather
 // than merely mis-attributed.
-func (c *Client) ReplyMessage(ctx context.Context, target, messageID, comment string, replyAll bool) error {
+func (c *Client) ReplyMessage(ctx context.Context, target, messageID, comment string, replyAll, isHTML bool) error {
 	if err := c.ensureMaySend(); err != nil {
 		return err
 	}
@@ -500,11 +551,19 @@ func (c *Client) ReplyMessage(ctx context.Context, target, messageID, comment st
 	var err error
 	if replyAll {
 		body := users.NewItemMessagesItemReplyAllPostRequestBody()
-		body.SetComment(&comment)
+		if isHTML {
+			body.SetMessage(htmlMessageBody(comment))
+		} else {
+			body.SetComment(&comment)
+		}
 		err = c.targetUser(target).Messages().ByMessageId(messageID).ReplyAll().Post(ctx, body, nil)
 	} else {
 		body := users.NewItemMessagesItemReplyPostRequestBody()
-		body.SetComment(&comment)
+		if isHTML {
+			body.SetMessage(htmlMessageBody(comment))
+		} else {
+			body.SetComment(&comment)
+		}
 		err = c.targetUser(target).Messages().ByMessageId(messageID).Reply().Post(ctx, body, nil)
 	}
 	if err != nil {
@@ -520,7 +579,7 @@ func (c *Client) ReplyMessage(ctx context.Context, target, messageID, comment st
 // signed-in user's own mailbox when target is empty. As with ReplyMessage, the
 // target selects both the mailbox the original is read from and the sending
 // identity.
-func (c *Client) ForwardMessage(ctx context.Context, target, messageID, comment string, toRecipients []string) error {
+func (c *Client) ForwardMessage(ctx context.Context, target, messageID, comment string, toRecipients []string, isHTML bool) error {
 	if err := c.ensureMaySend(); err != nil {
 		return err
 	}
@@ -528,12 +587,18 @@ func (c *Client) ForwardMessage(ctx context.Context, target, messageID, comment 
 		return err
 	}
 	body := users.NewItemMessagesItemForwardPostRequestBody()
-	body.SetComment(&comment)
 	fwdR, err := makeRecipients(toRecipients)
 	if err != nil {
 		return fmt.Errorf("invalid forward recipient: %w", err)
 	}
-	body.SetToRecipients(fwdR)
+	if isHTML {
+		message := htmlMessageBody(comment)
+		message.SetToRecipients(fwdR)
+		body.SetMessage(message)
+	} else {
+		body.SetComment(&comment)
+		body.SetToRecipients(fwdR)
+	}
 
 	err = c.targetUser(target).Messages().ByMessageId(messageID).Forward().Post(ctx, body, nil)
 	if err != nil {
@@ -543,6 +608,16 @@ func (c *Client) ForwardMessage(ctx context.Context, target, messageID, comment 
 		return fmt.Errorf("forward: %w", err)
 	}
 	return nil
+}
+
+func htmlMessageBody(content string) models.Messageable {
+	message := models.NewMessage()
+	body := models.NewItemBody()
+	body.SetContent(&content)
+	html := models.HTML_BODYTYPE
+	body.SetContentType(&html)
+	message.SetBody(body)
+	return message
 }
 
 func (c *Client) MoveMessage(ctx context.Context, messageID, folderID string) (*MoveMessageReceipt, error) {
@@ -608,26 +683,6 @@ func (c *Client) MarkMessage(ctx context.Context, messageID string, isRead bool)
 		return fmt.Errorf("updating message: %w", err)
 	}
 	return nil
-}
-
-// ListMailFolders returns folders from the target mailbox, or the signed-in
-// user's mailbox when target is empty. See ListMessages for scope requirements.
-func (c *Client) ListMailFolders(ctx context.Context, target string) ([]MailFolder, error) {
-	var top int32 = 100
-	resp, err := c.targetUser(target).MailFolders().Get(ctx, &users.ItemMailFoldersRequestBuilderGetRequestConfiguration{
-		QueryParameters: &users.ItemMailFoldersRequestBuilderGetQueryParameters{
-			Top: &top,
-		},
-	})
-	if err != nil {
-		return nil, fmt.Errorf("listing folders: %w", err)
-	}
-
-	folders := make([]MailFolder, 0, len(resp.GetValue()))
-	for _, f := range resp.GetValue() {
-		folders = append(folders, convertMailFolder(f))
-	}
-	return folders, nil
 }
 
 // GetWellKnownMailFolder resolves one guarded move destination by its canonical
@@ -751,16 +806,18 @@ type AttachmentInput struct {
 	Content     []byte
 }
 
-func (c *Client) DownloadAttachment(ctx context.Context, messageID, attachmentID string) (*Attachment, error) {
+// DownloadAttachment fetches one file attachment from the target mailbox, or
+// from the signed-in user's mailbox when target is empty.
+func (c *Client) DownloadAttachment(ctx context.Context, target, messageID, attachmentID string) (*Attachment, error) {
 	if err := validateID(messageID, "message ID"); err != nil {
 		return nil, err
 	}
 	if err := validateID(attachmentID, "attachment ID"); err != nil {
 		return nil, err
 	}
-	resp, err := c.inner.Me().Messages().ByMessageId(messageID).Attachments().ByAttachmentId(attachmentID).Get(ctx, nil)
+	resp, err := c.targetUser(target).Messages().ByMessageId(messageID).Attachments().ByAttachmentId(attachmentID).Get(ctx, nil)
 	if err != nil {
-		return nil, fmt.Errorf("downloading attachment: %w", err)
+		return nil, sharedMailboxReadError("downloading attachment", target, err)
 	}
 
 	att := &Attachment{
@@ -788,13 +845,15 @@ func (c *Client) DownloadAttachment(ctx context.Context, messageID, attachmentID
 	return att, nil
 }
 
-func (c *Client) GetAttachments(ctx context.Context, messageID string) ([]Attachment, error) {
+// GetAttachments lists attachments on a message in the target mailbox, or in
+// the signed-in user's mailbox when target is empty.
+func (c *Client) GetAttachments(ctx context.Context, target, messageID string) ([]Attachment, error) {
 	if err := validateID(messageID, "message ID"); err != nil {
 		return nil, err
 	}
-	resp, err := c.inner.Me().Messages().ByMessageId(messageID).Attachments().Get(ctx, nil)
+	resp, err := c.targetUser(target).Messages().ByMessageId(messageID).Attachments().Get(ctx, nil)
 	if err != nil {
-		return nil, fmt.Errorf("getting attachments: %w", err)
+		return nil, sharedMailboxReadError("getting attachments", target, err)
 	}
 
 	attachments := make([]Attachment, 0, len(resp.GetValue()))
@@ -980,11 +1039,19 @@ func convertMailFolder(value models.MailFolderable) MailFolder {
 	if value.GetId() != nil {
 		folder.ID = *value.GetId()
 	}
+	if extra := value.GetAdditionalData(); extra != nil {
+		if name, ok := extra["wellKnownName"].(string); ok {
+			folder.WellKnownName = name
+		}
+	}
 	if value.GetTotalItemCount() != nil {
 		folder.TotalCount = *value.GetTotalItemCount()
 	}
 	if value.GetUnreadItemCount() != nil {
 		folder.UnreadCount = *value.GetUnreadItemCount()
+	}
+	if value.GetChildFolderCount() != nil {
+		folder.ChildFolderCount = *value.GetChildFolderCount()
 	}
 	if value.GetParentFolderId() != nil {
 		folder.ParentFolderID = *value.GetParentFolderId()

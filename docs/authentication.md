@@ -63,16 +63,18 @@ either default, so treat it as the documented default rather than a guarantee.
 Confirm the sending address with `--dry-run`, which prints the mailbox a send will
 leave from.
 
-The draft commands honour `--mailbox` too, and are the lower-privilege path:
-leaving a draft in a shared mailbox needs `Mail.ReadWrite.Shared` and Full
-Access, but not Send As. Sending that draft afterwards does need Send As, since
-creating a draft somewhere confers no right to send it.
+The draft commands and `mail reply --draft` honour `--mailbox` too, and are the
+lower-privilege path: leaving a standalone or true threaded reply draft in a
+shared mailbox needs `Mail.ReadWrite.Shared` and Full Access, but not
+`Mail.Send.Shared`, Send As, or Send on Behalf Of. Sending that draft afterwards
+does need the sending grants, since creating a draft somewhere confers no right
+to send it.
 
-`mail reply --mailbox EMAIL` and `mail forward --mailbox EMAIL` need the same
-three grants, and read access besides: both read the original from that mailbox
-before sending as it. The message ID must therefore be one listed from that
-mailbox, since IDs are scoped to a mailbox and one taken from your own will not
-resolve.
+Immediate `mail reply --mailbox EMAIL` and `mail forward --mailbox EMAIL` need
+the same three sending grants, and read access besides: both read the original
+from that mailbox before sending as it. Reply-draft creation reads the same
+mailbox-scoped original without sending. In every case, the message ID must be
+one listed from that mailbox; one taken from your own mailbox will not resolve.
 
 Calendar writes, contact writes, folder writes, and the commands that organise
 mail in place — move, flag, categorise, mark — remain scoped to the signed-in

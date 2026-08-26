@@ -294,7 +294,7 @@ func classifyError(msg string) (code, action string) {
 	case strings.Contains(msg, "ErrorItemNotFound"),
 		strings.Contains(msg, "ResourceNotFound"),
 		strings.Contains(msg, "404"):
-		return codeNotFound, "the id may be stale; re-list to get a current id"
+		return codeNotFound, "the target mailbox or item was not found; verify Full Access and that the ID was listed from the target mailbox before retrying"
 	case strings.Contains(msg, "TooManyRequests"),
 		strings.Contains(msg, "throttl"),
 		strings.Contains(msg, "429"):

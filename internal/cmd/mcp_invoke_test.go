@@ -173,6 +173,10 @@ func TestClassifyError(t *testing.T) {
 			t.Errorf("classifyError(%q) code = %q, want %q", tc.msg, code, tc.wantCode)
 		}
 	}
+	_, action := classifyError("ErrorItemNotFound: The specified object was not found")
+	if !strings.Contains(action, "verify Full Access") || !strings.Contains(action, "ID was listed") {
+		t.Errorf("not-found action should distinguish mailbox access from stale IDs: %s", action)
+	}
 }
 
 // A missing Exchange delegation is not a missing scope, and no re-login supplies
@@ -230,7 +234,7 @@ func TestClassifyError_TheGrantHintAloneIsNotARefusal(t *testing.T) {
 		wantGrants  bool
 		explanation string
 	}{
-		{"ErrorItemNotFound", codeNotFound, false, "a stale ID is not a permission problem"},
+		{"ErrorItemNotFound", codeNotFound, true, "a not-found result needs neutral mailbox-access and ID guidance"},
 		{"TooManyRequests", codeRateLimited, false, "a throttle is not a permission problem"},
 		{"ErrorSendAsDenied", codeForbidden, true, "Graph naming the refusal outright"},
 		{"Access is denied.", codeForbidden, true, "Graph refusing without naming a code"},

@@ -11,7 +11,7 @@ import (
 func TestReplyMessage_NoSendGuardBeatsTarget(t *testing.T) {
 	c := &Client{}
 	c.SetGuards(false, true)
-	err := c.ReplyMessage(context.Background(), "shared@example.com", "AAA", "body", false)
+	err := c.ReplyMessage(context.Background(), "shared@example.com", "AAA", "body", false, false)
 	if err == nil {
 		t.Fatal("expected --no-send to block a reply from a shared mailbox target")
 	}
@@ -20,7 +20,7 @@ func TestReplyMessage_NoSendGuardBeatsTarget(t *testing.T) {
 func TestForwardMessage_NoSendGuardBeatsTarget(t *testing.T) {
 	c := &Client{}
 	c.SetGuards(false, true)
-	err := c.ForwardMessage(context.Background(), "shared@example.com", "AAA", "", []string{"a@example.com"})
+	err := c.ForwardMessage(context.Background(), "shared@example.com", "AAA", "", []string{"a@example.com"}, false)
 	if err == nil {
 		t.Fatal("expected --no-send to block a forward from a shared mailbox target")
 	}
@@ -30,7 +30,7 @@ func TestForwardMessage_NoSendGuardBeatsTarget(t *testing.T) {
 // shared mailbox is targeted.
 func TestReplyMessage_InvalidIDRejected(t *testing.T) {
 	c := &Client{}
-	err := c.ReplyMessage(context.Background(), "shared@example.com", "", "body", false)
+	err := c.ReplyMessage(context.Background(), "shared@example.com", "", "body", false, false)
 	if err == nil || !strings.Contains(err.Error(), "message ID") {
 		t.Fatalf("want a message ID error, got %v", err)
 	}
@@ -38,7 +38,7 @@ func TestReplyMessage_InvalidIDRejected(t *testing.T) {
 
 func TestForwardMessage_InvalidRecipientRejected(t *testing.T) {
 	c := &Client{}
-	err := c.ForwardMessage(context.Background(), "", "AAA", "", []string{"not-an-address"})
+	err := c.ForwardMessage(context.Background(), "", "AAA", "", []string{"not-an-address"}, false)
 	if err == nil || !strings.Contains(err.Error(), "recipient") {
 		t.Fatalf("want a recipient error, got %v", err)
 	}

@@ -13,6 +13,13 @@ for the exact generated schema.
 --enable-commands CSV --enable-commands-exact CSV --disable-commands CSV
 ```
 
+### Timeouts and retries
+
+A timeout means the outcome is unknown: the request may have reached Microsoft
+Graph and the message may have been sent. Before retrying a send, reply, or
+forward, verify Sent Items, Drafts, or the recipient mailbox. Blindly retrying
+can create duplicate mail.
+
 ## Authentication and profile
 
 ```bash
@@ -26,27 +33,43 @@ olk whoami
 ## Mail
 
 ```bash
-olk mail list [-n N] [--folder ID] [--from EMAIL] [--unread] [--focused|--other]
+olk mail list [-n N] [--folder ID_OR_PATH] [--from EMAIL] [--unread] [--focused|--other]
 olk mail get <ID> [--body-format text|html]
 olk mail search <KQL>
 olk mail batch <ID> [--id ID ...]
 olk mail thread <CONVERSATION_ID>
 olk mail delta [--token TOKEN]
 olk mail send --to EMAIL --subject SUBJECT --body BODY [--html]
-olk mail reply <ID> --body BODY [--all]
-olk mail forward <ID> --to EMAIL
+olk mail reply <ID> --body BODY [--reply-all] [--html] [--draft] [--inline CID=PATH ...]
+olk mail reply <ID> --body "Thanks" --draft
+olk mail reply <ID> --body '<p>Thanks</p>' --html --draft
+olk mail reply <ID> --body '<p>Thanks all</p>' --reply-all --html --draft
+olk mail reply <ID> --body '<p><img src="cid:steps"></p>' --html --draft --inline steps=steps.png
+olk mail forward <ID> --to EMAIL [--comment COMMENT] [--html]
 olk mail mark <ID> read|unread
-olk mail move <ID> --folder ID
+olk mail move <ID> ID_OR_PATH
 olk mail delete <ID> --force
 olk mail attachments <ID> --attachment-id ID
-olk mail folders list|create|rename|delete
+olk mail folders list|create|rename|delete  # list traverses visible child folders
 olk mail drafts list|create|send|delete
+olk mail drafts create --to EMAIL --subject SUBJECT --body '<img src="cid:logo">' --html --inline logo=logo.png
 olk mail flag <ID> flagged|complete|notFlagged
 olk mail categorize <ID> --category NAME
 olk mail importance <ID> low|normal|high
 olk mail ooo get|set|off
 olk mail rules list|create|delete
 ```
+
+`mail reply --draft` creates a true threaded Outlook reply or reply-all draft,
+including Outlook's quoted history, and returns its draft ID and subject. For
+HTML drafts, `olk` inserts the supplied HTML ahead of that generated history
+instead of replacing it. It does not send; without `--draft`, replies retain
+their immediate-send behavior.
+
+`--inline CID=PATH` is repeatable on `mail reply --html --draft` and
+`mail drafts create --html`. Reference every supplied CID in the HTML as
+`cid:CID`; CIDs must be unique, files must be images, and each file must be
+under 3 MB. Immediate replies, sends, and forwards do not accept `--inline`.
 
 ## Calendar
 

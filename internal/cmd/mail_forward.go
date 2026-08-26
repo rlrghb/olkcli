@@ -12,6 +12,7 @@ type MailForwardCmd struct {
 	ID      string   `arg:"" help:"Message ID to forward"`
 	To      []string `help:"Recipient email addresses" required:"" short:"t"`
 	Comment string   `help:"Comment to include" short:"c"`
+	HTML    bool     `help:"Comment is HTML"`
 }
 
 func (c *MailForwardCmd) Run(ctx *RunContext) error {
@@ -37,7 +38,7 @@ func (c *MailForwardCmd) Run(ctx *RunContext) error {
 		return nil
 	}
 
-	if err := client.ForwardMessage(ctx.Ctx, target, c.ID, c.Comment, c.To); err != nil {
+	if err := client.ForwardMessage(ctx.Ctx, target, c.ID, c.Comment, c.To, c.HTML); err != nil {
 		return err
 	}
 

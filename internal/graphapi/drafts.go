@@ -48,8 +48,11 @@ func (c *Client) ListDrafts(ctx context.Context, target string, top int32) ([]Dr
 // mailbox, but *not* Send As or Send on Behalf Of. The draft lands in that
 // mailbox's Drafts folder for a person who does hold those rights to review and
 // send, which keeps a human at the point where the message actually leaves.
-func (c *Client) CreateDraft(ctx context.Context, target, subject, body string, to, cc, bcc []string, isHTML bool) (*DraftMessage, error) {
+func (c *Client) CreateDraft(ctx context.Context, target, subject, body string, to, cc, bcc []string, isHTML bool, inlineAttachments ...InlineAttachmentInput) (*DraftMessage, error) {
 	if err := c.ensureWritable(); err != nil {
+		return nil, err
+	}
+	if err := validateInlineAttachments(body, isHTML, inlineAttachments); err != nil {
 		return nil, err
 	}
 	msg := models.NewMessage()
@@ -90,9 +93,31 @@ func (c *Client) CreateDraft(ctx context.Context, target, subject, body string, 
 	result, err := c.targetUser(target).Messages().Post(ctx, msg, nil)
 	if err != nil {
 		if target != "" {
-			return nil, fmt.Errorf("creating draft in %s: %w\n\nDrafting into another mailbox needs the Mail.ReadWrite.Shared scope (sign in again with --scope Mail.ReadWrite.Shared) and Full Access on that mailbox in Exchange. Read-only access to a mailbox is not enough to leave a draft in it", target, err)
+			return nil, sharedMailboxDraftError("creating draft", target, err)
 		}
 		return nil, fmt.Errorf("creating draft: %w", err)
+	}
+	if result == nil {
+		return nil, fmt.Errorf("creating draft: Graph returned no draft")
+	}
+	if len(inlineAttachments) > 0 {
+		draftID := derefStr(result.GetId())
+		if draftID == "" {
+			return nil, fmt.Errorf("creating draft: Graph returned a draft without an ID")
+		}
+		for _, attachment := range inlineAttachments {
+			fileAttachment := newInlineFileAttachment(attachment)
+			_, err := c.targetUser(target).Messages().ByMessageId(draftID).Attachments().Post(ctx, fileAttachment, nil)
+			if err != nil {
+				action := fmt.Sprintf("adding inline attachment %q to draft", attachment.ContentID)
+				if target != "" {
+					err = sharedMailboxDraftError(action, target, err)
+				} else {
+					err = fmt.Errorf("%s: %w", action, err)
+				}
+				return nil, c.cleanupFailedDraft(ctx, target, draftID, "draft", err)
+			}
+		}
 	}
 
 	draft := convertDraft(result)

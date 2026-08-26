@@ -203,6 +203,7 @@ const (
 	graphMessageDeltaCollection
 	graphCalendarViewDeltaCollection
 	graphContactsDeltaCollection
+	graphMailFolderCollection
 )
 
 type graphCollectionRoute struct {
@@ -250,10 +251,18 @@ func parseGraphCollectionRoute(path string) (graphCollectionRoute, bool) {
 		route.operation = graphMessageCollection
 		return route, true
 	}
+	if len(collection) == 1 && strings.EqualFold(collection[0], "mailfolders") {
+		route.operation = graphMailFolderCollection
+		return route, true
+	}
 
 	if folderID, consumed, ok := graphMailFolderRoute(collection); ok {
 		route.folderID = folderID
 		collection = collection[consumed:]
+		if len(collection) == 1 && strings.EqualFold(collection[0], "childfolders") {
+			route.operation = graphMailFolderCollection
+			return route, true
+		}
 		if len(collection) == 1 && strings.EqualFold(collection[0], "messages") {
 			route.operation = graphMessageCollection
 			return route, true

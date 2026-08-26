@@ -47,3 +47,7 @@ Thumbs.db
 # olk binaries dropped into per-platform npm packages by the release pipeline
 npm/olk-*/bin/olk
 npm/olk-*/bin/olk.exe
+
+# Live smoke-test configuration and run output (real mailbox addresses)
+contrib/smoke-delegated-mailbox/config.sh
+contrib/smoke-delegated-mailbox/results/

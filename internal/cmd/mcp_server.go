@@ -230,7 +230,7 @@ const mailboxArg = "mailbox"
 // exposed at all.
 var mailboxAwareTools = map[string]bool{
 	"mail_list": true, "mail_get": true, "mail_batch": true, "mail_thread": true,
-	"mail_search": true, "mail_folders_list": true, "mail_delta": true,
+	"mail_search": true, "mail_folders_list": true, "mail_attachments": true, "mail_delta": true,
 	"mail_drafts_create": true, "mail_drafts_send": true,
 	"mail_send": true, "mail_reply": true, "mail_forward": true,
 	"calendar_events": true, "calendar_view": true, "calendar_get": true,

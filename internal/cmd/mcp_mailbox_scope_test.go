@@ -16,8 +16,8 @@ import (
 // Every one of these reads or writes mailbox-scoped data while ignoring
 // --mailbox, which is why a launch mailbox withholds them.
 var mailboxScopedUnawareTools = map[string]bool{
-	"mail_attachments": true, "mail_categories_list": true, "mail_rules_list": true,
-	"mail_ooo_get": true, "mail_flag": true, "mail_categorize": true,
+	"mail_categories_list": true, "mail_rules_list": true, "mail_ooo_get": true,
+	"mail_flag": true, "mail_categorize": true,
 	"mail_mark": true, "mail_move": true, "mail_folders_create": true,
 	"mail_folders_rename": true, "mail_delete": true,
 	"calendar_availability": true, "calendar_find_times": true,

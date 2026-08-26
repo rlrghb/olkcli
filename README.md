@@ -52,11 +52,33 @@ olk auth login --enterprise
 | List task lists | `olk todo lists list` |
 | Browse OneDrive | `olk drive ls` |
 | Send mail | `olk mail send --to person@example.com --subject "Hi" --body "Hello"` |
+| Draft HTML with an inline image | `olk mail drafts create --to person@example.com --subject "Steps" --html --body '<img src="cid:steps">' --inline steps=steps.png` |
 | Synchronize changes | `olk changes --json` |
 | Use JSON for scripts | `olk mail list --json --results-only` |
 | Use as an MCP server | `olk mcp` |
 
 See the [command reference](docs/commands.md) for all commands and flags.
+
+### Inline images in HTML drafts
+
+Use a `cid:` URL in the HTML and supply the matching image with repeatable
+`--inline CID=PATH` flags. This works for new drafts and true threaded reply or
+reply-all drafts:
+
+```bash
+olk mail reply <ID> --draft --html \
+  --body '<p>See both images:</p><img src="cid:logo"><img src="cid:steps">' \
+  --inline logo=logo.png --inline steps=steps.png
+
+olk mail drafts create --to person@example.com --subject "Instructions" --html \
+  --body '<p>Follow these steps:</p><img src="cid:steps">' \
+  --inline steps=steps.png
+```
+
+Each CID must be unique and referenced by the HTML. Files must be images and
+each must be under 3 MB, the Microsoft Graph simple-attachment limit. Draft
+commands do not send mail; immediate sends and forwards do not accept
+`--inline`.
 
 ## Output and scripting
 

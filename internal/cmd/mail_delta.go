@@ -6,7 +6,7 @@ import "github.com/rlrghb/olkcli/internal/outfmt"
 // endpoint. Omit --token for a fresh sync; pass the returned token next time to
 // get only what changed since.
 type MailDeltaCmd struct {
-	Folder string `help:"Mail folder ID or well-known name" short:"f" default:"inbox"`
+	Folder string `help:"Mail folder ID, well-known name, or path (for example Inbox/2026)" short:"f" default:"inbox"`
 	Token  string `help:"Delta token from a previous call (omit to start a fresh sync)"`
 	Top    int32  `help:"Max items per page" short:"n"`
 }
@@ -21,7 +21,11 @@ func (c *MailDeltaCmd) Run(ctx *RunContext) error {
 		return err
 	}
 
-	items, page, err := client.DeltaMessages(ctx.Ctx, target, c.Folder, c.Token, c.Top)
+	folderID, err := client.ResolveMailFolderPath(ctx.Ctx, target, c.Folder)
+	if err != nil {
+		return err
+	}
+	items, page, err := client.DeltaMessages(ctx.Ctx, target, folderID, c.Token, c.Top)
 	if err != nil {
 		return err
 	}

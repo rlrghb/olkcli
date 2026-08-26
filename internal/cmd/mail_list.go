@@ -9,7 +9,7 @@ import (
 )
 
 type MailListCmd struct {
-	Folder  string  `help:"Mail folder ID or well-known name" short:"f" env:"OLK_MAIL_FOLDER"`
+	Folder  string  `help:"Mail folder ID, well-known name, or path (for example Inbox/2026)" short:"f" env:"OLK_MAIL_FOLDER"`
 	Top     int32   `help:"Number of messages to return" default:"25" short:"n"`
 	Unread  bool    `help:"Show only unread messages" short:"u"`
 	From    string  `help:"Filter by sender email"`
@@ -125,8 +125,12 @@ func (c *MailListCmd) Run(ctx *RunContext) error {
 	if c.Focused || c.Other {
 		orderBy = ""
 	}
+	folderID, err := client.ResolveMailFolderPath(ctx.Ctx, target, c.Folder)
+	if err != nil {
+		return err
+	}
 	opts := graphapi.ListMessagesOptions{
-		FolderID: c.Folder,
+		FolderID: folderID,
 		Top:      c.Top,
 		Filter:   filter,
 		OrderBy:  orderBy,

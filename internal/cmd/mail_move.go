@@ -9,7 +9,7 @@ import (
 
 type MailMoveCmd struct {
 	ID     string `arg:"" help:"Message ID"`
-	Folder string `arg:"" help:"Destination folder ID or well-known name"`
+	Folder string `arg:"" help:"Destination folder ID, well-known name, or path (for example Inbox/2026)"`
 }
 
 func (c *MailMoveCmd) Run(ctx *RunContext) error {
@@ -23,7 +23,13 @@ func (c *MailMoveCmd) Run(ctx *RunContext) error {
 		return nil
 	}
 
-	receipt, err := client.MoveMessage(ctx.Ctx, c.ID, c.Folder)
+	// MoveMessage is intentionally an own-mailbox operation, so resolve a path
+	// against that same mailbox rather than the global delegated read target.
+	folderID, err := client.ResolveMailFolderPath(ctx.Ctx, "", c.Folder)
+	if err != nil {
+		return err
+	}
+	receipt, err := client.MoveMessage(ctx.Ctx, c.ID, folderID)
 	if err != nil {
 		return err
 	}

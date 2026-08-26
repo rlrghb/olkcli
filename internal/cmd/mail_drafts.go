@@ -66,14 +66,10 @@ type MailDraftsCreateCmd struct {
 	CC      []string `help:"CC recipients"`
 	BCC     []string `help:"BCC recipients"`
 	HTML    bool     `help:"Body is HTML"`
+	Inline  []string `help:"Inline image as CID=PATH (repeatable; HTML only)" placeholder:"CID=PATH"`
 }
 
 func (c *MailDraftsCreateCmd) Run(ctx *RunContext) error {
-	client, err := ctx.GraphClient()
-	if err != nil {
-		return err
-	}
-
 	target, err := resolveMailboxTarget(ctx.Flags.Mailbox)
 	if err != nil {
 		return err
@@ -101,6 +97,13 @@ func (c *MailDraftsCreateCmd) Run(ctx *RunContext) error {
 			return err
 		}
 	}
+	if len(c.Inline) > 0 && !c.HTML {
+		return fmt.Errorf("--inline requires --html")
+	}
+	inlineAttachments, err := prepareInlineAttachments(c.Inline, body)
+	if err != nil {
+		return err
+	}
 
 	if ctx.Flags.DryRun {
 		fmt.Printf("Would create draft:\n  In: %s\n  To: %s\n", describeMailbox(target), strings.Join(c.To, ", "))
@@ -111,10 +114,18 @@ func (c *MailDraftsCreateCmd) Run(ctx *RunContext) error {
 			fmt.Printf("  Bcc: %s\n", strings.Join(c.BCC, ", "))
 		}
 		fmt.Printf("  Subject: %s\n  Body: %s\n", outfmt.Sanitize(c.Subject), outfmt.Sanitize(body))
+		for _, attachment := range inlineAttachments {
+			fmt.Printf("  Inline image: %s=%s (%d bytes)\n",
+				outfmt.Sanitize(attachment.ContentID), outfmt.Sanitize(attachment.Name), len(attachment.Content))
+		}
 		return nil
 	}
 
-	draft, err := client.CreateDraft(ctx.Ctx, target, c.Subject, body, c.To, c.CC, c.BCC, c.HTML)
+	client, err := ctx.GraphClient()
+	if err != nil {
+		return err
+	}
+	draft, err := client.CreateDraft(ctx.Ctx, target, c.Subject, body, c.To, c.CC, c.BCC, c.HTML, inlineAttachments...)
 	if err != nil {
 		return err
 	}

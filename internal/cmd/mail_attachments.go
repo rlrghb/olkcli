@@ -102,10 +102,14 @@ func (c *MailAttachmentsCmd) Run(ctx *RunContext) error {
 	if err != nil {
 		return err
 	}
+	target, err := resolveMailboxTarget(ctx.Flags.Mailbox)
+	if err != nil {
+		return err
+	}
 
 	// Download a specific attachment by ID
 	if c.AttachmentID != "" {
-		att, err := client.DownloadAttachment(ctx.Ctx, c.ID, c.AttachmentID)
+		att, err := client.DownloadAttachment(ctx.Ctx, target, c.ID, c.AttachmentID)
 		if err != nil {
 			return err
 		}
@@ -126,7 +130,7 @@ func (c *MailAttachmentsCmd) Run(ctx *RunContext) error {
 		return nil
 	}
 
-	attachments, err := client.GetAttachments(ctx.Ctx, c.ID)
+	attachments, err := client.GetAttachments(ctx.Ctx, target, c.ID)
 	if err != nil {
 		return err
 	}
@@ -147,7 +151,7 @@ func (c *MailAttachmentsCmd) Run(ctx *RunContext) error {
 			if a.Size > maxDownloadSize {
 				return fmt.Errorf("attachment %q is %d bytes, exceeds 50MB download limit", a.Name, a.Size)
 			}
-			att, err := client.DownloadAttachment(ctx.Ctx, c.ID, a.ID)
+			att, err := client.DownloadAttachment(ctx.Ctx, target, c.ID, a.ID)
 			if err != nil {
 				return fmt.Errorf("downloading %q: %w", a.Name, err)
 			}

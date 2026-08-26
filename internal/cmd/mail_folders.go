@@ -9,13 +9,13 @@ import (
 
 // MailFoldersCmd manages mail folders
 type MailFoldersCmd struct {
-	List   MailFoldersListCmd   `cmd:"" default:"1" help:"List mail folders"`
+	List   MailFoldersListCmd   `cmd:"" default:"1" help:"List all visible mail folders recursively"`
 	Create MailFoldersCreateCmd `cmd:"" help:"Create a mail folder"`
 	Rename MailFoldersRenameCmd `cmd:"" help:"Rename a mail folder"`
 	Delete MailFoldersDeleteCmd `cmd:"" help:"Delete a mail folder"`
 }
 
-// MailFoldersListCmd lists all mail folders (default subcommand)
+// MailFoldersListCmd lists all visible mail folders recursively (default subcommand)
 type MailFoldersListCmd struct {
 	WellKnown string `help:"Resolve one guarded destination by canonical Graph name (archive, deleteditems, inbox, or junkemail)"`
 }

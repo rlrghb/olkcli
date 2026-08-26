@@ -8,6 +8,8 @@ import (
 	"github.com/rlrghb/olkcli/internal/outfmt"
 )
 
+const mailBodyFormatHTML = "html"
+
 type MailGetCmd struct {
 	ID     string `arg:"" help:"Message ID"`
 	Format string `help:"Output format: full|text|html" default:"full" enum:"full,text,html"`
@@ -56,7 +58,7 @@ func (c *MailGetCmd) Run(ctx *RunContext) error {
 		} else {
 			fmt.Println(outfmt.SanitizeMultiline(msg.BodyPreview))
 		}
-	case "html":
+	case mailBodyFormatHTML:
 		fmt.Println(outfmt.SanitizeMultiline(msg.Body))
 	}
 
