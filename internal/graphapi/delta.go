@@ -109,7 +109,8 @@ func (c *Client) DeltaMessages(ctx context.Context, target, folderID, token stri
 			return nil, DeltaPage{}, err
 		}
 		rb := users.NewItemMailFoldersItemMessagesDeltaRequestBuilder(token, c.inner.GetAdapter())
-		resp, err = rb.GetAsDeltaGetResponse(ctx, nil)
+		cfg := &users.ItemMailFoldersItemMessagesDeltaRequestBuilderGetRequestConfiguration{Headers: maxPageSizeHeaders(top)}
+		resp, err = rb.GetAsDeltaGetResponse(ctx, cfg)
 	}
 	if err != nil {
 		return nil, DeltaPage{}, err
@@ -138,7 +139,8 @@ func (c *Client) DeltaCalendarView(ctx context.Context, target, token string, st
 			return nil, DeltaPage{}, err
 		}
 		rb := users.NewItemCalendarViewDeltaRequestBuilder(token, c.inner.GetAdapter())
-		resp, err = rb.GetAsDeltaGetResponse(ctx, nil)
+		cfg := &users.ItemCalendarViewDeltaRequestBuilderGetRequestConfiguration{Headers: maxPageSizeHeaders(top)}
+		resp, err = rb.GetAsDeltaGetResponse(ctx, cfg)
 	}
 	if err != nil {
 		return nil, DeltaPage{}, err
@@ -166,7 +168,8 @@ func (c *Client) DeltaContacts(ctx context.Context, target, token string, top in
 			return nil, DeltaPage{}, err
 		}
 		rb := users.NewItemContactsDeltaRequestBuilder(token, c.inner.GetAdapter())
-		resp, err = rb.GetAsDeltaGetResponse(ctx, nil)
+		cfg := &users.ItemContactsDeltaRequestBuilderGetRequestConfiguration{Headers: maxPageSizeHeaders(top)}
+		resp, err = rb.GetAsDeltaGetResponse(ctx, cfg)
 	}
 	if err != nil {
 		return nil, DeltaPage{}, err
