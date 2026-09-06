@@ -100,7 +100,7 @@ func (c *Client) DeltaMessages(ctx context.Context, target, folderID, token stri
 	var err error
 	if token == "" {
 		cfg := &users.ItemMailFoldersItemMessagesDeltaRequestBuilderGetRequestConfiguration{
-			Headers:         maxPageSizeHeaders(top),
+			Headers:         c.messageIDHeaders(maxPageSizeHeaders(top)),
 			QueryParameters: &users.ItemMailFoldersItemMessagesDeltaRequestBuilderGetQueryParameters{Select: []string{"id", "subject", "changeKey", "internetMessageId", "createdDateTime", "lastModifiedDateTime"}},
 		}
 		resp, err = c.targetUser(target).MailFolders().ByMailFolderId(folderID).Messages().Delta().GetAsDeltaGetResponse(ctx, cfg)
@@ -109,7 +109,8 @@ func (c *Client) DeltaMessages(ctx context.Context, target, folderID, token stri
 			return nil, DeltaPage{}, err
 		}
 		rb := users.NewItemMailFoldersItemMessagesDeltaRequestBuilder(token, c.inner.GetAdapter())
-		resp, err = rb.GetAsDeltaGetResponse(ctx, nil)
+		cfg := &users.ItemMailFoldersItemMessagesDeltaRequestBuilderGetRequestConfiguration{Headers: c.messageIDHeaders(nil)}
+		resp, err = rb.GetAsDeltaGetResponse(ctx, cfg)
 	}
 	if err != nil {
 		return nil, DeltaPage{}, err
