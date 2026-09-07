@@ -43,6 +43,9 @@ func TestMailDeltaImmutableIDs(t *testing.T) {
 							if got := strings.Contains(preference, `IdType="ImmutableId"`); got != enabled {
 								t.Errorf("Prefer = %q, want immutable IDs enabled = %t", preference, enabled)
 							}
+							if got := strings.Contains(preference, "odata.maxpagesize=500"); got != (top > 0) {
+								t.Errorf("Prefer = %q, want page-size preference enabled = %t", preference, top > 0)
+							}
 							if token != "" {
 								if got := req.URL.String(); got != token {
 									t.Errorf("continuation URL = %q, want %q", got, token)
@@ -50,9 +53,6 @@ func TestMailDeltaImmutableIDs(t *testing.T) {
 							} else {
 								if wantPath := "/v1.0" + initialUserPath + path + "()"; req.URL.Path != wantPath {
 									t.Errorf("initial path = %q, want %q", req.URL.Path, wantPath)
-								}
-								if got := strings.Contains(preference, "odata.maxpagesize=500"); got != (top > 0) {
-									t.Errorf("Prefer = %q, want page-size preference enabled = %t", preference, top > 0)
 								}
 							}
 							return graphJSONResponse(req, fmt.Sprintf(`{"value":[{"id":"immutable-message"},{"id":"removed-message","@removed":{"reason":"deleted"}}],%q:%q}`, linkType, returnedToken))

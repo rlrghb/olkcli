@@ -109,7 +109,7 @@ func (c *Client) DeltaMessages(ctx context.Context, target, folderID, token stri
 			return nil, DeltaPage{}, err
 		}
 		rb := users.NewItemMailFoldersItemMessagesDeltaRequestBuilder(token, c.inner.GetAdapter())
-		cfg := &users.ItemMailFoldersItemMessagesDeltaRequestBuilderGetRequestConfiguration{Headers: c.messageIDHeaders(nil)}
+		cfg := &users.ItemMailFoldersItemMessagesDeltaRequestBuilderGetRequestConfiguration{Headers: c.messageIDHeaders(maxPageSizeHeaders(top))}
 		resp, err = rb.GetAsDeltaGetResponse(ctx, cfg)
 	}
 	if err != nil {
