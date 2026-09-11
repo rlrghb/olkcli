@@ -20,7 +20,8 @@ func TestNoWriteGuardBlocksMutations(t *testing.T) {
 		name string
 		call func() error
 	}{
-		{"DeleteMessage", func() error { return c.DeleteMessage(ctx, "id") }},
+		{"DeleteMessage", func() error { return c.DeleteMessage(ctx, "", "id") }},
+		{"DeleteMessage from a shared mailbox", func() error { return c.DeleteMessage(ctx, "shared@example.com", "id") }},
 		{"MoveMessage", func() error { _, err := c.MoveMessage(ctx, "", "id", "f"); return err }},
 		{"MoveMessage in a shared mailbox", func() error { _, err := c.MoveMessage(ctx, "team@example.com", "id", "f"); return err }},
 		{"DeleteEvent", func() error { return c.DeleteEvent(ctx, "id") }},

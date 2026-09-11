@@ -136,9 +136,9 @@ For a bounded mail inventory, use:
 olk mail list --folder inbox --top 1000 --order oldest --json --results-only
 ```
 
-`mail move --mailbox EMAIL` moves within that mailbox and requires
-`Mail.ReadWrite.Shared` plus Full Access. The message and destination must
-belong to the same mailbox.
+`mail move --mailbox EMAIL` and `mail delete --mailbox EMAIL` act within that
+mailbox and require `Mail.ReadWrite.Shared` plus Full Access. The message ID,
+and for a move the destination folder, must belong to that mailbox.
 
 `--folder` and the `mail move` destination accept slash-separated display-name
 paths such as `Inbox/2026`; paths are resolved to Graph folder IDs by walking
@@ -383,7 +383,7 @@ the shared mailbox and needs `Mail.ReadWrite.Shared` plus Exchange Full Access,
 but not `Mail.Send.Shared`, Send As, or Send on Behalf Of. Sending that draft
 later is a separate action and does require the sending grants.
 
-Sending, replying, forwarding, moving messages and the draft commands are the writes that honour `--mailbox`. The calendar, contact and folder writes ignore it, as do the commands that organise mail in place — flag, categorise, mark — and all of them act on the signed-in user's own mailbox.
+Sending, replying, forwarding, moving and deleting messages and the draft commands are the writes that honour `--mailbox`. The calendar, contact and folder writes ignore it, as do the commands that organise mail in place — flag, categorise, mark — and all of them act on the signed-in user's own mailbox.
 
 ```bash
 # One-time login with shared scopes
@@ -424,7 +424,7 @@ export OLK_MAILBOX=boss@example.com
 ```
 
 - The target must have granted **Full Access** via M365 Admin Center → Mailbox permissions; the calling token must carry the matching `.Shared` scope.
-- Not every write honours it. Send, reply, forward, move and the draft commands do; flagging, categorising and marking mail do not, nor do the folder, calendar and contact writes, which always act on the signed-in user's own mailbox.
+- Not every write honours it. Send, reply, forward, move, delete and the draft commands do; flagging, categorising and marking mail do not, nor do the folder, calendar and contact writes, which always act on the signed-in user's own mailbox.
 
 ## Shortcuts
 

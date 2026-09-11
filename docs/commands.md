@@ -48,7 +48,7 @@ olk mail reply <ID> --body '<p><img src="cid:steps"></p>' --html --draft --inlin
 olk mail forward <ID> --to EMAIL [--comment COMMENT] [--html]
 olk mail mark <ID> read|unread
 olk mail move <ID> ID_OR_PATH [--mailbox EMAIL]
-olk mail delete <ID> --force
+olk mail delete <ID> --force [--mailbox EMAIL]
 olk mail attachments <ID> [--save] [--out DIR] [--attachment-id ID]
 olk mail folders list|create|rename|delete  # list traverses visible child folders
 olk mail drafts list|create|send|delete|attach|update

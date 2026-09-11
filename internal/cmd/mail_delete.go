@@ -11,7 +11,7 @@ type MailDeleteCmd struct {
 }
 
 func (c *MailDeleteCmd) Run(ctx *RunContext) error {
-	client, err := ctx.GraphClient()
+	target, err := resolveMailboxTarget(ctx.Flags.Mailbox)
 	if err != nil {
 		return err
 	}
@@ -21,15 +21,27 @@ func (c *MailDeleteCmd) Run(ctx *RunContext) error {
 	}
 
 	if ctx.Flags.DryRun {
-		fmt.Printf("Would delete message %s\n", outfmt.Sanitize(c.ID))
+		if target == "" {
+			fmt.Printf("Would delete message %s\n", outfmt.Sanitize(c.ID))
+		} else {
+			fmt.Printf("Would delete message %s from %s\n", outfmt.Sanitize(c.ID), describeMailbox(target))
+		}
 		return nil
 	}
 
-	err = client.DeleteMessage(ctx.Ctx, c.ID)
+	client, err := ctx.GraphClient()
 	if err != nil {
 		return err
 	}
 
-	fmt.Println("Message deleted.")
+	if err := client.DeleteMessage(ctx.Ctx, target, c.ID); err != nil {
+		return err
+	}
+
+	if target == "" {
+		fmt.Println("Message deleted.")
+	} else {
+		fmt.Printf("Message deleted from %s.\n", describeMailbox(target))
+	}
 	return nil
 }

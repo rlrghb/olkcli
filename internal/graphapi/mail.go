@@ -671,15 +671,25 @@ func (c *Client) MoveMessage(
 	}, nil
 }
 
-func (c *Client) DeleteMessage(ctx context.Context, messageID string) error {
+const deleteGrantHint = "Deleting messages in another mailbox needs the Mail.ReadWrite.Shared scope " +
+	"(sign in again with --scope Mail.ReadWrite.Shared) and Full Access on that mailbox in " +
+	"Exchange. It does not require Mail.Send.Shared, Send As, or Send on Behalf Of. The message " +
+	"ID must be one listed from that mailbox"
+
+// DeleteMessage deletes a message from the target mailbox, or from the signed-in
+// user's own mailbox when target is empty.
+func (c *Client) DeleteMessage(ctx context.Context, target, messageID string) error {
 	if err := c.ensureWritable(); err != nil {
 		return err
 	}
 	if err := validateID(messageID, "message ID"); err != nil {
 		return err
 	}
-	err := c.inner.Me().Messages().ByMessageId(messageID).Delete(ctx, nil)
+	err := c.targetUser(target).Messages().ByMessageId(messageID).Delete(ctx, nil)
 	if err != nil {
+		if target != "" {
+			return sharedMailboxItemError("deleting message", target, deleteGrantHint, err)
+		}
 		return fmt.Errorf("delete message: %w", err)
 	}
 	return nil

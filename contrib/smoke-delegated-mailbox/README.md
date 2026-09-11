@@ -102,9 +102,9 @@ Three outcomes look alike in an exit status and are not alike at all:
 
 ## Cleanup
 
-`06-cleanup-and-report` deletes the drafts it can reach and then names what it
-cannot. `mail delete` is scoped to the signed-in user and
-ignores `--mailbox`, so anything filed in a shared mailbox has to be removed by
+`06-cleanup-and-report` deletes the drafts it can reach and lists the remaining
+messages. It removes drafts only; sent copies are yours to remove, either with
+`mail delete --mailbox`, which acts on the shared mailbox, or by
 hand. Search for the run identifier, which every subject carries.
 
 Run `bash contrib/smoke-delegated-mailbox/test-private-output.sh` from the

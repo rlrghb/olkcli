@@ -229,7 +229,7 @@ const mailboxArg = "mailbox"
 // see mailboxIrrelevantTools for the distinction that decides whether it may be
 // exposed at all.
 var mailboxAwareTools = map[string]bool{
-	"mail_move": true,
+	"mail_move": true, "mail_delete": true,
 	"mail_list": true, "mail_get": true, "mail_batch": true, "mail_thread": true,
 	"mail_search": true, "mail_folders_list": true, "mail_attachments": true, "mail_delta": true,
 	"mail_drafts_create": true, "mail_drafts_send": true,

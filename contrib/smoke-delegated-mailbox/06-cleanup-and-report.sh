@@ -8,9 +8,9 @@ source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
 section "Stage 6 — cleanup, run ${RUN_ID}"
 
-# `mail delete` does not read --mailbox: it is scoped to the signed-in user. So the sent copies this run left in the shared mailbox cannot
-# be tidied by olk at all, and have to be removed by hand in Outlook. Drafts are
-# the exception, because the draft commands do honour --mailbox.
+# This stage removes only the drafts it created. The sent copies this run left
+# in the shared mailbox are listed below for the operator to remove, either with
+# `mail delete --mailbox` or by hand in Outlook.
 section "Drafts left behind in ${SHARED_MAILBOX}"
 olk_as_private "${SEND_ACCOUNT}" "${SHARED_MAILBOX}" mail drafts list -n 25 --json --results-only
 if [[ "${RUN_STATUS}" -ne 0 ]]; then
@@ -36,7 +36,7 @@ for row in ${DRAFT_ROWS[@]+"${DRAFT_ROWS[@]}"}; do
   fi
 done
 
-section "Residue that olk cannot remove"
+section "Messages left for the operator to remove"
 cat <<TEXT | tee -a "${LOG}"
 
 Delete these by hand in Outlook on the web, searching for ${TAG}:
@@ -45,8 +45,8 @@ Delete these by hand in Outlook on the web, searching for ${TAG}:
   ${CONTROL_MAILBOX:-(no control mailbox set)}  Sent Items, if the control send ran
   ${RECIPIENT}        Inbox, the delivered copies
 
-mail delete and mail move are scoped to the signed-in user and ignore --mailbox,
-so there is no command-line path to the first two.
+Or remove the first two with "mail delete --mailbox", which acts on the named
+mailbox; this stage does not delete sent copies for you.
 
 TEXT
 

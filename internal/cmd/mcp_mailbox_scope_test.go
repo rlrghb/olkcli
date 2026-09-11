@@ -19,7 +19,7 @@ var mailboxScopedUnawareTools = map[string]bool{
 	"mail_categories_list": true, "mail_rules_list": true, "mail_ooo_get": true,
 	"mail_flag": true, "mail_categorize": true,
 	"mail_mark": true, "mail_folders_create": true,
-	"mail_folders_rename": true, "mail_delete": true,
+	"mail_folders_rename":   true,
 	"calendar_availability": true, "calendar_find_times": true,
 	"calendar_respond": true, "calendar_create": true, "calendar_update": true,
 	"calendar_delete": true,

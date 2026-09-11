@@ -76,9 +76,10 @@ from that mailbox before sending as it. Reply-draft creation reads the same
 mailbox-scoped original without sending. In every case, the message ID must be
 one listed from that mailbox; one taken from your own mailbox will not resolve.
 
-`mail move` honours `--mailbox`; moving a shared-mailbox message needs
-`Mail.ReadWrite.Shared` and Full Access, and the message and destination folder
-must both belong to that mailbox. Calendar writes, contact writes, folder
+`mail move` and `mail delete` honour `--mailbox`; moving or deleting a
+shared-mailbox message needs `Mail.ReadWrite.Shared` and Full Access, and the
+message ID (and, for a move, the destination folder) must belong to that
+mailbox. Calendar writes, contact writes, folder
 writes, and the other commands that organise mail in place — flag, categorise,
 mark — remain scoped to the signed-in user; they do not read `--mailbox`.
 
