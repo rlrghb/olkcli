@@ -149,4 +149,33 @@ jobs:
         run: ./mcp-publisher login github-oidc
 
       - name: Publish to MCP Registry
-        run: ./mcp-publisher publish
+        run: |
+          set -euo pipefail
+          max_attempts=6
+
+          for ((attempt = 1; attempt <= max_attempts; attempt++)); do
+            set +e
+            output=$(./mcp-publisher publish 2>&1)
+            status=$?
+            set -e
+            printf '%s\n' "$output"
+
+            if [[ "$status" -eq 0 ]]; then
+              exit 0
+            fi
+
+            # npm can publish successfully before the registry's package
+            # validation replica can see the new version. Retry that
+            # transient 404, but fail immediately for other errors.
+            if ! grep -qE 'NPM package .* was not found|status: 404' <<<"$output"; then
+              exit "$status"
+            fi
+
+            if [[ "$attempt" -eq "$max_attempts" ]]; then
+              exit "$status"
+            fi
+
+            delay=$((15 << (attempt - 1)))
+            echo "npm propagation is still pending; retrying in ${delay}s (attempt ${attempt}/${max_attempts})"
+            sleep "$delay"
+          done
