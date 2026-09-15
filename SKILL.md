@@ -96,6 +96,10 @@ olk mail attachments <ID> --save [--out DIR]                             # downl
 olk mail attachments <ID> --attachment-id <ATT_ID> [--out DIR]           # download one
 ```
 
+`mail list` defaults to the Inbox when `--folder` is omitted. The `olk inbox`
+and `olk ls` shortcuts use the same default; pass `--folder` to list another
+folder.
+
 `mail reply --draft` uses Outlook's reply action to create a true threaded
 draft with quoted message history. HTML is inserted ahead of Outlook's
 generated history so formatting does not replace the quote. It returns the

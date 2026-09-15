@@ -60,6 +60,10 @@ olk mail ooo get|set|off
 olk mail rules list|create|delete
 ```
 
+`mail list` defaults to the Inbox when `--folder` is omitted. The `olk inbox`
+and `olk ls` shortcuts use the same default; pass `--folder` to list another
+folder.
+
 To edit an existing draft without sending it:
 
 ```bash
