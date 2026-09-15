@@ -3,6 +3,7 @@ package graphapi
 import (
 	"context"
 	"fmt"
+	"html"
 	"strings"
 	"time"
 
@@ -69,6 +70,42 @@ type RecurrenceDetails struct {
 	StartDate           string   `json:"startDate,omitempty"`
 	EndDate             string   `json:"endDate,omitempty"`
 	NumberOfOccurrences int32    `json:"numberOfOccurrences,omitempty"`
+}
+
+// EventBodyInput describes the caller-authored body of an event. A nil input
+// means that the body should be omitted from an update.
+type EventBodyInput struct {
+	Content string
+	HTML    bool
+}
+
+// CreateEventOptions contains the fields supported when creating an event.
+type CreateEventOptions struct {
+	CalendarID      string
+	Subject         string
+	Start           time.Time
+	End             time.Time
+	Location        string
+	Attendees       []string
+	IsAllDay        bool
+	IsOnlineMeeting bool
+	Recurrence      string
+	TransactionID   string
+	ReminderOn      *bool
+	Body            *EventBodyInput
+}
+
+// UpdateEventOptions contains only the fields that should be patched. Nil
+// pointers preserve the existing event values.
+type UpdateEventOptions struct {
+	EventID    string
+	Subject    *string
+	Start      *time.Time
+	End        *time.Time
+	Location   *string
+	AllDay     *bool
+	ReminderOn *bool
+	Body       *EventBodyInput
 }
 
 // CalendarInfo is a simplified calendar representation
@@ -197,57 +234,63 @@ func verifyCalendarBody(events []CalendarEvent, preference BodyPreference) error
 	return nil
 }
 
-func (c *Client) CreateEvent(ctx context.Context, calendarID, subject string, start, end time.Time, location string, attendees []string, isAllDay, isOnlineMeeting bool, recurrence, transactionID string, reminderOn *bool) (*CalendarEvent, error) {
+func (c *Client) CreateEvent(ctx context.Context, opts *CreateEventOptions) (*CalendarEvent, error) {
+	if opts == nil {
+		return nil, fmt.Errorf("event options are required")
+	}
 	if err := c.ensureWritable(); err != nil {
 		return nil, err
 	}
-	if len(attendees) > 0 {
+	if len(opts.Attendees) > 0 {
 		if err := c.ensureMaySend(); err != nil {
 			return nil, err
 		}
 	}
-	if calendarID != "" {
-		if err := validateID(calendarID, "calendar ID"); err != nil {
+	if opts.CalendarID != "" {
+		if err := validateID(opts.CalendarID, "calendar ID"); err != nil {
 			return nil, err
 		}
 	}
-	if err := ValidateTransactionID(transactionID); err != nil {
+	if err := ValidateTransactionID(opts.TransactionID); err != nil {
 		return nil, err
 	}
 	event := models.NewEvent()
-	event.SetSubject(&subject)
+	event.SetSubject(&opts.Subject)
 
 	startDt := models.NewDateTimeTimeZone()
-	startStr := start.UTC().Format("2006-01-02T15:04:05")
+	startStr := opts.Start.UTC().Format("2006-01-02T15:04:05")
 	startDt.SetDateTime(&startStr)
 	utc := graphTimeZoneUTC
 	startDt.SetTimeZone(&utc)
 	event.SetStart(startDt)
 
 	endDt := models.NewDateTimeTimeZone()
-	endStr := end.UTC().Format("2006-01-02T15:04:05")
+	endStr := opts.End.UTC().Format("2006-01-02T15:04:05")
 	endDt.SetDateTime(&endStr)
 	endDt.SetTimeZone(&utc)
 	event.SetEnd(endDt)
 
-	event.SetIsAllDay(&isAllDay)
-	event.SetIsOnlineMeeting(&isOnlineMeeting)
-	if reminderOn != nil {
-		event.SetIsReminderOn(reminderOn)
+	event.SetIsAllDay(&opts.IsAllDay)
+	event.SetIsOnlineMeeting(&opts.IsOnlineMeeting)
+	if opts.ReminderOn != nil {
+		event.SetIsReminderOn(opts.ReminderOn)
 	}
-	if transactionID != "" {
-		event.SetTransactionId(&transactionID)
+	if opts.TransactionID != "" {
+		event.SetTransactionId(&opts.TransactionID)
+	}
+	if opts.Body != nil {
+		event.SetBody(newEventBody(opts.Body.Content, opts.Body.HTML))
 	}
 
-	if location != "" {
+	if opts.Location != "" {
 		loc := models.NewLocation()
-		loc.SetDisplayName(&location)
+		loc.SetDisplayName(&opts.Location)
 		event.SetLocation(loc)
 	}
 
-	if len(attendees) > 0 {
+	if len(opts.Attendees) > 0 {
 		var atts []models.Attendeeable
-		for _, email := range attendees {
+		for _, email := range opts.Attendees {
 			if err := ValidateEmail(email); err != nil {
 				return nil, fmt.Errorf("invalid attendee email: %w", err)
 			}
@@ -263,8 +306,8 @@ func (c *Client) CreateEvent(ctx context.Context, calendarID, subject string, st
 		event.SetAttendees(atts)
 	}
 
-	if recurrence != "" {
-		rec, err := buildRecurrence(recurrence, start)
+	if opts.Recurrence != "" {
+		rec, err := buildRecurrence(opts.Recurrence, opts.Start)
 		if err != nil {
 			return nil, err
 		}
@@ -273,10 +316,10 @@ func (c *Client) CreateEvent(ctx context.Context, calendarID, subject string, st
 
 	var created models.Eventable
 	var err error
-	if calendarID == "" {
+	if opts.CalendarID == "" {
 		created, err = c.inner.Me().Events().Post(ctx, event, nil)
 	} else {
-		created, err = c.inner.Me().Calendars().ByCalendarId(calendarID).Events().Post(ctx, event, nil)
+		created, err = c.inner.Me().Calendars().ByCalendarId(opts.CalendarID).Events().Post(ctx, event, nil)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("creating event: %w", err)
@@ -285,52 +328,116 @@ func (c *Client) CreateEvent(ctx context.Context, calendarID, subject string, st
 	return &e, nil
 }
 
-func (c *Client) UpdateEvent(ctx context.Context, eventID string, subject *string, start, end *time.Time, location *string, allDay, reminderOn *bool) (*CalendarEvent, error) {
+func (c *Client) UpdateEvent(ctx context.Context, opts *UpdateEventOptions) (*CalendarEvent, error) {
+	if opts == nil {
+		return nil, fmt.Errorf("event options are required")
+	}
 	if err := c.ensureWritable(); err != nil {
 		return nil, err
 	}
-	if err := validateID(eventID, "event ID"); err != nil {
+	if err := validateID(opts.EventID, "event ID"); err != nil {
 		return nil, err
 	}
 	event := models.NewEvent()
 
-	if subject != nil {
-		event.SetSubject(subject)
+	if opts.Subject != nil {
+		event.SetSubject(opts.Subject)
 	}
-	if start != nil {
+	if opts.Start != nil {
 		startDt := models.NewDateTimeTimeZone()
-		startStr := start.UTC().Format("2006-01-02T15:04:05")
+		startStr := opts.Start.UTC().Format("2006-01-02T15:04:05")
 		startDt.SetDateTime(&startStr)
 		utc := graphTimeZoneUTC
 		startDt.SetTimeZone(&utc)
 		event.SetStart(startDt)
 	}
-	if end != nil {
+	if opts.End != nil {
 		endDt := models.NewDateTimeTimeZone()
-		endStr := end.UTC().Format("2006-01-02T15:04:05")
+		endStr := opts.End.UTC().Format("2006-01-02T15:04:05")
 		endDt.SetDateTime(&endStr)
 		utc := graphTimeZoneUTC
 		endDt.SetTimeZone(&utc)
 		event.SetEnd(endDt)
 	}
-	if location != nil {
+	if opts.Location != nil {
 		loc := models.NewLocation()
-		loc.SetDisplayName(location)
+		loc.SetDisplayName(opts.Location)
 		event.SetLocation(loc)
 	}
-	if allDay != nil {
-		event.SetIsAllDay(allDay)
+	if opts.AllDay != nil {
+		event.SetIsAllDay(opts.AllDay)
 	}
-	if reminderOn != nil {
-		event.SetIsReminderOn(reminderOn)
+	if opts.ReminderOn != nil {
+		event.SetIsReminderOn(opts.ReminderOn)
+	}
+	if opts.Body != nil {
+		body, err := c.eventBodyForUpdate(ctx, opts.EventID, opts.Body)
+		if err != nil {
+			return nil, err
+		}
+		event.SetBody(body)
 	}
 
-	updated, err := c.inner.Me().Events().ByEventId(eventID).Patch(ctx, event, nil)
+	updated, err := c.inner.Me().Events().ByEventId(opts.EventID).Patch(ctx, event, nil)
 	if err != nil {
 		return nil, fmt.Errorf("updating event: %w", err)
 	}
 	e := convertEvent(updated)
 	return &e, nil
+}
+
+func newEventBody(content string, isHTML bool) models.ItemBodyable {
+	body := models.NewItemBody()
+	body.SetContent(&content)
+	contentType := models.TEXT_BODYTYPE
+	if isHTML {
+		contentType = models.HTML_BODYTYPE
+	}
+	body.SetContentType(&contentType)
+	return body
+}
+
+// eventBodyForUpdate protects the provider-generated online-meeting section.
+// Graph stores the join information inside the HTML body and warns that
+// replacing it without preserving that section disables the online meeting.
+func (c *Client) eventBodyForUpdate(ctx context.Context, eventID string, input *EventBodyInput) (models.ItemBodyable, error) {
+	current, err := c.GetEvent(ctx, "", eventID, BodyHTML)
+	if err != nil {
+		return nil, fmt.Errorf("reading existing event body: %w", err)
+	}
+	if !current.IsOnline {
+		return newEventBody(input.Content, input.HTML), nil
+	}
+	content, err := preserveOnlineMeetingBody(current.Body, input.Content, input.HTML)
+	if err != nil {
+		return nil, fmt.Errorf("updating online meeting body: %w", err)
+	}
+	return newEventBody(content, true), nil
+}
+
+func preserveOnlineMeetingBody(existing, replacement string, replacementHTML bool) (string, error) {
+	lower := strings.ToLower(existing)
+	marker := strings.Index(lower, `class="me-email-text"`)
+	if marker < 0 {
+		marker = strings.Index(lower, "join microsoft teams meeting")
+	}
+	if marker < 0 {
+		return "", fmt.Errorf("could not identify the provider meeting section")
+	}
+	start := strings.LastIndex(lower[:marker], "<div")
+	if start < 0 {
+		return "", fmt.Errorf("could not identify the provider meeting section")
+	}
+	end := strings.LastIndex(lower, "</body>")
+	if end < start {
+		return "", fmt.Errorf("existing meeting body is malformed")
+	}
+	meetingHTML := existing[start:end]
+	userHTML := replacement
+	if !replacementHTML {
+		userHTML = strings.ReplaceAll(html.EscapeString(replacement), "\n", "<br>\n")
+	}
+	return "<html><body>" + userHTML + meetingHTML + "</body></html>", nil
 }
 
 func (c *Client) DeleteEvent(ctx context.Context, eventID string) error {

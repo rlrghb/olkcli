@@ -21,6 +21,8 @@ var mailboxScopedUnawareTools = map[string]bool{
 	"mail_mark": true, "mail_move": true, "mail_folders_create": true,
 	"mail_folders_rename": true, "mail_delete": true,
 	"calendar_availability": true, "calendar_find_times": true,
+	"calendar_attachments_list": true, "calendar_attachments_download": true,
+	"calendar_attachments_add": true, "calendar_attachments_delete": true,
 	"calendar_respond": true, "calendar_create": true, "calendar_update": true,
 	"calendar_delete": true,
 	"contacts_create": true, "contacts_update": true, "contacts_delete": true,

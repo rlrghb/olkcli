@@ -18,6 +18,7 @@ type CalendarCmd struct {
 	Delete       CalendarDeleteCmd       `cmd:"" help:"Delete a calendar event"`
 	Respond      CalendarRespondCmd      `cmd:"" help:"Respond to an event invitation"`
 	Calendars    CalendarCalendarsCmd    `cmd:"" help:"List available calendars"`
+	Attachments  CalendarAttachmentsCmd  `cmd:"" help:"Event attachment operations"`
 	Availability CalendarAvailabilityCmd `cmd:"" help:"Check availability / free-busy"`
 	View         CalendarViewCmd         `cmd:"" help:"Calendar view with expanded recurring events"`
 	FindTimes    CalendarFindTimesCmd    `cmd:"" help:"Find available meeting times" name:"find-times"`
@@ -179,6 +180,8 @@ type CalendarCreateCmd struct {
 	Recurrence    string   `help:"Recurrence: daily|weekdays|weekly|monthly|yearly" short:"r"`
 	TransactionID string   `help:"Retry-safe provider transaction ID" name:"transaction-id"`
 	NoReminder    bool     `help:"Disable event reminders" name:"no-reminder"`
+	Body          *string  `help:"Event body" short:"b"`
+	HTML          bool     `help:"Treat --body as HTML"`
 }
 
 func (c *CalendarCreateCmd) Run(ctx *RunContext) error {
@@ -199,11 +202,20 @@ func (c *CalendarCreateCmd) Run(ctx *RunContext) error {
 	if !end.After(start) {
 		return fmt.Errorf("--end must be after --start")
 	}
+	var body *graphapi.EventBodyInput
+	if c.Body != nil {
+		body = &graphapi.EventBodyInput{Content: *c.Body, HTML: c.HTML}
+	} else if c.HTML {
+		return fmt.Errorf("--html requires --body")
+	}
 
 	if ctx.Flags.DryRun {
 		fmt.Printf("Would create event:\n  Subject: %s\n  Start: %s\n  End: %s\n", outfmt.Sanitize(c.Subject), c.Start, c.End)
 		if c.Calendar != "" {
 			fmt.Printf("  Calendar: %s\n", outfmt.Sanitize(c.Calendar))
+		}
+		if c.Body != nil {
+			fmt.Printf("  Body: %s\n", outfmt.Sanitize(*c.Body))
 		}
 		return nil
 	}
@@ -213,7 +225,12 @@ func (c *CalendarCreateCmd) Run(ctx *RunContext) error {
 		v := false
 		reminderOn = &v
 	}
-	event, err := client.CreateEvent(ctx.Ctx, c.Calendar, c.Subject, start, end, c.Location, c.Attendees, c.AllDay, c.OnlineMeeting, c.Recurrence, c.TransactionID, reminderOn)
+	event, err := client.CreateEvent(ctx.Ctx, &graphapi.CreateEventOptions{
+		CalendarID: c.Calendar, Subject: c.Subject, Start: start, End: end,
+		Location: c.Location, Attendees: c.Attendees, IsAllDay: c.AllDay,
+		IsOnlineMeeting: c.OnlineMeeting, Recurrence: c.Recurrence,
+		TransactionID: c.TransactionID, ReminderOn: reminderOn, Body: body,
+	})
 	if err != nil {
 		return err
 	}
@@ -226,14 +243,17 @@ func (c *CalendarCreateCmd) Run(ctx *RunContext) error {
 }
 
 type CalendarUpdateCmd struct {
-	ID         string `arg:"" help:"Event ID"`
-	Subject    string `help:"New subject" short:"s"`
-	Start      string `help:"New start time (ISO 8601)"`
-	End        string `help:"New end time (ISO 8601)"`
-	Location   string `help:"New location" short:"l"`
-	AllDay     *bool  `help:"Convert event to an all-day event" name:"all-day"`
-	Timed      *bool  `help:"Convert event to a timed event"`
-	NoReminder bool   `help:"Disable event reminders" name:"no-reminder"`
+	ID         string  `arg:"" help:"Event ID"`
+	Subject    string  `help:"New subject" short:"s"`
+	Start      string  `help:"New start time (ISO 8601)"`
+	End        string  `help:"New end time (ISO 8601)"`
+	Location   string  `help:"New location" short:"l"`
+	AllDay     *bool   `help:"Convert event to an all-day event" name:"all-day"`
+	Timed      *bool   `help:"Convert event to a timed event"`
+	NoReminder bool    `help:"Disable event reminders" name:"no-reminder"`
+	Body       *string `help:"Replace event body" short:"b"`
+	HTML       bool    `help:"Treat --body as HTML"`
+	ClearBody  bool    `help:"Clear the event body" name:"clear-body"`
 }
 
 func (c *CalendarUpdateCmd) Run(ctx *RunContext) error {
@@ -273,6 +293,12 @@ func (c *CalendarUpdateCmd) Run(ctx *RunContext) error {
 	if c.AllDay != nil && c.Timed != nil {
 		return fmt.Errorf("--all-day and --timed are mutually exclusive")
 	}
+	if c.Body != nil && c.ClearBody {
+		return fmt.Errorf("--body and --clear-body are mutually exclusive")
+	}
+	if c.HTML && c.Body == nil {
+		return fmt.Errorf("--html requires --body")
+	}
 	var allDay *bool
 	if c.AllDay != nil {
 		allDay = c.AllDay
@@ -289,7 +315,16 @@ func (c *CalendarUpdateCmd) Run(ctx *RunContext) error {
 		v := false
 		reminderOn = &v
 	}
-	event, err := client.UpdateEvent(ctx.Ctx, c.ID, subject, start, end, location, allDay, reminderOn)
+	var body *graphapi.EventBodyInput
+	if c.ClearBody {
+		body = &graphapi.EventBodyInput{}
+	} else if c.Body != nil {
+		body = &graphapi.EventBodyInput{Content: *c.Body, HTML: c.HTML}
+	}
+	event, err := client.UpdateEvent(ctx.Ctx, &graphapi.UpdateEventOptions{
+		EventID: c.ID, Subject: subject, Start: start, End: end, Location: location,
+		AllDay: allDay, ReminderOn: reminderOn, Body: body,
+	})
 	if err != nil {
 		return err
 	}

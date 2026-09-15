@@ -57,6 +57,8 @@ var curatedTools = []curatedTool{
 	{"calendar_availability", []string{"calendar", "availability"}, tierRead},
 	{"calendar_find_times", []string{"calendar", "find-times"}, tierRead},
 	{"calendar_delta", []string{"calendar", "delta"}, tierRead},
+	{"calendar_attachments_list", []string{"calendar", "attachments", "list"}, tierRead},
+	{"calendar_attachments_download", []string{"calendar", "attachments", "download"}, tierRead},
 	// Contacts (read)
 	{"contacts_list", []string{"contacts", "list"}, tierRead},
 	{"contacts_get", []string{"contacts", "get"}, tierRead},
@@ -94,6 +96,7 @@ var curatedTools = []curatedTool{
 	{"todo_create", []string{"todo", "create"}, tierSafeWrite},
 	{"todo_update", []string{"todo", "update"}, tierSafeWrite},
 	{"todo_complete", []string{"todo", "complete"}, tierSafeWrite}, // reversible: status can be set back
+	{"calendar_attachments_add", []string{"calendar", "attachments", "add"}, tierSafeWrite},
 	// Send (--allow-send, off by default, also vetoed by --no-send): transmits
 	// to other people. calendar create/update are here because attendee'd events
 	// send invitations.
@@ -111,6 +114,7 @@ var curatedTools = []curatedTool{
 	{"calendar_delete", []string{"calendar", "delete"}, tierDestructive},
 	{"contacts_delete", []string{"contacts", "delete"}, tierDestructive},
 	{"todo_delete", []string{"todo", "delete"}, tierDestructive},
+	{"calendar_attachments_delete", []string{"calendar", "attachments", "delete"}, tierDestructive},
 }
 
 // mcpConfig controls which curated tools a server exposes.

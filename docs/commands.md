@@ -83,9 +83,15 @@ olk calendar delta [--token TOKEN]
 olk calendar create --subject SUBJECT --start TIME --end TIME
   [--calendar ID] [--location LOCATION] [--attendees EMAIL]
   [--all-day] [--online-meeting] [--transaction-id ID] [--no-reminder]
+  [--body BODY] [--html]
   [-r daily|weekdays|weekly|monthly|yearly]
 olk calendar update <ID> [--subject SUBJECT] [--start TIME] [--end TIME]
   [--location LOCATION|none] [--all-day|--timed] [--no-reminder]
+  [--body BODY] [--html] [--clear-body]
+olk calendar attachments list <EVENT_ID>
+olk calendar attachments add <EVENT_ID> <FILE>
+olk calendar attachments download <EVENT_ID> <ATTACHMENT_ID> [--out DIR]
+olk calendar attachments delete <EVENT_ID> <ATTACHMENT_ID> --force
 olk calendar delete <ID> --force
 olk calendar respond <ID> accept|decline|tentative
 olk calendar calendars
@@ -98,6 +104,16 @@ state, structured attendee responses, and structured recurrence when Graph
 returns those fields. `createdDateTime` and `lastModifiedDateTime` may be
 unavailable on calendar-view endpoints because Graph does not support selecting
 them there.
+
+`calendar create --body` and `calendar update --body` accept plain text by
+default; add `--html` for HTML content. `calendar update --clear-body` removes
+caller-authored content. Updates to online meetings preserve the provider's
+meeting section and fail if it cannot be identified safely.
+
+Event attachments use separate commands because Graph adds them after the event
+exists. Simple uploads must be under 3 MB. Adding an attachment does not itself
+send a new invitation; use the normal meeting-update flow when attendees must
+receive the attachment.
 
 ## Contacts, tasks, and OneDrive
 
