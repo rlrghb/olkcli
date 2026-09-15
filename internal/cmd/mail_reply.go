@@ -64,6 +64,9 @@ func (c *MailReplyCmd) Run(ctx *RunContext) error {
 		if err != nil {
 			return err
 		}
+		if ctx.Flags.JSON {
+			return ctx.Printer().PrintJSON(draft, 1, "")
+		}
 		fmt.Printf("%s draft created in %s: %s (ID: %s)\n",
 			displayAction, describeMailbox(target), outfmt.Sanitize(draft.Subject), outfmt.Sanitize(draft.ID))
 		return nil

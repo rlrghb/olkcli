@@ -41,6 +41,18 @@ type CreateReplyDraftOptions struct {
 	InlineAttachments []InlineAttachmentInput
 }
 
+const graphReplySubjectPrefix = "RE: "
+
+// outlookWebReplySubject normalizes Graph's uppercase reply prefix to the
+// casing Outlook on the web uses. This is limited to the generated prefix;
+// user subject text is preserved unchanged.
+func outlookWebReplySubject(subject string) string {
+	if strings.HasPrefix(subject, graphReplySubjectPrefix) {
+		return "Re: " + subject[len(graphReplySubjectPrefix):]
+	}
+	return subject
+}
+
 // ValidateInlineContentID rejects values that cannot be used safely and
 // predictably in both a Content-ID header and a cid: URL.
 func ValidateInlineContentID(contentID string) error {
@@ -206,7 +218,8 @@ func (c *Client) finishHTMLReplyDraft(
 	}
 
 	combinedHTML := generatedHTML[:insertionIndex] + opts.Body + generatedHTML[insertionIndex:]
-	updated, err := c.patchReplyDraftHTML(ctx, target, draftID, combinedHTML)
+	subject := outlookWebReplySubject(derefStr(generated.GetSubject()))
+	updated, err := c.patchReplyDraftHTML(ctx, target, draftID, subject, combinedHTML)
 	if err != nil {
 		return nil, err
 	}
@@ -223,7 +236,7 @@ func (c *Client) finishHTMLReplyDraft(
 		draft.ID = draftID
 	}
 	if draft.Subject == "" {
-		draft.Subject = createdDraft.Subject
+		draft.Subject = subject
 	}
 	if len(draft.To) == 0 {
 		draft.To = createdDraft.To
@@ -257,11 +270,14 @@ func (c *Client) getReplyDraftHTML(ctx context.Context, target, draftID string) 
 	return result, nil
 }
 
-func (c *Client) patchReplyDraftHTML(ctx context.Context, target, draftID, content string) (models.Messageable, error) {
+func (c *Client) patchReplyDraftHTML(ctx context.Context, target, draftID, subject, content string) (models.Messageable, error) {
 	if err := c.ensureWritable(); err != nil {
 		return nil, err
 	}
 	message := htmlMessageBody(content)
+	if subject != "" {
+		message.SetSubject(&subject)
+	}
 	result, err := c.targetUser(target).Messages().ByMessageId(draftID).Patch(ctx, message, nil)
 	if err != nil {
 		return nil, c.replyDraftError("formatting reply draft", target, err)

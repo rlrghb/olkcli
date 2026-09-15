@@ -121,6 +121,45 @@ func TestCreateReplyDraftRoutesFormatsAndPreservesHistory(t *testing.T) {
 	}
 }
 
+func TestCreateReplyDraftNormalizesGraphReplySubjectForHTML(t *testing.T) {
+	client := testGraphClient(t, func(req *http.Request) *http.Response {
+		switch req.Method {
+		case http.MethodPost:
+			return graphJSONResponse(req, `{"id":"draft-id","subject":"RE: Original subject","body":{"contentType":"html","content":`+quotedJSON(generatedReplyHTML)+`}}`)
+		case http.MethodPatch:
+			var payload struct {
+				Subject string `json:"subject"`
+				Body    struct {
+					Content string `json:"content"`
+				} `json:"body"`
+			}
+			if err := json.NewDecoder(req.Body).Decode(&payload); err != nil {
+				t.Fatalf("decode HTML patch: %v", err)
+			}
+			if payload.Subject != "Re: Original subject" {
+				t.Fatalf("patched subject = %q, want normalized subject", payload.Subject)
+			}
+			if !strings.Contains(payload.Body.Content, "Thanks") {
+				t.Fatalf("patched body omitted reply content: %q", payload.Body.Content)
+			}
+			return graphJSONResponse(req, `{"id":"draft-id","subject":"Re: Original subject"}`)
+		default:
+			t.Fatalf("unexpected Graph request: %s %s", req.Method, req.URL.Path)
+			return graphEmptyResponse(req)
+		}
+	})
+
+	draft, err := client.CreateReplyDraft(context.Background(), "", "AAA", &CreateReplyDraftOptions{
+		Body: "<p>Thanks</p>", IsHTML: true,
+	})
+	if err != nil {
+		t.Fatalf("CreateReplyDraft: %v", err)
+	}
+	if draft.Subject != "Re: Original subject" {
+		t.Fatalf("draft subject = %q, want normalized subject", draft.Subject)
+	}
+}
+
 func TestCreateReplyDraftFetchesGeneratedHTMLWhenActionOmitsBody(t *testing.T) {
 	wantBody := strings.Replace(generatedReplyHTML, `<body class="reply">`, `<body class="reply"><p>Thanks</p>`, 1)
 	var requests []string

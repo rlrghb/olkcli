@@ -20,6 +20,32 @@ import (
 	"github.com/rlrghb/olkcli/internal/graphapi"
 )
 
+func TestMailListPathsDefaultToTheInboxFolder(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		path []string
+	}{
+		{name: "mail list", path: []string{"mail", "list"}},
+		{name: "inbox shortcut", path: []string{"inbox"}},
+		{name: "ls shortcut", path: []string{"ls"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, calls, err := runMailCommand(t, tc.path, []string{"--json"}, func(req *http.Request) *http.Response {
+				if req.URL.Path != "/v1.0/me/mailFolders/inbox/messages" {
+					t.Fatalf("%s path = %s, want the Inbox folder", tc.name, req.URL.Path)
+				}
+				return graphMessageListResponse(req)
+			})
+			if err != nil {
+				t.Fatalf("%s: %v", tc.name, err)
+			}
+			if calls != 1 {
+				t.Fatalf("%s Graph requests = %d, want 1", tc.name, calls)
+			}
+		})
+	}
+}
+
 func TestMailListDefaultsToNewestOrder(t *testing.T) {
 	query, _ := runMailList(t, "--json")
 	if got := query.Get("$orderby"); got != "receivedDateTime desc" {

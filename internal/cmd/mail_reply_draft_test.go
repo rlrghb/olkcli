@@ -74,6 +74,32 @@ func TestMailReplyDraftCommandPlainRoutesAndReportsDraft(t *testing.T) {
 	}
 }
 
+func TestMailReplyDraftCommandJSONOutputsTheDraft(t *testing.T) {
+	output, calls, err := runMailCommand(t, []string{"mail", "reply"}, []string{
+		"AAA", "--body", "Thanks", "--draft", "--json",
+	}, func(req *http.Request) *http.Response {
+		return graphJSONResponse(req, `{"id":"draft-id","subject":"Re: Original subject"}`)
+	})
+	if err != nil {
+		t.Fatalf("mail reply --draft --json: %v", err)
+	}
+	if calls != 1 {
+		t.Fatalf("Graph requests = %d, want 1", calls)
+	}
+	var envelope struct {
+		Results struct {
+			ID      string `json:"id"`
+			Subject string `json:"subject"`
+		} `json:"results"`
+	}
+	if err := json.Unmarshal([]byte(output), &envelope); err != nil {
+		t.Fatalf("output is not JSON: %v\n%s", err, output)
+	}
+	if envelope.Results.ID != "draft-id" || envelope.Results.Subject != "Re: Original subject" {
+		t.Fatalf("JSON draft = %#v", envelope.Results)
+	}
+}
+
 func TestMailReplyDraftCommandWiresThreadedHTMLAndMultipleInlineImages(t *testing.T) {
 	logo := writeTestFile(t, "logo.png", testPNG)
 	steps := writeTestFile(t, "steps.jpg", append([]byte{0xff, 0xd8, 0xff, 0xdb}, make([]byte, 20)...))

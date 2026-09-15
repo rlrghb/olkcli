@@ -81,8 +81,8 @@ The new commands are CLI-only; the MCP tool allowlist is unchanged.
 `mail reply --draft` creates a true threaded Outlook reply or reply-all draft,
 including Outlook's quoted history, and returns its draft ID and subject. For
 HTML drafts, `olk` inserts the supplied HTML ahead of that generated history
-instead of replacing it. It does not send; without `--draft`, replies retain
-their immediate-send behavior.
+instead of replacing it. Use `--json` for a structured draft response. It does
+not send; without `--draft`, replies retain their immediate-send behavior.
 
 `--inline CID=PATH` is repeatable on `mail reply --html --draft` and
 `mail drafts create --html`. Reference every supplied CID in the HTML as

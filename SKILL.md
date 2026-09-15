@@ -99,8 +99,8 @@ olk mail attachments <ID> --attachment-id <ATT_ID> [--out DIR]           # downl
 `mail reply --draft` uses Outlook's reply action to create a true threaded
 draft with quoted message history. HTML is inserted ahead of Outlook's
 generated history so formatting does not replace the quote. It returns the
-created draft and does not send it; omit `--draft` to send the reply
-immediately.
+created draft and does not send it; use `--json` for a structured response.
+Omit `--draft` to send the reply immediately.
 
 To edit an existing draft without sending it:
 

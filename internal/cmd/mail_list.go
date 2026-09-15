@@ -9,7 +9,7 @@ import (
 )
 
 type MailListCmd struct {
-	Folder  string  `help:"Mail folder ID, well-known name, or path (for example Inbox/2026)" short:"f" env:"OLK_MAIL_FOLDER"`
+	Folder  string  `help:"Mail folder ID, well-known name, or path (for example Inbox/2026)" short:"f" env:"OLK_MAIL_FOLDER" default:"inbox"`
 	Top     int32   `help:"Number of messages to return" default:"25" short:"n"`
 	Unread  bool    `help:"Show only unread messages" short:"u"`
 	From    string  `help:"Filter by sender email"`
@@ -19,6 +19,8 @@ type MailListCmd struct {
 	Other   bool    `help:"Show only Other Inbox messages"`
 	Order   *string `help:"Message order: newest|oldest (default newest)" enum:"newest,oldest"`
 }
+
+const defaultMailListFolder = "inbox"
 
 // mailListSelectableFields is the Graph selector set that ListMessages converts
 // into mail-list JSON fields. Keep this limited to fields ListMessages converts into
@@ -116,6 +118,12 @@ func (c *MailListCmd) Run(ctx *RunContext) error {
 	if err != nil {
 		return err
 	}
+	folder := c.Folder
+	if folder == "" {
+		// Shortcuts such as `olk inbox` construct MailListCmd directly, so
+		// Kong's struct-tag default is not applied to those paths.
+		folder = defaultMailListFolder
+	}
 
 	order := ""
 	if c.Order != nil {
@@ -125,7 +133,7 @@ func (c *MailListCmd) Run(ctx *RunContext) error {
 	if c.Focused || c.Other {
 		orderBy = ""
 	}
-	folderID, err := client.ResolveMailFolderPath(ctx.Ctx, target, c.Folder)
+	folderID, err := client.ResolveMailFolderPath(ctx.Ctx, target, folder)
 	if err != nil {
 		return err
 	}
