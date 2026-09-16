@@ -42,6 +42,7 @@ type CalendarEvent struct {
 	OriginalStart     string               `json:"originalStart,omitempty"`
 	IsCancelled       bool                 `json:"isCancelled"`
 	IsReminderOn      *bool                `json:"isReminderOn,omitempty"`
+	ReminderMinutes   *int32               `json:"reminderMinutesBeforeStart,omitempty"`
 	TransactionID     string               `json:"transactionId,omitempty"`
 	AttendeeDetails   []AttendeeDetails    `json:"attendeeDetails,omitempty" concise:"omit"`
 	ResponseStatus    *EventResponseStatus `json:"responseStatus,omitempty" concise:"omit"`
@@ -92,20 +93,22 @@ type CreateEventOptions struct {
 	Recurrence      string
 	TransactionID   string
 	ReminderOn      *bool
+	ReminderMinutes *int32
 	Body            *EventBodyInput
 }
 
 // UpdateEventOptions contains only the fields that should be patched. Nil
 // pointers preserve the existing event values.
 type UpdateEventOptions struct {
-	EventID    string
-	Subject    *string
-	Start      *time.Time
-	End        *time.Time
-	Location   *string
-	AllDay     *bool
-	ReminderOn *bool
-	Body       *EventBodyInput
+	EventID         string
+	Subject         *string
+	Start           *time.Time
+	End             *time.Time
+	Location        *string
+	AllDay          *bool
+	ReminderOn      *bool
+	ReminderMinutes *int32
+	Body            *EventBodyInput
 }
 
 // CalendarInfo is a simplified calendar representation
@@ -134,7 +137,7 @@ func (c *Client) ListEvents(ctx context.Context, target string, startTime, endTi
 		StartDateTime: &startStr,
 		EndDateTime:   &endStr,
 		Top:           &top,
-		Select:        []string{"id", "subject", "start", "end", "location", "organizer", "attendees", "isAllDay", "isOnlineMeeting", "onlineMeetingUrl", "showAs", "bodyPreview", "recurrence", "iCalUId", "changeKey", "type", "seriesMasterId", "originalStart", "isCancelled", "isReminderOn", "responseStatus", "transactionId"},
+		Select:        []string{"id", "subject", "start", "end", "location", "organizer", "attendees", "isAllDay", "isOnlineMeeting", "onlineMeetingUrl", "showAs", "bodyPreview", "recurrence", "iCalUId", "changeKey", "type", "seriesMasterId", "originalStart", "isCancelled", "isReminderOn", "reminderMinutesBeforeStart", "responseStatus", "transactionId"},
 		Orderby:       []string{"start/dateTime"},
 	}
 	if preference != BodyDefault {
@@ -272,8 +275,8 @@ func (c *Client) CreateEvent(ctx context.Context, opts *CreateEventOptions) (*Ca
 
 	event.SetIsAllDay(&opts.IsAllDay)
 	event.SetIsOnlineMeeting(&opts.IsOnlineMeeting)
-	if opts.ReminderOn != nil {
-		event.SetIsReminderOn(opts.ReminderOn)
+	if err := applyEventReminder(event, opts.ReminderOn, opts.ReminderMinutes); err != nil {
+		return nil, err
 	}
 	if opts.TransactionID != "" {
 		event.SetTransactionId(&opts.TransactionID)
@@ -367,8 +370,8 @@ func (c *Client) UpdateEvent(ctx context.Context, opts *UpdateEventOptions) (*Ca
 	if opts.AllDay != nil {
 		event.SetIsAllDay(opts.AllDay)
 	}
-	if opts.ReminderOn != nil {
-		event.SetIsReminderOn(opts.ReminderOn)
+	if err := applyEventReminder(event, opts.ReminderOn, opts.ReminderMinutes); err != nil {
+		return nil, err
 	}
 	if opts.Body != nil {
 		body, err := c.eventBodyForUpdate(ctx, opts.EventID, opts.Body)
@@ -384,6 +387,23 @@ func (c *Client) UpdateEvent(ctx context.Context, opts *UpdateEventOptions) (*Ca
 	}
 	e := convertEvent(updated)
 	return &e, nil
+}
+
+func applyEventReminder(event models.Eventable, on *bool, minutes *int32) error {
+	if minutes != nil {
+		if *minutes < 0 {
+			return fmt.Errorf("reminder minutes must be nonnegative")
+		}
+		if on != nil && !*on {
+			return fmt.Errorf("reminder minutes cannot be combined with a disabled reminder")
+		}
+		enabled := true
+		event.SetIsReminderOn(&enabled)
+		event.SetReminderMinutesBeforeStart(minutes)
+	} else if on != nil {
+		event.SetIsReminderOn(on)
+	}
+	return nil
 }
 
 func newEventBody(content string, isHTML bool) models.ItemBodyable {
@@ -607,6 +627,10 @@ func convertEvent(e models.Eventable) CalendarEvent {
 	if e.GetIsReminderOn() != nil {
 		v := *e.GetIsReminderOn()
 		ev.IsReminderOn = &v
+	}
+	if e.GetReminderMinutesBeforeStart() != nil {
+		v := *e.GetReminderMinutesBeforeStart()
+		ev.ReminderMinutes = &v
 	}
 	if e.GetTransactionId() != nil {
 		ev.TransactionID = *e.GetTransactionId()

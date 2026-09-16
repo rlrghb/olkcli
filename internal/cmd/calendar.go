@@ -169,22 +169,27 @@ func (c *CalendarGetCmd) Run(ctx *RunContext) error {
 }
 
 type CalendarCreateCmd struct {
-	Subject       string   `help:"Event subject" required:"" short:"s"`
-	Start         string   `help:"Start time (ISO 8601)" required:""`
-	End           string   `help:"End time (ISO 8601)" required:""`
-	Calendar      string   `help:"Calendar ID (default calendar when omitted)"`
-	Location      string   `help:"Event location" short:"l"`
-	Attendees     []string `help:"Attendee email addresses" short:"a"`
-	AllDay        bool     `help:"All-day event"`
-	OnlineMeeting bool     `help:"Create online meeting"`
-	Recurrence    string   `help:"Recurrence: daily|weekdays|weekly|monthly|yearly" short:"r"`
-	TransactionID string   `help:"Retry-safe provider transaction ID" name:"transaction-id"`
-	NoReminder    bool     `help:"Disable event reminders" name:"no-reminder"`
-	Body          *string  `help:"Event body" short:"b"`
-	HTML          bool     `help:"Treat --body as HTML"`
+	Subject         string   `help:"Event subject" required:"" short:"s"`
+	Start           string   `help:"Start time (ISO 8601)" required:""`
+	End             string   `help:"End time (ISO 8601)" required:""`
+	Calendar        string   `help:"Calendar ID (default calendar when omitted)"`
+	Location        string   `help:"Event location" short:"l"`
+	Attendees       []string `help:"Attendee email addresses" short:"a"`
+	AllDay          bool     `help:"All-day event"`
+	OnlineMeeting   bool     `help:"Create online meeting"`
+	Recurrence      string   `help:"Recurrence: daily|weekdays|weekly|monthly|yearly" short:"r"`
+	TransactionID   string   `help:"Retry-safe provider transaction ID" name:"transaction-id"`
+	NoReminder      bool     `help:"Disable event reminders" name:"no-reminder"`
+	ReminderMinutes *int32   `help:"Enable reminder this many minutes before the event" name:"reminder-minutes"`
+	Body            *string  `help:"Event body" short:"b"`
+	HTML            bool     `help:"Treat --body as HTML"`
 }
 
 func (c *CalendarCreateCmd) Run(ctx *RunContext) error {
+	reminderOn, err := calendarReminder(c.NoReminder, c.ReminderMinutes)
+	if err != nil {
+		return err
+	}
 	client, err := ctx.GraphClient()
 	if err != nil {
 		return err
@@ -214,22 +219,20 @@ func (c *CalendarCreateCmd) Run(ctx *RunContext) error {
 		if c.Calendar != "" {
 			fmt.Printf("  Calendar: %s\n", outfmt.Sanitize(c.Calendar))
 		}
+		if c.ReminderMinutes != nil {
+			fmt.Printf("  Reminder: %d minutes before start\n", *c.ReminderMinutes)
+		}
 		if c.Body != nil {
 			fmt.Printf("  Body: %s\n", outfmt.Sanitize(*c.Body))
 		}
 		return nil
 	}
 
-	var reminderOn *bool
-	if c.NoReminder {
-		v := false
-		reminderOn = &v
-	}
 	event, err := client.CreateEvent(ctx.Ctx, &graphapi.CreateEventOptions{
 		CalendarID: c.Calendar, Subject: c.Subject, Start: start, End: end,
 		Location: c.Location, Attendees: c.Attendees, IsAllDay: c.AllDay,
 		IsOnlineMeeting: c.OnlineMeeting, Recurrence: c.Recurrence,
-		TransactionID: c.TransactionID, ReminderOn: reminderOn, Body: body,
+		TransactionID: c.TransactionID, ReminderOn: reminderOn, ReminderMinutes: c.ReminderMinutes, Body: body,
 	})
 	if err != nil {
 		return err
@@ -243,20 +246,25 @@ func (c *CalendarCreateCmd) Run(ctx *RunContext) error {
 }
 
 type CalendarUpdateCmd struct {
-	ID         string  `arg:"" help:"Event ID"`
-	Subject    string  `help:"New subject" short:"s"`
-	Start      string  `help:"New start time (ISO 8601)"`
-	End        string  `help:"New end time (ISO 8601)"`
-	Location   string  `help:"New location" short:"l"`
-	AllDay     *bool   `help:"Convert event to an all-day event" name:"all-day"`
-	Timed      *bool   `help:"Convert event to a timed event"`
-	NoReminder bool    `help:"Disable event reminders" name:"no-reminder"`
-	Body       *string `help:"Replace event body" short:"b"`
-	HTML       bool    `help:"Treat --body as HTML"`
-	ClearBody  bool    `help:"Clear the event body" name:"clear-body"`
+	ID              string  `arg:"" help:"Event ID"`
+	Subject         string  `help:"New subject" short:"s"`
+	Start           string  `help:"New start time (ISO 8601)"`
+	End             string  `help:"New end time (ISO 8601)"`
+	Location        string  `help:"New location" short:"l"`
+	AllDay          *bool   `help:"Convert event to an all-day event" name:"all-day"`
+	Timed           *bool   `help:"Convert event to a timed event"`
+	NoReminder      bool    `help:"Disable event reminders" name:"no-reminder"`
+	ReminderMinutes *int32  `help:"Enable reminder this many minutes before the event" name:"reminder-minutes"`
+	Body            *string `help:"Replace event body" short:"b"`
+	HTML            bool    `help:"Treat --body as HTML"`
+	ClearBody       bool    `help:"Clear the event body" name:"clear-body"`
 }
 
 func (c *CalendarUpdateCmd) Run(ctx *RunContext) error {
+	reminderOn, err := calendarReminder(c.NoReminder, c.ReminderMinutes)
+	if err != nil {
+		return err
+	}
 	client, err := ctx.GraphClient()
 	if err != nil {
 		return err
@@ -310,11 +318,6 @@ func (c *CalendarUpdateCmd) Run(ctx *RunContext) error {
 	if allDay != nil && *allDay && (start == nil || end == nil || start.UTC().Hour() != 0 || start.UTC().Minute() != 0 || start.UTC().Second() != 0 || end.UTC().Hour() != 0 || end.UTC().Minute() != 0 || end.UTC().Second() != 0 || !end.After(*start)) {
 		return fmt.Errorf("all-day updates require --start and --end at midnight")
 	}
-	var reminderOn *bool
-	if c.NoReminder {
-		v := false
-		reminderOn = &v
-	}
 	var body *graphapi.EventBodyInput
 	if c.ClearBody {
 		body = &graphapi.EventBodyInput{}
@@ -323,7 +326,7 @@ func (c *CalendarUpdateCmd) Run(ctx *RunContext) error {
 	}
 	event, err := client.UpdateEvent(ctx.Ctx, &graphapi.UpdateEventOptions{
 		EventID: c.ID, Subject: subject, Start: start, End: end, Location: location,
-		AllDay: allDay, ReminderOn: reminderOn, Body: body,
+		AllDay: allDay, ReminderOn: reminderOn, ReminderMinutes: c.ReminderMinutes, Body: body,
 	})
 	if err != nil {
 		return err
@@ -331,6 +334,22 @@ func (c *CalendarUpdateCmd) Run(ctx *RunContext) error {
 
 	fmt.Printf("Event updated: %s\n", outfmt.Sanitize(event.Subject))
 	return nil
+}
+
+func calendarReminder(noReminder bool, minutes *int32) (*bool, error) {
+	if minutes != nil {
+		if noReminder {
+			return nil, fmt.Errorf("--no-reminder and --reminder-minutes are mutually exclusive")
+		}
+		if *minutes < 0 {
+			return nil, fmt.Errorf("--reminder-minutes must be nonnegative")
+		}
+	}
+	if noReminder || minutes != nil {
+		on := !noReminder
+		return &on, nil
+	}
+	return nil, nil
 }
 
 type CalendarDeleteCmd struct {

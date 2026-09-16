@@ -11,7 +11,7 @@ import (
 func TestListEventsPreservesProviderMetadataAndStructuredCalendarState(t *testing.T) {
 	client := testGraphClient(t, func(req *http.Request) *http.Response {
 		selectFields := req.URL.Query().Get("$select")
-		for _, field := range []string{"iCalUId", "changeKey", "type", "seriesMasterId", "originalStart", "isCancelled", "responseStatus", "body"} {
+		for _, field := range []string{"iCalUId", "changeKey", "type", "seriesMasterId", "originalStart", "isCancelled", "responseStatus", "body", "reminderMinutesBeforeStart"} {
 			if !strings.Contains(selectFields, field) {
 				t.Errorf("$select = %q, missing %q", selectFields, field)
 			}
@@ -22,6 +22,7 @@ func TestListEventsPreservesProviderMetadataAndStructuredCalendarState(t *testin
 		resp := graphJSONResponse(req, `{"value":[{
 			"id":"event-1","subject":"Planning","iCalUId":"ical-1","changeKey":"key-2",
 			"type":"exception","seriesMasterId":"master-1","originalStart":"2026-08-18T09:00:00Z",
+			"isReminderOn":true,"reminderMinutesBeforeStart":30,
 			"isCancelled":false,"body":{"contentType":"text","content":"Agenda"},
 			"attendees":[{"emailAddress":{"name":"Alex","address":"alex@example.com"},"type":"optional","status":{"response":"accepted","time":"2026-08-17T12:00:00Z"}}],
 			"responseStatus":{"response":"tentativelyAccepted","time":"2026-08-17T12:00:00Z"},
@@ -39,6 +40,9 @@ func TestListEventsPreservesProviderMetadataAndStructuredCalendarState(t *testin
 		t.Fatalf("event count = %d, want 1", len(events))
 	}
 	event := events[0]
+	if event.ReminderMinutes == nil || *event.ReminderMinutes != 30 {
+		t.Fatalf("reminder minutes = %v, want 30", event.ReminderMinutes)
+	}
 	if event.ICalUID != "ical-1" || event.ChangeKey != "key-2" || event.EventType != "exception" || event.SeriesMasterID != "master-1" {
 		t.Fatalf("provider metadata = %#v", event)
 	}
