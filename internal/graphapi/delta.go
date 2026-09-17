@@ -131,7 +131,7 @@ func (c *Client) DeltaCalendarView(ctx context.Context, target, token string, st
 	if token == "" {
 		s := start.UTC().Format(time.RFC3339)
 		e := end.UTC().Format(time.RFC3339)
-		qp := &users.ItemCalendarViewDeltaRequestBuilderGetQueryParameters{StartDateTime: &s, EndDateTime: &e, Select: []string{"id", "subject", "changeKey", "iCalUId", "type", "seriesMasterId", "originalStart", "isCancelled", "recurrence", "attendees", "responseStatus"}}
+		qp := &users.ItemCalendarViewDeltaRequestBuilderGetQueryParameters{StartDateTime: &s, EndDateTime: &e, Select: []string{"id", "subject", "changeKey", "iCalUId", "type", "seriesMasterId", "originalStart", "isCancelled", "recurrence", "attendees", "responseStatus", "isReminderOn", "reminderMinutesBeforeStart"}}
 		cfg := &users.ItemCalendarViewDeltaRequestBuilderGetRequestConfiguration{QueryParameters: qp, Headers: maxPageSizeHeaders(top)}
 		resp, err = c.targetUser(target).CalendarView().Delta().GetAsDeltaGetResponse(ctx, cfg)
 	} else {

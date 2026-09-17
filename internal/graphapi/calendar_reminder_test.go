@@ -76,3 +76,33 @@ func TestGetEventReminderJSON(t *testing.T) {
 		})
 	}
 }
+
+func TestDeltaCalendarViewSelectsReminderFields(t *testing.T) {
+	client := testGraphClient(t, func(req *http.Request) *http.Response {
+		selectFields := req.URL.Query().Get("$select")
+		for _, field := range []string{"isReminderOn", "reminderMinutesBeforeStart"} {
+			if !strings.Contains(selectFields, field) {
+				t.Errorf("$select = %q, missing %q", selectFields, field)
+			}
+		}
+		return graphJSONResponse(req, `{"value":[{"id":"event-id","isReminderOn":true,"reminderMinutesBeforeStart":0}],"@odata.deltaLink":"https://graph.microsoft.com/v1.0/me/calendarView/delta?$deltatoken=done"}`)
+	})
+
+	items, page, err := client.DeltaCalendarView(
+		context.Background(), "", "",
+		time.Date(2030, 1, 15, 0, 0, 0, 0, time.UTC),
+		time.Date(2030, 1, 16, 0, 0, 0, 0, time.UTC), 25,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 1 || items[0].ReminderMinutes == nil || *items[0].ReminderMinutes != 0 {
+		t.Fatalf("delta reminder minutes = %#v, want one event with zero minutes", items)
+	}
+	if items[0].IsReminderOn == nil || !*items[0].IsReminderOn {
+		t.Fatalf("delta reminder state = %#v, want enabled", items[0].IsReminderOn)
+	}
+	if !page.Complete {
+		t.Fatal("delta page should be complete")
+	}
+}
