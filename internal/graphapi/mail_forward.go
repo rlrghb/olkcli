@@ -123,7 +123,7 @@ func (c *Client) CreateForwardDraft(ctx context.Context, target, messageID strin
 		return &draft, nil
 	}
 
-	draft, err := c.finishHTMLReplyDraft(ctx, target, draftID, result, htmlOpts, forwardDraftKind)
+	draft, err := c.finishHTMLReplyDraft(ctx, target, messageID, draftID, result, htmlOpts, forwardDraftKind)
 	if err != nil {
 		return nil, c.cleanupFailedDraft(ctx, target, draftID, forwardDraftKind, err)
 	}

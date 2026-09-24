@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/microsoftgraph/msgraph-sdk-go/models"
 	"github.com/microsoftgraph/msgraph-sdk-go/users"
@@ -34,11 +35,16 @@ type InlineAttachmentInput struct {
 
 // CreateReplyDraftOptions carries the content and reply mode for a threaded
 // reply draft. InlineAttachments are supported only for HTML drafts.
+//
+// QuoteTimeLocation, when set, rewrites an HTML draft's quoted "Sent:" line
+// in that zone using Outlook on the web's layout; nil leaves Graph's UTC
+// rendering in place.
 type CreateReplyDraftOptions struct {
 	Body              string
 	ReplyAll          bool
 	IsHTML            bool
 	InlineAttachments []InlineAttachmentInput
+	QuoteTimeLocation *time.Location
 }
 
 const (
@@ -114,7 +120,7 @@ func (c *Client) CreateReplyDraft(ctx context.Context, target, messageID string,
 		return &draft, nil
 	}
 
-	draft, err := c.finishHTMLReplyDraft(ctx, target, draftID, result, opts, replyDraftKind)
+	draft, err := c.finishHTMLReplyDraft(ctx, target, messageID, draftID, result, opts, replyDraftKind)
 	if err != nil {
 		return nil, c.cleanupFailedDraft(ctx, target, draftID, replyDraftKind, err)
 	}
@@ -203,7 +209,7 @@ func (c *Client) createReplyDraft(
 
 func (c *Client) finishHTMLReplyDraft(
 	ctx context.Context,
-	target, draftID string,
+	target, messageID, draftID string,
 	created models.Messageable,
 	opts *CreateReplyDraftOptions,
 	kind string,
@@ -222,6 +228,17 @@ func (c *Client) finishHTMLReplyDraft(
 		}
 	}
 
+	// The quoted header is rewritten in Graph's generated body before the
+	// caller's fragment goes in, so a fragment that happens to contain the
+	// header markup can neither trigger the read nor be rewritten. The header
+	// sits after the body tag, so the insertion index is unaffected.
+	if opts.QuoteTimeLocation != nil && hasQuotedSentLine(generatedHTML) {
+		sent, err := c.messageSentTime(ctx, target, messageID)
+		if err != nil {
+			return nil, err
+		}
+		generatedHTML = rewriteQuotedSentLine(generatedHTML, sent.In(opts.QuoteTimeLocation))
+	}
 	combinedHTML := generatedHTML[:insertionIndex] + opts.Body + generatedHTML[insertionIndex:]
 	subject := outlookWebReplySubject(derefStr(generated.GetSubject()))
 	updated, err := c.patchReplyDraftHTML(ctx, target, draftID, subject, combinedHTML, kind)

@@ -119,8 +119,10 @@ folder.
 
 `mail reply --draft` uses Outlook's reply action to create a true threaded
 draft with quoted message history. HTML is inserted ahead of Outlook's
-generated history so formatting does not replace the quote. It returns the
-created draft and does not send it; use `--json` for a structured response.
+generated history so formatting does not replace the quote, and the quoted
+`Sent:` line is rewritten from UTC into the display time zone (`--tz`
+overrides it). It returns the created draft and does not send it; use
+`--json` for a structured response.
 Omit `--draft` to send the reply immediately.
 
 To edit an existing draft without sending it:

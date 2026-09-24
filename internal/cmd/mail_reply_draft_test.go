@@ -336,3 +336,81 @@ func mustJSONQuote(t *testing.T, value string) string {
 	}
 	return string(encoded)
 }
+
+func TestMailReplyDraftCommandWritesTheQuotedSentLineInTheDisplayZone(t *testing.T) {
+	generated := `<html><body><hr><div id="divRplyFwdMsg" dir="ltr"><font><b>From:</b> Maria<br>` +
+		`<b>Sent:</b> Monday, 14 September 2026 07:45:15<br><b>To:</b> Abe</font></div></body></html>`
+	wantCombined := `<html><body><p>Thanks</p><hr><div id="divRplyFwdMsg" dir="ltr"><font><b>From:</b> Maria<br>` +
+		`<b>Sent:</b> 14 September 2026 08:45<br><b>To:</b> Abe</font></div></body></html>`
+	call := 0
+
+	_, calls, err := runMailCommand(t, []string{"mail", "reply"}, []string{
+		"AAA", "--body", "<p>Thanks</p>", "--html", "--draft", "--tz", "Europe/London", "--mailbox", "team@example.com",
+	}, func(req *http.Request) *http.Response {
+		call++
+		switch call {
+		case 1:
+			if req.Method != http.MethodPost || req.URL.Path != "/v1.0/users/team@example.com/messages/AAA/createReply" {
+				t.Fatalf("create request = %s %s", req.Method, req.URL.Path)
+			}
+			return graphJSONResponse(req, `{"id":"draft-id","subject":"RE: Original subject","body":{"contentType":"html","content":`+mustJSONQuote(t, generated)+`}}`)
+		case 2:
+			if req.Method != http.MethodGet || req.URL.Path != "/v1.0/users/team@example.com/messages/AAA" {
+				t.Fatalf("original read = %s %s", req.Method, req.URL.Path)
+			}
+			if got := req.URL.Query().Get("$select"); got != "sentDateTime" {
+				t.Fatalf("original read $select = %q, want sentDateTime", got)
+			}
+			return graphJSONResponse(req, `{"id":"AAA","sentDateTime":"2026-09-14T07:45:15Z"}`)
+		case 3:
+			if req.Method != http.MethodPatch || req.URL.Path != "/v1.0/users/team@example.com/messages/draft-id" {
+				t.Fatalf("patch request = %s %s", req.Method, req.URL.Path)
+			}
+			var payload struct {
+				Body struct {
+					Content string `json:"content"`
+				} `json:"body"`
+			}
+			if err := decodeGraphJSON(req.Body, &payload); err != nil {
+				t.Fatalf("decode patch: %v", err)
+			}
+			if payload.Body.Content != wantCombined {
+				t.Fatalf("patched body =\n%s\nwant\n%s", payload.Body.Content, wantCombined)
+			}
+			return graphJSONResponse(req, `{"id":"draft-id","subject":"Re: Original subject"}`)
+		default:
+			t.Fatalf("unexpected Graph request %d: %s %s", call, req.Method, req.URL.Path)
+			return graphJSONResponse(req, `{}`)
+		}
+	})
+	if err != nil {
+		t.Fatalf("mail reply --html --draft: %v", err)
+	}
+	if calls != 3 {
+		t.Fatalf("Graph requests = %d, want 3", calls)
+	}
+}
+
+func TestMailReplyDraftCommandChecksTheTimeZoneOnlyForHTML(t *testing.T) {
+	_, calls, err := runMailCommand(t, []string{"mail", "reply"}, []string{
+		"AAA", "--body", "<p>Thanks</p>", "--html", "--draft", "--tz", "Invalid/Zone",
+	}, func(req *http.Request) *http.Response {
+		t.Fatalf("unexpected Graph request: %s %s", req.Method, req.URL.Path)
+		return nil
+	})
+	if err == nil || !strings.Contains(err.Error(), "Invalid/Zone") {
+		t.Fatalf("HTML draft error = %v, want the invalid zone named", err)
+	}
+	if calls != 0 {
+		t.Fatalf("Graph requests = %d, want 0", calls)
+	}
+
+	_, _, err = runMailCommand(t, []string{"mail", "reply"}, []string{
+		"AAA", "--body", "Thanks", "--draft", "--tz", "Invalid/Zone",
+	}, func(req *http.Request) *http.Response {
+		return graphJSONResponse(req, `{"id":"draft-id","subject":"RE: Original subject"}`)
+	})
+	if err != nil {
+		t.Fatalf("plain draft with an unused invalid zone: %v", err)
+	}
+}

@@ -98,10 +98,16 @@ not-found error that reads like a missing send permission.
 including Outlook's quoted history, and returns its draft ID and subject. For
 HTML drafts, `olk` inserts the supplied HTML ahead of that generated history
 instead of replacing it. It does not send; without `--draft`, replies retain
-their immediate-send behavior. Use `--json` for a structured draft response,
-which reports the `to`, `cc` and `bcc` lists Outlook returned for the draft.
-`mail drafts list --json` reports the same three lists; its table shows To and
-CC.
+instead of replacing it. Graph writes the quoted `Sent:` line in UTC with a
+weekday and seconds; HTML drafts rewrite it in the display time zone (`--tz`,
+`OLK_TIMEZONE`, config, or the local zone) in Outlook on the web's
+`14 September 2026 08:45` layout. That costs one extra read of the original
+message's `sentDateTime`. A `Sent:` line in any other layout is left as Graph
+wrote it. Use `--json` for a structured draft response. It does not send;
+without `--draft`, replies retain their immediate-send behavior. Use `--json`
+for a structured draft response, which reports the `to`, `cc` and `bcc` lists
+Outlook returned for the draft. `mail drafts list --json` reports the same
+three lists; its table shows To and CC.
 
 `mail forward --draft` does the same for a forward: Outlook generates the
 forwarded original, an HTML comment is inserted ahead of it, and the draft is
