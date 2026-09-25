@@ -47,6 +47,81 @@ func TestCreateEventIncludesBody(t *testing.T) {
 	}
 }
 
+func TestCreateAllDayEventPreservesNamedTimeZone(t *testing.T) {
+	client := testGraphClient(t, func(req *http.Request) *http.Response {
+		var payload struct {
+			Start struct {
+				DateTime string `json:"dateTime"`
+				TimeZone string `json:"timeZone"`
+			} `json:"start"`
+			End struct {
+				DateTime string `json:"dateTime"`
+				TimeZone string `json:"timeZone"`
+			} `json:"end"`
+			IsAllDay bool `json:"isAllDay"`
+		}
+		if err := json.NewDecoder(req.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode create payload: %v", err)
+		}
+		if !payload.IsAllDay || payload.Start.DateTime != "2026-11-01T00:00:00" || payload.End.DateTime != "2026-11-02T00:00:00" {
+			t.Errorf("all-day boundaries = %#v, want local midnight across DST boundary", payload)
+		}
+		if payload.Start.TimeZone != "America/Los_Angeles" || payload.End.TimeZone != payload.Start.TimeZone {
+			t.Errorf("boundary time zones = %q / %q, want America/Los_Angeles", payload.Start.TimeZone, payload.End.TimeZone)
+		}
+		return graphJSONResponse(req, `{"id":"event-id","isAllDay":true,"start":{"dateTime":"2026-11-01T00:00:00","timeZone":"America/Los_Angeles"},"end":{"dateTime":"2026-11-02T00:00:00","timeZone":"America/Los_Angeles"}}`)
+	})
+
+	start, err := time.Parse("2006-01-02", "2026-11-01")
+	if err != nil {
+		t.Fatal(err)
+	}
+	end, err := time.Parse("2006-01-02", "2026-11-02")
+	if err != nil {
+		t.Fatal(err)
+	}
+	event, err := client.CreateEvent(context.Background(), &CreateEventOptions{
+		Subject: "DST day", Start: start, End: end, IsAllDay: true, TimeZone: "America/Los_Angeles",
+	})
+	if err != nil {
+		t.Fatalf("CreateEvent() error = %v", err)
+	}
+	if event.StartTimeZone != "America/Los_Angeles" || event.EndTimeZone != "America/Los_Angeles" {
+		t.Fatalf("returned time zones = %q / %q", event.StartTimeZone, event.EndTimeZone)
+	}
+}
+
+func TestUpdateAllDayEventPreservesNamedTimeZone(t *testing.T) {
+	client := testGraphClient(t, func(req *http.Request) *http.Response {
+		var payload struct {
+			Start struct {
+				DateTime string `json:"dateTime"`
+				TimeZone string `json:"timeZone"`
+			} `json:"start"`
+			End struct {
+				DateTime string `json:"dateTime"`
+				TimeZone string `json:"timeZone"`
+			} `json:"end"`
+		}
+		if err := json.NewDecoder(req.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode update payload: %v", err)
+		}
+		if payload.Start.DateTime != "2026-03-08T00:00:00" || payload.End.DateTime != "2026-03-09T00:00:00" || payload.Start.TimeZone != "America/Los_Angeles" || payload.End.TimeZone != payload.Start.TimeZone {
+			t.Errorf("update boundaries = %#v, want local midnight in America/Los_Angeles", payload)
+		}
+		return graphJSONResponse(req, `{"id":"event-id"}`)
+	})
+	start, _ := time.Parse("2006-01-02", "2026-03-08")
+	end, _ := time.Parse("2006-01-02", "2026-03-09")
+	allDay := true
+	_, err := client.UpdateEvent(context.Background(), &UpdateEventOptions{
+		EventID: "event-id", Start: &start, End: &end, AllDay: &allDay, TimeZone: "America/Los_Angeles",
+	})
+	if err != nil {
+		t.Fatalf("UpdateEvent() error = %v", err)
+	}
+}
+
 func TestUpdateEventPreservesOnlineMeetingBody(t *testing.T) {
 	client := testGraphClient(t, func(req *http.Request) *http.Response {
 		if req.Method == http.MethodGet {

@@ -150,11 +150,11 @@ olk calendar get <ID> [--body-format text|html]
 olk calendar delta [--token TOKEN]
 olk calendar create --subject SUBJECT --start TIME --end TIME
   [--calendar ID] [--location LOCATION] [--attendees EMAIL]
-  [--all-day] [--online-meeting] [--transaction-id ID] [--no-reminder|--reminder-minutes N]
+  [--all-day] [--event-timezone IANA_ZONE] [--online-meeting] [--transaction-id ID] [--no-reminder|--reminder-minutes N]
   [--body BODY] [--html]
   [-r daily|weekdays|weekly|monthly|yearly]
 olk calendar update <ID> [--subject SUBJECT] [--start TIME] [--end TIME]
-  [--location LOCATION|none] [--all-day|--timed] [--no-reminder|--reminder-minutes N]
+  [--location LOCATION|none] [--all-day|--timed] [--event-timezone IANA_ZONE] [--no-reminder|--reminder-minutes N]
   [--body BODY] [--html] [--clear-body]
 olk calendar attachments list <EVENT_ID>
 olk calendar attachments add <EVENT_ID> <FILE>
@@ -172,6 +172,11 @@ state, structured attendee responses, and structured recurrence when Graph
 returns those fields. `createdDateTime` and `lastModifiedDateTime` may be
 unavailable on calendar-view endpoints because Graph does not support selecting
 them there.
+
+All-day event boundaries must be midnight, with the end date exclusive. Use
+`--event-timezone IANA_ZONE` on create or when updating with `--all-day` to send
+both boundaries at midnight in that zone. JSON event output includes
+`startTimeZone` and `endTimeZone` when Graph returns timezone metadata.
 
 `--reminder-minutes N` enables a reminder N minutes before the event (0 means
 at the start). It cannot be combined with `--no-reminder`, and N must be
