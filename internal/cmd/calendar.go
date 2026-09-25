@@ -144,8 +144,11 @@ func (c *CalendarGetCmd) Run(ctx *RunContext) error {
 
 	loc, _ := ctx.Timezone()
 	fmt.Printf("Subject:   %s\n", outfmt.Sanitize(event.Subject))
-	fmt.Printf("Start:     %s\n", outfmt.Sanitize(outfmt.ConvertTime(event.Start, loc)))
-	fmt.Printf("End:       %s\n", outfmt.Sanitize(outfmt.ConvertTime(event.End, loc)))
+	fmt.Printf("Start:     %s\n", outfmt.Sanitize(displayCalendarBoundary(event.Start, event.IsAllDay, loc)))
+	fmt.Printf("End:       %s\n", outfmt.Sanitize(displayCalendarBoundary(event.End, event.IsAllDay, loc)))
+	if event.IsAllDay && event.StartTimeZone != "" {
+		fmt.Printf("Time Zone: %s\n", outfmt.Sanitize(event.StartTimeZone))
+	}
 	fmt.Printf("Location:  %s\n", outfmt.Sanitize(event.Location))
 	fmt.Printf("Organizer: %s\n", outfmt.Sanitize(event.Organizer))
 	fmt.Printf("Status:    %s\n", outfmt.Sanitize(event.Status))
@@ -176,6 +179,7 @@ type CalendarCreateCmd struct {
 	Location        string   `help:"Event location" short:"l"`
 	Attendees       []string `help:"Attendee email addresses" short:"a"`
 	AllDay          bool     `help:"All-day event"`
+	EventTimeZone   string   `help:"Named time zone for all-day boundaries (e.g. America/Los_Angeles)" name:"event-timezone"`
 	OnlineMeeting   bool     `help:"Create online meeting"`
 	Recurrence      string   `help:"Recurrence: daily|weekdays|weekly|monthly|yearly" short:"r"`
 	TransactionID   string   `help:"Retry-safe provider transaction ID" name:"transaction-id"`
@@ -207,6 +211,12 @@ func (c *CalendarCreateCmd) Run(ctx *RunContext) error {
 	if !end.After(start) {
 		return fmt.Errorf("--end must be after --start")
 	}
+	if c.EventTimeZone != "" && !c.AllDay {
+		return fmt.Errorf("--event-timezone requires --all-day")
+	}
+	if c.AllDay && !calendarAllDayRange(start, end) {
+		return fmt.Errorf("all-day events require --start and --end at midnight with --end after --start")
+	}
 	var body *graphapi.EventBodyInput
 	if c.Body != nil {
 		body = &graphapi.EventBodyInput{Content: *c.Body, HTML: c.HTML}
@@ -230,7 +240,7 @@ func (c *CalendarCreateCmd) Run(ctx *RunContext) error {
 
 	event, err := client.CreateEvent(ctx.Ctx, &graphapi.CreateEventOptions{
 		CalendarID: c.Calendar, Subject: c.Subject, Start: start, End: end,
-		Location: c.Location, Attendees: c.Attendees, IsAllDay: c.AllDay,
+		Location: c.Location, Attendees: c.Attendees, IsAllDay: c.AllDay, TimeZone: c.EventTimeZone,
 		IsOnlineMeeting: c.OnlineMeeting, Recurrence: c.Recurrence,
 		TransactionID: c.TransactionID, ReminderOn: reminderOn, ReminderMinutes: c.ReminderMinutes, Body: body,
 	})
@@ -253,6 +263,7 @@ type CalendarUpdateCmd struct {
 	Location        string  `help:"New location" short:"l"`
 	AllDay          *bool   `help:"Convert event to an all-day event" name:"all-day"`
 	Timed           *bool   `help:"Convert event to a timed event"`
+	EventTimeZone   string  `help:"Named time zone for all-day boundaries (e.g. America/Los_Angeles)" name:"event-timezone"`
 	NoReminder      bool    `help:"Disable event reminders" name:"no-reminder"`
 	ReminderMinutes *int32  `help:"Enable reminder this many minutes before the event" name:"reminder-minutes"`
 	Body            *string `help:"Replace event body" short:"b"`
@@ -315,8 +326,11 @@ func (c *CalendarUpdateCmd) Run(ctx *RunContext) error {
 		v := false
 		allDay = &v
 	}
-	if allDay != nil && *allDay && (start == nil || end == nil || start.UTC().Hour() != 0 || start.UTC().Minute() != 0 || start.UTC().Second() != 0 || end.UTC().Hour() != 0 || end.UTC().Minute() != 0 || end.UTC().Second() != 0 || !end.After(*start)) {
-		return fmt.Errorf("all-day updates require --start and --end at midnight")
+	if c.EventTimeZone != "" && (allDay == nil || !*allDay) {
+		return fmt.Errorf("--event-timezone requires --all-day")
+	}
+	if allDay != nil && *allDay && (start == nil || end == nil || !calendarAllDayRange(*start, *end)) {
+		return fmt.Errorf("all-day updates require --start and --end at midnight with --end after --start")
 	}
 	var body *graphapi.EventBodyInput
 	if c.ClearBody {
@@ -326,7 +340,7 @@ func (c *CalendarUpdateCmd) Run(ctx *RunContext) error {
 	}
 	event, err := client.UpdateEvent(ctx.Ctx, &graphapi.UpdateEventOptions{
 		EventID: c.ID, Subject: subject, Start: start, End: end, Location: location,
-		AllDay: allDay, ReminderOn: reminderOn, ReminderMinutes: c.ReminderMinutes, Body: body,
+		AllDay: allDay, TimeZone: c.EventTimeZone, ReminderOn: reminderOn, ReminderMinutes: c.ReminderMinutes, Body: body,
 	})
 	if err != nil {
 		return err
@@ -334,6 +348,20 @@ func (c *CalendarUpdateCmd) Run(ctx *RunContext) error {
 
 	fmt.Printf("Event updated: %s\n", outfmt.Sanitize(event.Subject))
 	return nil
+}
+
+func calendarAllDayRange(start, end time.Time) bool {
+	return start.Hour() == 0 && start.Minute() == 0 && start.Second() == 0 && start.Nanosecond() == 0 &&
+		end.Hour() == 0 && end.Minute() == 0 && end.Second() == 0 && end.Nanosecond() == 0 && end.After(start)
+}
+
+func displayCalendarBoundary(value string, allDay bool, location *time.Location) string {
+	if allDay {
+		if t, err := time.Parse(time.RFC3339, value); err == nil {
+			return t.Format("2006-01-02")
+		}
+	}
+	return outfmt.ConvertTime(value, location)
 }
 
 func calendarReminder(noReminder bool, minutes *int32) (*bool, error) {

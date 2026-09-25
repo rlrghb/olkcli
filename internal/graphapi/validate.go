@@ -15,7 +15,8 @@ import (
 const graphTimeZoneUTC = "UTC"
 
 // graphDateTimeFormats are the layouts Microsoft Graph returns on dateTimeTimeZone.dateTime fields.
-// The values are UTC wall-clock times without a zone suffix, so we parse as UTC and re-emit as RFC3339.
+// These wall-clock strings omit a zone suffix, so this legacy normalization parses them as UTC and
+// re-emits RFC3339. Calendar output separately preserves the provider's start/end timezone metadata.
 var graphDateTimeFormats = []string{
 	"2006-01-02T15:04:05.0000000",
 	"2006-01-02T15:04:05.9999999",
@@ -26,9 +27,9 @@ var graphDateTimeFormats = []string{
 }
 
 // normalizeGraphUTC converts a Microsoft Graph dateTimeTimeZone.dateTime string to RFC3339 with a Z suffix.
-// Graph returns values like "2026-04-22T15:15:00.0000000" (UTC wall-clock, no zone), which JSON clients
-// misinterpret as local time. We always request timeZone=UTC, so it is safe to force Z here. Returns
-// the input unchanged if empty or unparseable.
+// Graph returns values like "2026-04-22T15:15:00.0000000" without a zone suffix. This preserves the
+// existing UTC-shaped output contract; calendar events also expose their provider timezone separately.
+// Returns the input unchanged if empty or unparseable.
 func normalizeGraphUTC(s string) string {
 	if s == "" {
 		return s
