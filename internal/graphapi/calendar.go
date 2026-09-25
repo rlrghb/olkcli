@@ -22,8 +22,8 @@ type CalendarEvent struct {
 	Subject           string               `json:"subject" untrusted:"true"`
 	Start             string               `json:"start"`
 	End               string               `json:"end"`
-	StartTimeZone     string               `json:"startTimeZone,omitempty"`
-	EndTimeZone       string               `json:"endTimeZone,omitempty"`
+	StartTimeZone     string               `json:"startTimeZone,omitempty" untrusted:"true"`
+	EndTimeZone       string               `json:"endTimeZone,omitempty" untrusted:"true"`
 	Location          string               `json:"location" untrusted:"true"`
 	Organizer         string               `json:"organizer" untrusted:"true"`
 	Attendees         []string             `json:"attendees,omitempty" untrusted:"true" concise:"omit"`
@@ -264,8 +264,7 @@ func (c *Client) CreateEvent(ctx context.Context, opts *CreateEventOptions) (*Ca
 	if opts.TimeZone != "" && !opts.IsAllDay {
 		return nil, fmt.Errorf("event time zone is only supported for all-day events")
 	}
-	location, err := eventTimeZone(opts.TimeZone)
-	if err != nil {
+	if err := validateEventTimeZone(opts.TimeZone); err != nil {
 		return nil, err
 	}
 	if opts.IsAllDay && !validAllDayRange(opts.Start, opts.End) {
@@ -275,7 +274,7 @@ func (c *Client) CreateEvent(ctx context.Context, opts *CreateEventOptions) (*Ca
 	event.SetSubject(&opts.Subject)
 
 	startDt := models.NewDateTimeTimeZone()
-	startStr := eventBoundary(opts.Start, opts.IsAllDay, location)
+	startStr := eventBoundary(opts.Start, opts.IsAllDay)
 	startDt.SetDateTime(&startStr)
 	timeZone := opts.TimeZone
 	if timeZone == "" {
@@ -285,7 +284,7 @@ func (c *Client) CreateEvent(ctx context.Context, opts *CreateEventOptions) (*Ca
 	event.SetStart(startDt)
 
 	endDt := models.NewDateTimeTimeZone()
-	endStr := eventBoundary(opts.End, opts.IsAllDay, location)
+	endStr := eventBoundary(opts.End, opts.IsAllDay)
 	endDt.SetDateTime(&endStr)
 	endDt.SetTimeZone(&timeZone)
 	event.SetEnd(endDt)
@@ -335,6 +334,7 @@ func (c *Client) CreateEvent(ctx context.Context, opts *CreateEventOptions) (*Ca
 	}
 
 	var created models.Eventable
+	var err error
 	if opts.CalendarID == "" {
 		created, err = c.inner.Me().Events().Post(ctx, event, nil)
 	} else {
@@ -360,8 +360,7 @@ func (c *Client) UpdateEvent(ctx context.Context, opts *UpdateEventOptions) (*Ca
 	if opts.TimeZone != "" && (opts.AllDay == nil || !*opts.AllDay) {
 		return nil, fmt.Errorf("event time zone is only supported when converting to an all-day event")
 	}
-	location, err := eventTimeZone(opts.TimeZone)
-	if err != nil {
+	if err := validateEventTimeZone(opts.TimeZone); err != nil {
 		return nil, err
 	}
 	if opts.AllDay != nil && *opts.AllDay && (opts.Start == nil || opts.End == nil || !validAllDayRange(*opts.Start, *opts.End)) {
@@ -375,7 +374,7 @@ func (c *Client) UpdateEvent(ctx context.Context, opts *UpdateEventOptions) (*Ca
 	if opts.Start != nil {
 		startDt := models.NewDateTimeTimeZone()
 		allDay := opts.AllDay != nil && *opts.AllDay
-		startStr := eventBoundary(*opts.Start, allDay, location)
+		startStr := eventBoundary(*opts.Start, allDay)
 		startDt.SetDateTime(&startStr)
 		timeZone := opts.TimeZone
 		if timeZone == "" {
@@ -387,7 +386,7 @@ func (c *Client) UpdateEvent(ctx context.Context, opts *UpdateEventOptions) (*Ca
 	if opts.End != nil {
 		endDt := models.NewDateTimeTimeZone()
 		allDay := opts.AllDay != nil && *opts.AllDay
-		endStr := eventBoundary(*opts.End, allDay, location)
+		endStr := eventBoundary(*opts.End, allDay)
 		endDt.SetDateTime(&endStr)
 		timeZone := opts.TimeZone
 		if timeZone == "" {
@@ -423,15 +422,14 @@ func (c *Client) UpdateEvent(ctx context.Context, opts *UpdateEventOptions) (*Ca
 	return &e, nil
 }
 
-func eventTimeZone(name string) (*time.Location, error) {
+func validateEventTimeZone(name string) error {
 	if name == "" {
-		return time.UTC, nil
+		return nil
 	}
-	location, err := time.LoadLocation(name)
-	if err != nil {
-		return nil, fmt.Errorf("invalid event time zone %q: %w", name, err)
+	if _, err := time.LoadLocation(name); err != nil {
+		return fmt.Errorf("invalid event time zone %q: %w", name, err)
 	}
-	return location, nil
+	return nil
 }
 
 func validAllDayRange(start, end time.Time) bool {
@@ -439,9 +437,11 @@ func validAllDayRange(start, end time.Time) bool {
 		end.Hour() == 0 && end.Minute() == 0 && end.Second() == 0 && end.Nanosecond() == 0 && end.After(start)
 }
 
-func eventBoundary(value time.Time, allDay bool, location *time.Location) string {
+func eventBoundary(value time.Time, allDay bool) string {
 	if allDay {
-		return time.Date(value.Year(), value.Month(), value.Day(), 0, 0, 0, 0, location).Format("2006-01-02T15:04:05")
+		// This is a wall-clock value paired with a separate Graph timeZone field.
+		// Formatting the date in UTC avoids normalizing midnight across timezone transitions.
+		return time.Date(value.Year(), value.Month(), value.Day(), 0, 0, 0, 0, time.UTC).Format("2006-01-02T15:04:05")
 	}
 	return value.UTC().Format("2006-01-02T15:04:05")
 }
