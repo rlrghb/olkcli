@@ -26,6 +26,7 @@ func resolveMailboxTarget(mailbox string) (string, error) {
 // buildMailFilter builds an OData filter string from common mail filter options
 func buildMailFilter(unread bool, from, after, before string) (string, error) {
 	var filters []string
+	var dateFilters []string
 
 	if unread {
 		filters = append(filters, "isRead eq false")
@@ -42,17 +43,19 @@ func buildMailFilter(unread bool, from, after, before string) (string, error) {
 		if canonical == "" {
 			return "", fmt.Errorf("invalid --after date %q: use ISO 8601 format (e.g. 2024-01-15 or 2024-01-15T09:00:00Z)", after)
 		}
-		filters = append(filters, fmt.Sprintf("receivedDateTime ge %s", canonical))
+		dateFilters = append(dateFilters, fmt.Sprintf("receivedDateTime ge %s", canonical))
 	}
 	if before != "" {
 		canonical := parseDateTime(before)
 		if canonical == "" {
 			return "", fmt.Errorf("invalid --before date %q: use ISO 8601 format (e.g. 2024-01-15 or 2024-01-15T09:00:00Z)", before)
 		}
-		filters = append(filters, fmt.Sprintf("receivedDateTime le %s", canonical))
+		dateFilters = append(dateFilters, fmt.Sprintf("receivedDateTime le %s", canonical))
 	}
 
-	return strings.Join(filters, " and "), nil
+	// Graph documents that sorted properties must precede other properties
+	// in $filter when the query also orders by receivedDateTime.
+	return strings.Join(append(dateFilters, filters...), " and "), nil
 }
 
 // parseDateTime validates and returns a canonical ISO 8601 string, or empty if invalid.

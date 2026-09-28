@@ -132,6 +132,11 @@ func (c *MailListCmd) Run(ctx *RunContext) error {
 	orderBy := mailListOrderBy(order)
 	if c.Focused || c.Other {
 		orderBy = ""
+	} else if filter != "" && c.After == "" && c.Before == "" {
+		// Follow Graph's documented $filter/$orderby contract for queries
+		// without a date bound. Some providers accept unread-only filters
+		// without this bound. The minimum avoids an arbitrary date cutoff.
+		filter = "receivedDateTime ge 0001-01-01T00:00:00Z and " + filter
 	}
 	folderID, err := client.ResolveMailFolderPath(ctx.Ctx, target, folder)
 	if err != nil {
