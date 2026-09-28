@@ -81,7 +81,7 @@ type MailFollowupFlag struct {
 // messageDetailSelect is the $select field set for a full single message (used by
 // GetMessage and the batch fetch) — includes the body and conversation id.
 var messageDetailSelect = []string{
-	"id", "subject", "from", "toRecipients", "ccRecipients", "bccRecipients",
+	"id", "subject", "from", "toRecipients", "ccRecipients", "bccRecipients", "replyTo",
 	"receivedDateTime", "isRead", "hasAttachments", "body", "bodyPreview", "conversationId",
 	"parentFolderId", "changeKey", "flag", "internetMessageId", "createdDateTime", "lastModifiedDateTime",
 }
