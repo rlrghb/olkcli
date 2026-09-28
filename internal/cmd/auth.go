@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -12,6 +13,28 @@ import (
 	"github.com/rlrghb/olkcli/internal/outfmt"
 	"github.com/rlrghb/olkcli/internal/secrets"
 )
+
+// loginTimeout bounds `olk auth login`. Microsoft device codes also last 900
+// seconds, and this budget starts before the code is requested, so it is
+// usually the timer that ends a device-code login nobody completes.
+const loginTimeout = 15 * time.Minute
+
+// errLoginTimedOut replaces a bare "context deadline exceeded" when the login
+// command's own time budget runs out before sign-in completes.
+var errLoginTimedOut = errors.New("sign-in was not completed within 15 minutes; run 'olk auth login' again")
+
+// explainLoginTimeout reports the device login budget running out in plain words.
+// Browser errors already include recovery advice and pass through unchanged,
+// as do code-expiry errors and deadlines unrelated to the command's budget.
+func explainLoginTimeout(loginCtx context.Context, err error, browser bool) error {
+	if browser {
+		return err
+	}
+	if errors.Is(err, context.DeadlineExceeded) && errors.Is(loginCtx.Err(), context.DeadlineExceeded) {
+		return errLoginTimedOut
+	}
+	return err
+}
 
 type AuthCmd struct {
 	Login  AuthLoginCmd  `cmd:"" help:"Login to a Microsoft account"`
@@ -65,7 +88,7 @@ func (c *AuthLoginCmd) Run(ctx *RunContext) error {
 	// Use a dedicated context for login — the global --timeout (default 60s)
 	// is too short for device-code flow which needs minutes for the user to
 	// open a browser and enter the code.
-	loginCtx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
+	loginCtx, cancel := context.WithTimeout(context.Background(), loginTimeout)
 	defer cancel()
 	var info *msauth.AccountInfo
 	if c.Browser {
@@ -74,7 +97,7 @@ func (c *AuthLoginCmd) Run(ctx *RunContext) error {
 		info, err = auth.LoginDeviceCode(loginCtx, scopes, ctx.Flags.Verbose)
 	}
 	if err != nil {
-		return err
+		return explainLoginTimeout(loginCtx, err, c.Browser)
 	}
 
 	// Save client config for this account

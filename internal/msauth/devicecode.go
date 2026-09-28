@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -76,6 +77,20 @@ type TokenResponse struct {
 	ExpiresIn    int    `json:"expires_in"`
 	TokenType    string `json:"token_type"`
 	Scope        string `json:"scope"`
+}
+
+// ErrDeviceCodeExpired is returned when the device code expires before the user
+// finishes signing in. Without it the caller sees a bare "context deadline
+// exceeded", which does not tell the user what happened or what to do next.
+var ErrDeviceCodeExpired = errors.New("the sign-in code expired before sign-in was completed; run 'olk auth login' again to get a new code")
+
+// pollStopped reports code expiry only when the code's own timer fired.
+// Earlier caller deadlines and explicit cancellation keep their original errors.
+func pollStopped(ctx context.Context) error {
+	if errors.Is(context.Cause(ctx), ErrDeviceCodeExpired) {
+		return ErrDeviceCodeExpired
+	}
+	return ctx.Err()
 }
 
 // ErrorResponse represents an OAuth2 error response.
@@ -186,7 +201,7 @@ func PollForToken(ctx context.Context, clientID, tenantID, deviceCode string, in
 	// Enforce a maximum polling duration based on the device code expiry.
 	if expiresIn > 0 {
 		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, time.Duration(expiresIn)*time.Second)
+		ctx, cancel = context.WithTimeoutCause(ctx, time.Duration(expiresIn)*time.Second, ErrDeviceCodeExpired)
 		defer cancel()
 	}
 
@@ -202,7 +217,7 @@ func PollForToken(ctx context.Context, clientID, tenantID, deviceCode string, in
 	for {
 		select {
 		case <-ctx.Done():
-			return nil, ctx.Err()
+			return nil, pollStopped(ctx)
 		case <-time.After(time.Duration(interval) * time.Second):
 		}
 
@@ -214,12 +229,20 @@ func PollForToken(ctx context.Context, clientID, tenantID, deviceCode string, in
 
 		resp, err := httpClient.Do(req)
 		if err != nil {
+			// A deadline or cancellation can interrupt a poll request;
+			// preserve its cause instead of reporting a transport failure.
+			if ctx.Err() != nil {
+				return nil, pollStopped(ctx)
+			}
 			return nil, fmt.Errorf("polling for token: %w", err)
 		}
 
 		body, err := io.ReadAll(io.LimitReader(resp.Body, 100<<10)) // 100 KB limit for OAuth responses
 		resp.Body.Close()
 		if err != nil {
+			if ctx.Err() != nil {
+				return nil, pollStopped(ctx)
+			}
 			return nil, fmt.Errorf("reading token response: %w", err)
 		}
 
@@ -234,6 +257,9 @@ func PollForToken(ctx context.Context, clientID, tenantID, deviceCode string, in
 				case "authorization_pending":
 					// User hasn't completed auth yet; keep polling.
 					continue
+				case "expired_token":
+					// RFC 8628 section 3.5: the device code has expired.
+					return nil, ErrDeviceCodeExpired
 				case "slow_down":
 					// Server asks us to slow down; increase interval.
 					interval += 5
