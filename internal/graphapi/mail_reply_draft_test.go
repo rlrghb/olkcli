@@ -74,7 +74,7 @@ func TestCreateReplyDraftRoutesFormatsAndPreservesHistory(t *testing.T) {
 						if err := json.NewDecoder(req.Body).Decode(&payload); err != nil {
 							t.Fatalf("decode create reply request: %v", err)
 						}
-						if payload.Comment == nil || *payload.Comment != tc.content {
+						if payload.Comment == nil || *payload.Comment != plainTextHTML(tc.content) {
 							t.Errorf("comment = %v, want exact %q", payload.Comment, tc.content)
 						}
 						if payload.Message != nil {
@@ -279,7 +279,7 @@ func TestCreateReplyDraftCapabilityGuards(t *testing.T) {
 		t.Fatalf("CreateReplyDraft Graph requests under --no-send = %d, want 1", calls)
 	}
 
-	if err := noSend.ReplyMessage(ctx, "", "AAA", "Thanks", false, false); !errors.Is(err, ErrNoSend) {
+	if err := noSend.ReplyMessage(ctx, "", "AAA", &ReplyOptions{Body: "Thanks"}); !errors.Is(err, ErrNoSend) {
 		t.Fatalf("immediate ReplyMessage under --no-send = %v, want ErrNoSend", err)
 	}
 }

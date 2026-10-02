@@ -75,7 +75,7 @@ func TestNoSendGuardBlocksSends(t *testing.T) {
 		call func() error
 	}{
 		{"SendMessage", func() error { return c.SendMessage(ctx, "", &SendMessageOptions{Subject: "s", Body: "b"}) }},
-		{"ReplyMessage", func() error { return c.ReplyMessage(ctx, "", "id", "c", false, false) }},
+		{"ReplyMessage", func() error { return c.ReplyMessage(ctx, "", "id", &ReplyOptions{Body: "c"}) }},
 		{"ForwardMessage", func() error {
 			return c.ForwardMessage(ctx, "", "id", &ForwardOptions{To: []string{"a@b.com"}, Comment: "c", IsHTML: false})
 		}},

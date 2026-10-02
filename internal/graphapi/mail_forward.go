@@ -13,32 +13,47 @@ import (
 type ForwardOptions struct {
 	To      []string
 	Cc      []string
+	Bcc     []string
 	Comment string
 	IsHTML  bool
 }
 
-func forwardRecipients(opts *ForwardOptions) (to, cc []models.Recipientable, err error) {
+type forwardRecipientLists struct {
+	to, cc, bcc []models.Recipientable
+}
+
+func (r forwardRecipientLists) copied() bool {
+	return len(r.cc) > 0 || len(r.bcc) > 0
+}
+
+func forwardRecipients(opts *ForwardOptions) (forwardRecipientLists, error) {
+	var lists forwardRecipientLists
 	if opts == nil {
-		return nil, nil, fmt.Errorf("forward options are required")
+		return lists, fmt.Errorf("forward options are required")
 	}
-	to, err = makeRecipients(opts.To)
-	if err != nil {
-		return nil, nil, fmt.Errorf("invalid forward recipient: %w", err)
+	var err error
+	if lists.to, err = makeRecipients(opts.To); err != nil {
+		return lists, fmt.Errorf("invalid forward recipient: %w", err)
 	}
-	cc, err = makeRecipients(opts.Cc)
-	if err != nil {
-		return nil, nil, fmt.Errorf("invalid forward cc recipient: %w", err)
+	if lists.cc, err = makeRecipients(opts.Cc); err != nil {
+		return lists, fmt.Errorf("invalid forward cc recipient: %w", err)
 	}
-	return to, cc, nil
+	if lists.bcc, err = makeRecipients(opts.Bcc); err != nil {
+		return lists, fmt.Errorf("invalid forward bcc recipient: %w", err)
+	}
+	return lists, nil
 }
 
 // forwardRecipientMessage carries the recipients inside the message payload,
 // which is where Graph's documented forward examples put them once a message
 // object is present at all.
-func forwardRecipientMessage(message models.Messageable, to, cc []models.Recipientable) models.Messageable {
-	message.SetToRecipients(to)
-	if len(cc) > 0 {
-		message.SetCcRecipients(cc)
+func forwardRecipientMessage(message models.Messageable, recipients forwardRecipientLists) models.Messageable {
+	message.SetToRecipients(recipients.to)
+	if len(recipients.cc) > 0 {
+		message.SetCcRecipients(recipients.cc)
+	}
+	if len(recipients.bcc) > 0 {
+		message.SetBccRecipients(recipients.bcc)
 	}
 	return message
 }
@@ -54,21 +69,24 @@ func (c *Client) ForwardMessage(ctx context.Context, target, messageID string, o
 	if err := validateID(messageID, "message ID"); err != nil {
 		return err
 	}
-	to, cc, err := forwardRecipients(opts)
+	recipients, err := forwardRecipients(opts)
 	if err != nil {
 		return err
 	}
 	comment := opts.Comment
+	if !opts.IsHTML {
+		comment = plainTextHTML(comment)
+	}
 	body := users.NewItemMessagesItemForwardPostRequestBody()
 	switch {
 	case opts.IsHTML:
-		body.SetMessage(forwardRecipientMessage(htmlMessageBody(comment), to, cc))
-	case len(cc) > 0:
+		body.SetMessage(forwardRecipientMessage(htmlMessageBody(comment), recipients))
+	case recipients.copied():
 		body.SetComment(&comment)
-		body.SetMessage(forwardRecipientMessage(models.NewMessage(), to, cc))
+		body.SetMessage(forwardRecipientMessage(models.NewMessage(), recipients))
 	default:
 		body.SetComment(&comment)
-		body.SetToRecipients(to)
+		body.SetToRecipients(recipients.to)
 	}
 
 	err = c.targetUser(target).Messages().ByMessageId(messageID).Forward().Post(ctx, body, nil)
@@ -92,7 +110,7 @@ func (c *Client) CreateForwardDraft(ctx context.Context, target, messageID strin
 	if err := validateID(messageID, "message ID"); err != nil {
 		return nil, err
 	}
-	to, cc, err := forwardRecipients(opts)
+	recipients, err := forwardRecipients(opts)
 	if err != nil {
 		return nil, err
 	}
@@ -102,9 +120,9 @@ func (c *Client) CreateForwardDraft(ctx context.Context, target, messageID strin
 	}
 
 	body := users.NewItemMessagesItemCreateForwardPostRequestBody()
-	body.SetMessage(forwardRecipientMessage(models.NewMessage(), to, cc))
+	body.SetMessage(forwardRecipientMessage(models.NewMessage(), recipients))
 	if !opts.IsHTML {
-		comment := opts.Comment
+		comment := plainTextHTML(opts.Comment)
 		body.SetComment(&comment)
 	}
 	result, err := c.targetUser(target).Messages().ByMessageId(messageID).CreateForward().Post(ctx, body, nil)

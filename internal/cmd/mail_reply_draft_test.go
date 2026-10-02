@@ -25,17 +25,17 @@ func TestMailReplyDraftCommandPlainRoutesAndReportsDraft(t *testing.T) {
 		wantOutput  string
 	}{
 		{
-			name:        "plain reply in own mailbox",
-			args:        []string{"AAA", "--body", "Thanks", "--draft"},
+			name:        "plain reply in own mailbox without reading original",
+			args:        []string{"AAA", "--body", "Thanks\n\n  indented", "--draft"},
 			wantPath:    "/v1.0/me/messages/AAA/createReply",
-			wantComment: "Thanks",
+			wantComment: "<div>Thanks</div><div><br></div><div>&nbsp;&nbsp;indented</div>",
 			wantOutput:  "Reply draft created in your own mailbox: Re: Original subject (ID: draft-id)\n",
 		},
 		{
-			name:        "plain reply-all in delegated mailbox",
+			name:        "plain reply-all in delegated mailbox without reading original",
 			args:        []string{"AAA", "--body", "Thanks all", "--reply-all", "--draft", "--mailbox", "team@example.com"},
 			wantPath:    "/v1.0/users/team@example.com/messages/AAA/createReplyAll",
-			wantComment: "Thanks all",
+			wantComment: "<div>Thanks all</div>",
 			wantOutput:  "Reply-all draft created in team@example.com: Re: Original subject (ID: draft-id)\n",
 		},
 	}
@@ -62,7 +62,7 @@ func TestMailReplyDraftCommandPlainRoutesAndReportsDraft(t *testing.T) {
 				t.Fatalf("mail reply --draft: %v", err)
 			}
 			if calls != 1 {
-				t.Fatalf("Graph requests = %d, want 1", calls)
+				t.Fatalf("Graph requests = %d, want only the draft creation", calls)
 			}
 			if output != tc.wantOutput {
 				t.Fatalf("output = %q, want %q", output, tc.wantOutput)
@@ -84,7 +84,7 @@ func TestMailReplyDraftCommandJSONOutputsTheDraft(t *testing.T) {
 		t.Fatalf("mail reply --draft --json: %v", err)
 	}
 	if calls != 1 {
-		t.Fatalf("Graph requests = %d, want 1", calls)
+		t.Fatalf("Graph requests = %d, want only the draft creation", calls)
 	}
 	var envelope struct {
 		Results struct {
@@ -412,5 +412,28 @@ func TestMailReplyDraftCommandChecksTheTimeZoneOnlyForHTML(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("plain draft with an unused invalid zone: %v", err)
+	}
+}
+
+func TestMailReplyCommandAddedRecipients(t *testing.T) {
+	noRequests := func(req *http.Request) *http.Response {
+		t.Fatalf("unexpected Graph request %s %s", req.Method, req.URL.Path)
+		return nil
+	}
+	output, _, err := runMailCommand(t, []string{"mail", "reply"}, []string{
+		"AAA", "--body", "Thanks", "--reply-all", "--cc", "a@example.com", "--bcc", "b@example.com", "--dry-run",
+	}, noRequests)
+	if err != nil {
+		t.Fatalf("mail reply --dry-run: %v", err)
+	}
+	if !strings.Contains(output, "Add Cc: a@example.com") || !strings.Contains(output, "Add Bcc: b@example.com") {
+		t.Errorf("dry-run output = %q, want the added Cc and Bcc", output)
+	}
+
+	_, calls, err := runMailCommand(t, []string{"mail", "reply"}, []string{
+		"AAA", "--body", "Thanks", "--draft", "--cc", "not-an-address",
+	}, noRequests)
+	if err == nil || calls != 0 {
+		t.Fatalf("invalid --cc: error %v after %d requests, want a refusal before any request", err, calls)
 	}
 }

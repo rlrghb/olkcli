@@ -77,13 +77,13 @@ olk mail send --to a@b.com --subject "Urgent" --body "ASAP" --importance high
 olk mail send --to a@b.com --subject "Contract" --body "Please review" --read-receipt
 olk mail search "from:boss@co.com subject:urgent" [-n 25]                 # KQL
 olk mail thread <CONVERSATION_ID> [--top 50 | --complete]               # one conversation
-olk mail reply <ID> --body "Thanks" [--reply-all] [--html]
+olk mail reply <ID> --body "Thanks" [--reply-all] [--html] [--cc a@b.com] [--bcc c@d.com]
 olk mail reply <ID> --body "<p>Thanks</p>" --html
 olk mail reply <ID> --body "Thanks" --draft
 olk mail reply <ID> --body '<p>Thanks</p>' --html --draft
 olk mail reply <ID> --body '<p>Thanks all</p>' --reply-all --html --draft
 olk mail reply <ID> --body '<p><img src="cid:steps"></p>' --html --draft --inline steps=steps.png
-olk mail forward <ID> --to a@b.com [--cc c@d.com] [--comment "FYI"] [--html] [--draft]
+olk mail forward <ID> --to a@b.com [--cc c@d.com] [--bcc e@f.com] [--comment "FYI"] [--html] [--draft]
 olk mail forward <ID> --to a@b.com --comment "<p>FYI</p>" --html
 olk mail forward <ID> --to a@b.com --cc c@d.com --comment "<p>FYI</p>" --html --draft
 olk mail move <ID> <FOLDER_ID_OR_PATH>                                 # e.g. Inbox/2026
@@ -124,6 +124,11 @@ generated history so formatting does not replace the quote, and the quoted
 overrides it). It returns the created draft and does not send it; use
 `--json` for a structured response.
 Omit `--draft` to send the reply immediately.
+
+A plain `--body` keeps its paragraphs and line breaks when replying to an HTML
+message; there is no need to convert it to HTML first. `--cc` and `--bcc` add
+to the recipients Outlook generates for a reply or reply-all rather than
+replacing them.
 
 To edit an existing draft without sending it:
 

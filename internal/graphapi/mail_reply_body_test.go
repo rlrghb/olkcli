@@ -38,7 +38,7 @@ func TestReplyAndForwardBodyFormats(t *testing.T) {
 			name: "plain reply keeps comment payload",
 			path: "/reply",
 			call: func(c *Client) error {
-				return c.ReplyMessage(context.Background(), "", "message-id", "Reply body", false, false)
+				return c.ReplyMessage(context.Background(), "", "message-id", &ReplyOptions{Body: "Reply body"})
 			},
 		},
 		{
@@ -46,7 +46,7 @@ func TestReplyAndForwardBodyFormats(t *testing.T) {
 			path: "/reply",
 			html: true,
 			call: func(c *Client) error {
-				return c.ReplyMessage(context.Background(), "", "message-id", "<p>Reply body</p>", false, true)
+				return c.ReplyMessage(context.Background(), "", "message-id", &ReplyOptions{Body: "<p>Reply body</p>", IsHTML: true})
 			},
 		},
 		{
@@ -54,7 +54,7 @@ func TestReplyAndForwardBodyFormats(t *testing.T) {
 			path: "/replyAll",
 			html: true,
 			call: func(c *Client) error {
-				return c.ReplyMessage(context.Background(), "", "message-id", "<p>Reply body</p>", true, true)
+				return c.ReplyMessage(context.Background(), "", "message-id", &ReplyOptions{Body: "<p>Reply body</p>", ReplyAll: true, IsHTML: true})
 			},
 		},
 		{
@@ -107,7 +107,7 @@ func TestReplyAndForwardBodyFormats(t *testing.T) {
 					t.Errorf("body content = %q, want HTML input", got)
 				}
 			} else {
-				if payload.Comment == nil || *payload.Comment != "Reply body" {
+				if payload.Comment == nil || *payload.Comment != "<div>Reply body</div>" {
 					t.Errorf("plain comment = %v, want Reply body", payload.Comment)
 				}
 				if payload.Message != nil {
