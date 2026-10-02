@@ -377,6 +377,11 @@ func (c *ContactsUpdateCmd) Run(ctx *RunContext) error {
 			in.Categories = &c.Categories
 		}
 	}
+	// A dry run stops before the address read below as well as before the write.
+	if ctx.Flags.DryRun {
+		fmt.Printf("Would update contact %s%s\n", outfmt.Sanitize(c.ID), mailboxSuffix("in", target))
+		return nil
+	}
 	if c.Street != "" || c.City != "" || c.State != "" || c.PostalCode != "" || c.Country != "" {
 		// Read-modify-write: fetch existing address, merge provided fields,
 		// so unspecified fields are preserved. 'none' clears individual parts.
@@ -462,6 +467,11 @@ func (c *ContactsDeleteCmd) Run(ctx *RunContext) error {
 
 	if !ctx.Flags.Force {
 		return fmt.Errorf("delete contact %s: use --force to confirm deletion", outfmt.Sanitize(c.ID))
+	}
+
+	if ctx.Flags.DryRun {
+		fmt.Printf("Would delete contact %s%s\n", outfmt.Sanitize(c.ID), mailboxSuffix("in", target))
+		return nil
 	}
 
 	err = client.DeleteContact(ctx.Ctx, target, c.ID)

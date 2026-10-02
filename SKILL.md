@@ -491,6 +491,7 @@ export OLK_MAILBOX=boss@example.com
 
 - The target must have granted **Full Access** via M365 Admin Center → Mailbox permissions; the calling token must carry the matching `.Shared` scope.
 - Every mailbox-scoped write honours it. A dry run names the mailbox it would act on.
+- `--dry-run` previews every mail, calendar, contact and To Do write. Builds without `mailbox.dry-run-all-writes-v1` in `olk version --json` perform `mail mark`, `mail rules delete`, `mail ooo off`, `calendar update|delete|respond` and `contacts update|delete` even when it is passed.
 
 ## Shortcuts
 

@@ -39,7 +39,7 @@ type mailboxScopedCommand struct {
 // user's own mailbox whatever --mailbox said. Each must now send every request
 // to the mailbox it was given.
 var mailboxScopedCommands = []mailboxScopedCommand{
-	{path: []string{"mail", "mark"}, args: []string{"message-id", "--read"}},
+	{path: []string{"mail", "mark"}, args: []string{"message-id", "--read"}, dryRun: true},
 	{path: []string{"mail", "flag"}, args: []string{"message-id", "flagged"}, dryRun: true},
 	{path: []string{"mail", "categorize"}, args: []string{"message-id", "--categories", "green"}, dryRun: true},
 	{path: []string{"mail", "importance"}, args: []string{"message-id", "high"}, dryRun: true},
@@ -49,13 +49,13 @@ var mailboxScopedCommands = []mailboxScopedCommand{
 		args:   []string{"--name", "Rule", "--from", "sender@example.com", "--mark-read"},
 		dryRun: true,
 	},
-	{path: []string{"mail", "rules", "delete"}, args: []string{"rule-id", "--force"}},
+	{path: []string{"mail", "rules", "delete"}, args: []string{"rule-id", "--force"}, dryRun: true},
 	{path: []string{"mail", "categories", "list"}},
 	{path: []string{"mail", "categories", "create"}, args: []string{"--name", "Green"}, dryRun: true},
 	{path: []string{"mail", "categories", "delete"}, args: []string{"category-id", "--force"}, dryRun: true},
 	{path: []string{"mail", "ooo", "get"}},
 	{path: []string{"mail", "ooo", "set"}, args: []string{"--message", "Away"}, dryRun: true},
-	{path: []string{"mail", "ooo", "off"}},
+	{path: []string{"mail", "ooo", "off"}, dryRun: true},
 
 	{
 		path:   []string{"calendar", "create"},
@@ -69,14 +69,15 @@ var mailboxScopedCommands = []mailboxScopedCommand{
 			"--calendar", "calendar-id",
 		},
 	},
-	{path: []string{"calendar", "update"}, args: []string{"event-id", "--subject", "Review"}},
+	{path: []string{"calendar", "update"}, args: []string{"event-id", "--subject", "Review"}, dryRun: true},
 	{
 		path:     []string{"calendar", "update"},
 		args:     []string{"event-id", "--body", "Agenda"},
 		response: scopeEventResponse,
+		dryRun:   true,
 	},
-	{path: []string{"calendar", "delete"}, args: []string{"event-id", "--force"}},
-	{path: []string{"calendar", "respond"}, args: []string{"event-id", "accept"}},
+	{path: []string{"calendar", "delete"}, args: []string{"event-id", "--force"}, dryRun: true},
+	{path: []string{"calendar", "respond"}, args: []string{"event-id", "accept"}, dryRun: true},
 	{path: []string{"calendar", "attachments", "list"}, args: []string{"event-id"}},
 	{
 		path:   []string{"calendar", "attachments", "add"},
@@ -99,9 +100,9 @@ var mailboxScopedCommands = []mailboxScopedCommand{
 		args:   []string{"--first-name", "Sample", "--last-name", "Contact"},
 		dryRun: true,
 	},
-	{path: []string{"contacts", "update"}, args: []string{"contact-id", "--company", "Example"}},
-	{path: []string{"contacts", "update"}, args: []string{"contact-id", "--city", "London"}},
-	{path: []string{"contacts", "delete"}, args: []string{"contact-id", "--force"}},
+	{path: []string{"contacts", "update"}, args: []string{"contact-id", "--company", "Example"}, dryRun: true},
+	{path: []string{"contacts", "update"}, args: []string{"contact-id", "--city", "London"}, dryRun: true},
+	{path: []string{"contacts", "delete"}, args: []string{"contact-id", "--force"}, dryRun: true},
 
 	{path: []string{"todo", "lists", "list"}},
 	{path: []string{"todo", "lists", "create"}, args: []string{"--name", "Work"}, dryRun: true},
@@ -201,9 +202,24 @@ func runScopedCommand(
 	extra ...string,
 ) (paths []string, output string, err error) {
 	t.Helper()
+	requests, output, err := runScopedCommandRequests(t, c, extra...)
+	for _, req := range requests {
+		paths = append(paths, req.URL.Path)
+	}
+	return paths, output, err
+}
+
+// runScopedCommandRequests runs the command and returns every Graph request it
+// made.
+func runScopedCommandRequests(
+	t *testing.T,
+	c mailboxScopedCommand,
+	extra ...string,
+) (requests []*http.Request, output string, err error) {
+	t.Helper()
 	args := append(c.resolvedArgs(t), extra...)
 	output, _, err = runMailCommand(t, c.path, args, func(req *http.Request) *http.Response {
-		paths = append(paths, req.URL.Path)
+		requests = append(requests, req)
 		if req.Method == http.MethodDelete {
 			return graphNoContentResponse(req)
 		}
@@ -218,7 +234,7 @@ func runScopedCommand(
 		}
 		return response
 	})
-	return paths, output, err
+	return requests, output, err
 }
 
 // A command that ignores --mailbox acts on the signed-in user's own mailbox and
@@ -282,6 +298,25 @@ func TestMailboxScopedDryRunsNameTheMailbox(t *testing.T) {
 			}
 			if !strings.Contains(output, "shared@example.com") {
 				t.Errorf("dry run output %q does not name the mailbox", output)
+			}
+		})
+	}
+}
+
+// The table marks which commands preview a write. This covers the rest of it: a
+// command added without that mark, or one that loses its check, must still
+// change nothing when --dry-run is passed.
+func TestMailboxScopedDryRunsNeverWrite(t *testing.T) {
+	for _, command := range mailboxScopedCommands {
+		t.Run(command.name(), func(t *testing.T) {
+			requests, _, err := runScopedCommandRequests(t, command, "--dry-run")
+			if err != nil {
+				t.Fatalf("dry run: %v", err)
+			}
+			for _, req := range requests {
+				if req.Method != http.MethodGet {
+					t.Errorf("dry run sent %s %s", req.Method, req.URL.Path)
+				}
 			}
 		})
 	}

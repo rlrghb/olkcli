@@ -347,6 +347,11 @@ func (c *CalendarUpdateCmd) Run(ctx *RunContext) error {
 	} else if c.Body != nil {
 		body = &graphapi.EventBodyInput{Content: *c.Body, HTML: c.HTML}
 	}
+	if ctx.Flags.DryRun {
+		fmt.Printf("Would update event %s%s\n", outfmt.Sanitize(c.ID), mailboxSuffix("in", target))
+		return nil
+	}
+
 	event, err := client.UpdateEvent(ctx.Ctx, target, &graphapi.UpdateEventOptions{
 		EventID: c.ID, Subject: subject, Start: start, End: end, Location: location,
 		AllDay: allDay, TimeZone: c.EventTimeZone, ReminderOn: reminderOn, ReminderMinutes: c.ReminderMinutes, Body: body,
@@ -407,6 +412,11 @@ func (c *CalendarDeleteCmd) Run(ctx *RunContext) error {
 		return fmt.Errorf("delete event %s: use --force to confirm deletion", outfmt.Sanitize(c.ID))
 	}
 
+	if ctx.Flags.DryRun {
+		fmt.Printf("Would delete event %s%s\n", outfmt.Sanitize(c.ID), mailboxSuffix("in", target))
+		return nil
+	}
+
 	err = client.DeleteEvent(ctx.Ctx, target, c.ID)
 	if err != nil {
 		return err
@@ -429,6 +439,11 @@ func (c *CalendarRespondCmd) Run(ctx *RunContext) error {
 	client, err := ctx.GraphClient()
 	if err != nil {
 		return err
+	}
+
+	if ctx.Flags.DryRun {
+		fmt.Printf("Would respond '%s' to event %s%s\n", c.Response, outfmt.Sanitize(c.ID), mailboxSuffix("in", target))
+		return nil
 	}
 
 	err = client.RespondToEvent(ctx.Ctx, target, c.ID, c.Response)

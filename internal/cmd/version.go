@@ -40,6 +40,7 @@ var advertisedCapabilities = []string{
 	"mail.get.eml-v1",
 	"mcp.delegated-mailbox-v1",
 	"mailbox.target-all-scoped-commands-v1",
+	"mailbox.dry-run-all-writes-v1",
 }
 
 func (c *VersionCmd) Run(ctx *RunContext) error {

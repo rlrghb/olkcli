@@ -144,6 +144,11 @@ func (c *MailOOOOffCmd) Run(ctx *RunContext) error {
 		return err
 	}
 
+	if ctx.Flags.DryRun {
+		fmt.Printf("Would disable auto-reply%s\n", mailboxSuffix("in", target))
+		return nil
+	}
+
 	err = client.SetAutoReply(ctx.Ctx, target, "disabled", "", "", "", "", "")
 	if err != nil {
 		return err

@@ -1,6 +1,10 @@
 package cmd
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/rlrghb/olkcli/internal/outfmt"
+)
 
 type MailMarkCmd struct {
 	ID     string `arg:"" help:"Message ID"`
@@ -22,15 +26,20 @@ func (c *MailMarkCmd) Run(ctx *RunContext) error {
 		return err
 	}
 
+	state := "unread"
+	if c.Read {
+		state = "read"
+	}
+	if ctx.Flags.DryRun {
+		fmt.Printf("Would mark message %s as %s%s\n", outfmt.Sanitize(c.ID), state, mailboxSuffix("in", target))
+		return nil
+	}
+
 	err = client.MarkMessage(ctx.Ctx, target, c.ID, c.Read)
 	if err != nil {
 		return err
 	}
 
-	if c.Read {
-		fmt.Println("Marked as read.")
-	} else {
-		fmt.Println("Marked as unread.")
-	}
+	fmt.Printf("Marked as %s.\n", state)
 	return nil
 }

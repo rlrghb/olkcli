@@ -101,6 +101,12 @@ to work in your own mailbox. See
 [authentication](authentication.md) for the scope each family needs, and for the
 families Microsoft does not document for another mailbox.
 
+`--dry-run` previews every write in these families and sends no write request.
+Earlier releases ignored it for `mail mark`, `mail rules delete`, `mail ooo off`,
+`calendar update`, `calendar delete`, `calendar respond`, `contacts update` and
+`contacts delete`, and performed the write. `olk version --json` lists
+`mailbox.dry-run-all-writes-v1` when the installed build previews all of them.
+
 To edit an existing draft without sending it:
 
 ```bash

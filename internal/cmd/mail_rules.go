@@ -145,6 +145,11 @@ func (c *MailRulesDeleteCmd) Run(ctx *RunContext) error {
 		return fmt.Errorf("delete rule %s: use --force to confirm deletion", outfmt.Sanitize(c.ID))
 	}
 
+	if ctx.Flags.DryRun {
+		fmt.Printf("Would delete rule %s%s\n", outfmt.Sanitize(c.ID), mailboxSuffix("in", target))
+		return nil
+	}
+
 	err = client.DeleteMailRule(ctx.Ctx, target, c.ID)
 	if err != nil {
 		return err
