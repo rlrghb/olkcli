@@ -251,3 +251,20 @@ func TestPaths_HonorsEnvOverride(t *testing.T) {
 		t.Errorf("AccountsDir: got %q", AccountsDir())
 	}
 }
+
+func TestConfigDir_UsesTheBuildNamespace(t *testing.T) {
+	t.Setenv("OLK_CONFIG_DIR", "")
+	orig := Namespace
+	t.Cleanup(func() { Namespace = orig })
+
+	release := ConfigDir()
+	if filepath.Base(release) != DefaultNamespace {
+		t.Fatalf("release ConfigDir = %q, want a directory named %q", release, DefaultNamespace)
+	}
+
+	Namespace = "olk-dev"
+	dev := ConfigDir()
+	if filepath.Base(dev) != "olk-dev" || filepath.Dir(dev) != filepath.Dir(release) {
+		t.Fatalf("development ConfigDir = %q, want olk-dev beside %q", dev, release)
+	}
+}

@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"github.com/99designs/keyring"
+
+	"github.com/rlrghb/olkcli/internal/config"
 )
 
 func TestItemLabelNamesTheAccountForTokens(t *testing.T) {
@@ -18,10 +20,56 @@ func TestItemLabelNamesTheAccountForTokens(t *testing.T) {
 	}
 }
 
+func useNamespace(t *testing.T, ns string) {
+	t.Helper()
+	orig := config.Namespace
+	config.Namespace = ns
+	t.Cleanup(func() { config.Namespace = orig })
+}
+
+func TestItemLabelNamesTheBuildNamespace(t *testing.T) {
+	useNamespace(t, "olk-dev")
+	tests := []struct{ key, want string }{
+		{TokenKey("someone@example.com"), "olk-dev token for someone@example.com"},
+		{"olk:other", "olk-dev olk:other"},
+	}
+	for _, tc := range tests {
+		if got := ItemLabel(tc.key); got != tc.want {
+			t.Fatalf("ItemLabel(%q) = %q, want %q", tc.key, got, tc.want)
+		}
+	}
+}
+
+func TestKeyringConfigKeepsReleaseStorageNames(t *testing.T) {
+	cfg := keyringConfig(t.TempDir(), nil)
+	if cfg.ServiceName != "olk" || cfg.LibSecretCollectionName != "olk" || cfg.WinCredPrefix != "olk" {
+		t.Fatalf("release config = service %q, collection %q, wincred %q; want olk for all",
+			cfg.ServiceName, cfg.LibSecretCollectionName, cfg.WinCredPrefix)
+	}
+	if cfg.PassPrefix != "" {
+		t.Fatalf("release PassPrefix = %q, want empty so existing pass entries are found", cfg.PassPrefix)
+	}
+}
+
+func TestKeyringConfigSeparatesADevelopmentNamespace(t *testing.T) {
+	useNamespace(t, "olk-dev")
+	cfg := keyringConfig(t.TempDir(), nil)
+	for name, got := range map[string]string{
+		"ServiceName":             cfg.ServiceName,
+		"LibSecretCollectionName": cfg.LibSecretCollectionName,
+		"WinCredPrefix":           cfg.WinCredPrefix,
+		"PassPrefix":              cfg.PassPrefix,
+	} {
+		if got != "olk-dev" {
+			t.Errorf("%s = %q, want olk-dev", name, got)
+		}
+	}
+}
+
 func newFileStore(t *testing.T) *KeyringStore {
 	t.Helper()
 	ring, err := keyring.Open(keyring.Config{
-		ServiceName:      serviceName,
+		ServiceName:      config.Namespace,
 		AllowedBackends:  []keyring.BackendType{keyring.FileBackend},
 		FileDir:          t.TempDir(),
 		FilePasswordFunc: keyring.FixedStringPrompt("test"),

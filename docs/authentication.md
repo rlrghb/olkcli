@@ -89,6 +89,12 @@ they do not read `--mailbox`.
 Tokens are stored in the macOS Keychain. After installing a freshly built or
 upgraded binary, macOS may ask for Keychain access. Select **Always Allow**.
 
+A binary built with `make build` uses the `olk-dev` namespace: its own config
+directory and its own Keychain items, so it needs its own `olk auth login` and
+never reads or rewrites the tokens of an installed `olk`. `olk version` names
+the namespace of a non-release build. Setting `OLK_CONFIG_DIR` to the same
+directory for both builds shares the config and any file-backend tokens.
+
 ## Token storage
 
 Refresh tokens are stored in the OS credential manager. Access tokens are held

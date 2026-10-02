@@ -19,6 +19,31 @@ go vet ./...
 go mod verify
 ```
 
+`make build` produces `bin/olk` in the `olk-dev` storage namespace, with its
+own config directory and credential-store entries; sign in once with
+`./bin/olk auth login`. `make install` and release builds use `olk`. Override
+with `make build NAMESPACE=<name>`.
+
+### Signing development builds on macOS
+
+`go build` gives each binary an ad-hoc signature that changes on every build,
+so macOS asks for Keychain access again after each rebuild. Signing every
+build with the same certificate and identifier keeps one **Always Allow**
+grant for all of them:
+
+```bash
+scripts/macos-dev-cert.sh                     # once: creates olk-dev-signer
+OLK_CODESIGN_IDENTITY=olk-dev-signer make build sign
+```
+
+`OLK_CODESIGN_IDENTITY` takes the name or SHA-1 hash of any code-signing
+identity in your keychains, including a Developer ID certificate; any
+environment manager can set it. `OLK_CODESIGN_IDENTIFIER` overrides the default
+identifier, `com.rlrghb.olk.dev`. Local builds need no notarization, because
+macOS checks it only for downloaded files. `make sign` refuses a binary that
+does not report a development namespace, so a release build is never re-signed
+with a local certificate.
+
 New tests should pass `go test -race -count=1 ./...`. Graph-wrapper changes
 should include fixture tests for request projections and converted output.
 

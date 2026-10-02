@@ -10,10 +10,22 @@ LDFLAGS  = -s -w \
 
 BINARY   = ./bin/olk
 
-.PHONY: build test lint install clean version
+# Storage namespace of `make build` output. A development binary keeps its own
+# config directory and credential-store entries, so it never touches the
+# tokens of an installed olk. `make install` always builds with the release
+# namespace, olk.
+NAMESPACE ?= olk-dev
+
+.PHONY: build sign test lint install clean version
 
 build:
-	go build -ldflags '$(LDFLAGS)' -o $(BINARY) ./cmd/olk
+	go build -ldflags '$(LDFLAGS) -X $(MODULE)/internal/config.Namespace=$(NAMESPACE)' \
+		-o $(BINARY) ./cmd/olk
+
+# Sign bin/olk with OLK_CODESIGN_IDENTITY so macOS keeps its Keychain grant
+# across rebuilds (macOS only). See docs/development.md.
+sign:
+	scripts/macos-dev-sign.sh $(BINARY)
 
 test:
 	go test -race -count=1 ./...
@@ -21,8 +33,8 @@ test:
 lint:
 	golangci-lint run ./...
 
-install: build
-	cp $(BINARY) $(GOPATH)/bin/olk
+install:
+	go build -ldflags '$(LDFLAGS)' -o $(shell go env GOPATH)/bin/olk ./cmd/olk
 
 clean:
 	rm -rf ./bin

@@ -9,7 +9,7 @@ This file provides context for Claude Code when working on the olk project.
 ## Quick Reference
 
 ```bash
-make build          # Build binary to ./bin/olk
+make build          # Build ./bin/olk (olk-dev namespace: own config and keychain entries)
 make test           # Run tests
 make lint           # Lint with golangci-lint
 go mod tidy         # After changing dependencies

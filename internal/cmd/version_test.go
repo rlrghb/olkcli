@@ -6,6 +6,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/rlrghb/olkcli/internal/config"
 )
 
 func TestVersionJSONAdvertisesStructuredMailCapabilities(t *testing.T) {
@@ -48,7 +50,40 @@ func TestVersionJSONAdvertisesStructuredMailCapabilities(t *testing.T) {
 		"mail.attachments.item-download-v1",
 		"mail.get.eml-v1",
 		"mcp.delegated-mailbox-v1",
+		"cli.version-namespace-v1",
 	}; !reflect.DeepEqual(got.Capabilities, want) {
 		t.Fatalf("capabilities = %v, want %v", got.Capabilities, want)
+	}
+}
+
+func TestVersionReportsTheStorageNamespace(t *testing.T) {
+	orig := config.Namespace
+	config.Namespace = "olk-dev"
+	t.Cleanup(func() { config.Namespace = orig })
+
+	stdout, _, err := captureStd(func() error {
+		return (&VersionCmd{}).Run(&RunContext{Ctx: context.Background(), Flags: &RootFlags{JSON: true}})
+	})
+	if err != nil {
+		t.Fatalf("VersionCmd.Run() error = %v", err)
+	}
+	var got struct {
+		Namespace string `json:"namespace"`
+	}
+	if err := json.Unmarshal([]byte(strings.TrimSpace(stdout)), &got); err != nil {
+		t.Fatalf("decoding version JSON: %v\n%s", err, stdout)
+	}
+	if got.Namespace != "olk-dev" {
+		t.Fatalf("namespace = %q, want olk-dev", got.Namespace)
+	}
+
+	text, _, err := captureStd(func() error {
+		return (&VersionCmd{}).Run(&RunContext{Ctx: context.Background(), Flags: &RootFlags{}})
+	})
+	if err != nil {
+		t.Fatalf("VersionCmd.Run() error = %v", err)
+	}
+	if !strings.Contains(text, "namespace: olk-dev") {
+		t.Fatalf("text output does not name the namespace:\n%s", text)
 	}
 }

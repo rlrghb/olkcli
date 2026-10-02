@@ -16,10 +16,11 @@
 
 ## Build, Test, and Development Commands
 
-- `make build`: build `bin/olk` with version ldflags.
+- `make build`: build `bin/olk` with version ldflags and the `olk-dev` storage namespace (its own config directory and keychain entries; sign in once with `./bin/olk auth login`).
 - `make test`: run tests with race detector.
 - `make lint`: run `golangci-lint`.
-- `make install`: build and copy to `$GOPATH/bin`.
+- `make sign`: sign `bin/olk` with `OLK_CODESIGN_IDENTITY` so the Keychain grant survives rebuilds (macOS; see `docs/development.md`).
+- `make install`: build with the release namespace, `olk`, into `$(go env GOPATH)/bin`.
 - `make clean`: remove `bin/`.
 - `make version`: print current version/commit/date.
 
@@ -36,7 +37,7 @@
 - Unit tests: stdlib `testing` package. Test files go next to the code they test (`*_test.go`).
 - Existing coverage: `internal/outfmt` (formatting + untrusted-wrapping), `internal/config`, `internal/msauth/scopes`, `internal/graphapi` (validation, capability guards, provider metadata/body contracts, pagination, and security invariants), and `internal/cmd` (paging filters + mailbox-target validation, MCP server/registry, schema generation, argv building, output capture). Coverage is partial — many command and Graph-wrapper paths remain untested.
 - Integration tests require a valid OAuth token + live Graph access — run manually, not in CI.
-- **macOS validation:** each `make build` produces a fresh (ad-hoc) binary identity, so the first run of the new `./bin/olk` that reads stored tokens triggers a macOS Keychain access prompt — a human must click **"Always Allow"**. An automated/agent run can't dismiss the dialog, so a hang on the first post-build command is expected (not a code bug); surface it for manual approval.
+- **macOS validation:** `./bin/olk` stores tokens under the `olk-dev` namespace, so it never reads or rewrites the Keychain items of an installed `olk`. Each `make build` still produces a fresh (ad-hoc) binary identity, so the first token-reading run after a rebuild can raise a macOS Keychain prompt for the `olk-dev` items — a human must click **"Always Allow"**. An automated/agent run can't dismiss the dialog, so a hang on the first post-build command is expected (not a code bug); surface it for manual approval. `make build sign` with the same certificate each time keeps that grant across rebuilds.
 - New tests should run cleanly under `go test -race -count=1 ./...` and pass `golangci-lint run`.
 
 ## CI

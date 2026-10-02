@@ -14,10 +14,10 @@ import (
 	"github.com/rlrghb/olkcli/internal/config"
 )
 
-const (
-	serviceName = "olk"
-	tokenPrefix = "olk:token:"
-)
+// tokenPrefix is the key of a token inside the store. It stays the same in
+// every build; config.Namespace is what separates one build's store from
+// another's.
+const tokenPrefix = "olk:token:"
 
 // Store defines the interface for credential storage.
 type Store interface {
@@ -89,8 +89,20 @@ func NewKeyringStore() (*KeyringStore, error) {
 		passwordFunc = stderrPrompt
 	}
 
+	cfg := keyringConfig(keyringDir, passwordFunc)
+
+	ring, err := keyring.Open(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("opening keyring: %w", err)
+	}
+	return &KeyringStore{ring: ring}, nil
+}
+
+// keyringConfig names every backend's storage after config.Namespace, so a
+// development build and a released build never share credential entries.
+func keyringConfig(fileDir string, passwordFunc keyring.PromptFunc) keyring.Config {
 	cfg := keyring.Config{
-		ServiceName: serviceName,
+		ServiceName: config.Namespace,
 
 		// macOS
 		KeychainTrustApplication:       true,
@@ -98,15 +110,23 @@ func NewKeyringStore() (*KeyringStore, error) {
 		KeychainAccessibleWhenUnlocked: true,
 
 		// Linux / FreeBSD
-		LibSecretCollectionName: serviceName,
+		LibSecretCollectionName: config.Namespace,
 
 		// Windows
-		WinCredPrefix: serviceName,
+		WinCredPrefix: config.Namespace,
 
 		// Fall back to an encrypted file store when no native backend is
 		// available (e.g. headless Linux without Secret Service).
-		FileDir:          keyringDir,
+		FileDir:          fileDir,
 		FilePasswordFunc: passwordFunc,
+	}
+
+	// The pass backend ignores ServiceName. Released builds have always
+	// stored their entries at the top of the password store, so only other
+	// namespaces get a subdirectory; existing release entries stay where
+	// they are.
+	if config.Namespace != config.DefaultNamespace {
+		cfg.PassPrefix = config.Namespace
 	}
 
 	// On macOS, prefer Keychain (native UI with "Always Allow") but fall
@@ -114,12 +134,7 @@ func NewKeyringStore() (*KeyringStore, error) {
 	if runtime.GOOS == "darwin" {
 		cfg.AllowedBackends = []keyring.BackendType{keyring.KeychainBackend, keyring.FileBackend}
 	}
-
-	ring, err := keyring.Open(cfg)
-	if err != nil {
-		return nil, fmt.Errorf("opening keyring: %w", err)
-	}
-	return &KeyringStore{ring: ring}, nil
+	return cfg
 }
 
 // Set stores a value under the given key. The item carries a label and a
@@ -146,7 +161,7 @@ func (s *KeyringStore) Set(key, value string) error {
 		Key:         key,
 		Data:        []byte(value),
 		Label:       ItemLabel(key),
-		Description: "olk Microsoft 365 credential",
+		Description: config.Namespace + " Microsoft 365 credential",
 	}
 	err := s.ring.Set(item)
 	if err != nil && isKeychainDuplicate(err) {
@@ -171,9 +186,9 @@ func isKeychainDuplicate(err error) bool {
 // credential store, e.g. "olk token for someone@example.com".
 func ItemLabel(key string) string {
 	if IsTokenKey(key) {
-		return "olk token for " + strings.TrimPrefix(key, tokenPrefix)
+		return config.Namespace + " token for " + strings.TrimPrefix(key, tokenPrefix)
 	}
-	return "olk " + key
+	return config.Namespace + " " + key
 }
 
 // Get retrieves the value stored under the given key.
