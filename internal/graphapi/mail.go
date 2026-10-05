@@ -837,8 +837,10 @@ func (c *Client) SearchMessages(ctx context.Context, target, query string, top i
 	// The $search parameter value must be wrapped in double quotes per
 	// Graph API requirements. KQL property restrictions (from:, subject:, etc.)
 	// and boolean operators (AND, OR, NOT) work inside the quoted string.
-	// Strip literal double quotes from user input to prevent breaking the wrapper.
-	search := `"` + strings.ReplaceAll(query, `"`, "") + `"`
+	// Escape backslashes and quotes to preserve the query inside the wrapper.
+	escaped := strings.ReplaceAll(query, `\`, `\\`)
+	escaped = strings.ReplaceAll(escaped, `"`, `\"`)
+	search := `"` + escaped + `"`
 	return c.ListMessages(ctx, target, &ListMessagesOptions{
 		Top:    top,
 		Search: search,
