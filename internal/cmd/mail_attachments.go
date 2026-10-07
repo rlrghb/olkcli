@@ -175,11 +175,21 @@ func saveAttachment(
 }
 
 func (c *MailAttachmentsCmd) Run(ctx *RunContext) error {
-	client, err := ctx.GraphClient()
+	target, err := resolveMailboxTarget(ctx.Flags.Mailbox)
 	if err != nil {
 		return err
 	}
-	target, err := resolveMailboxTarget(ctx.Flags.Mailbox)
+	if ctx.Flags.DryRun && (c.Save || c.AttachmentID != "") {
+		if c.AttachmentID != "" {
+			fmt.Printf("Would download attachment %s", outfmt.Sanitize(c.AttachmentID))
+		} else {
+			fmt.Print("Would save attachments")
+		}
+		fmt.Printf(" from message %s in %s to %s\n", outfmt.Sanitize(c.ID), describeMailbox(target), outfmt.Sanitize(c.Out))
+		return nil
+	}
+
+	client, err := ctx.GraphClient()
 	if err != nil {
 		return err
 	}
