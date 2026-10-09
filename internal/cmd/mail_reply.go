@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/rlrghb/olkcli/internal/graphapi"
@@ -15,6 +16,8 @@ type MailReplyCmd struct {
 	ReplyAll bool     `help:"Reply to all recipients" short:"a"`
 	Draft    bool     `help:"Create a reply draft instead of sending"`
 	Inline   []string `help:"Inline image as CID=PATH (repeatable; HTML drafts only)" placeholder:"CID=PATH"`
+	CC       []string `help:"CC recipients, added to those the reply generates"`
+	BCC      []string `help:"BCC recipients, added to those the reply generates"`
 }
 
 func (c *MailReplyCmd) Run(ctx *RunContext) error {
@@ -29,6 +32,11 @@ func (c *MailReplyCmd) Run(ctx *RunContext) error {
 	if err != nil {
 		return err
 	}
+	for _, addr := range append(append([]string{}, c.CC...), c.BCC...) {
+		if err := graphapi.ValidateEmail(addr); err != nil {
+			return err
+		}
+	}
 
 	action := "reply"
 	displayAction := "Reply"
@@ -38,15 +46,7 @@ func (c *MailReplyCmd) Run(ctx *RunContext) error {
 	}
 
 	if ctx.Flags.DryRun {
-		if c.Draft {
-			fmt.Printf("Would create %s draft for message %s in %s\n", action, outfmt.Sanitize(c.ID), describeMailbox(target))
-			for _, attachment := range inlineAttachments {
-				fmt.Printf("  Inline image: %s=%s (%d bytes)\n",
-					outfmt.Sanitize(attachment.ContentID), outfmt.Sanitize(attachment.Name), len(attachment.Content))
-			}
-			return nil
-		}
-		fmt.Printf("Would %s to message %s as %s\n", action, outfmt.Sanitize(c.ID), describeMailbox(target))
+		c.printDryRun(action, target, inlineAttachments)
 		return nil
 	}
 
@@ -69,6 +69,8 @@ func (c *MailReplyCmd) Run(ctx *RunContext) error {
 			IsHTML:            c.HTML,
 			InlineAttachments: inlineAttachments,
 			QuoteTimeLocation: quoteLocation,
+			Cc:                c.CC,
+			Bcc:               c.BCC,
 		})
 		if err != nil {
 			return err
@@ -81,7 +83,10 @@ func (c *MailReplyCmd) Run(ctx *RunContext) error {
 		return nil
 	}
 
-	if err := client.ReplyMessage(ctx.Ctx, target, c.ID, c.Body, c.ReplyAll, c.HTML); err != nil {
+	err = client.ReplyMessage(ctx.Ctx, target, c.ID, &graphapi.ReplyOptions{
+		Body: c.Body, ReplyAll: c.ReplyAll, IsHTML: c.HTML, Cc: c.CC, Bcc: c.BCC,
+	})
+	if err != nil {
 		return err
 	}
 
@@ -95,4 +100,22 @@ func (c *MailReplyCmd) Run(ctx *RunContext) error {
 		fmt.Println("Reply sent.")
 	}
 	return nil
+}
+
+func (c *MailReplyCmd) printDryRun(action, target string, inlineAttachments []graphapi.InlineAttachmentInput) {
+	if c.Draft {
+		fmt.Printf("Would create %s draft for message %s in %s\n", action, outfmt.Sanitize(c.ID), describeMailbox(target))
+		for _, attachment := range inlineAttachments {
+			fmt.Printf("  Inline image: %s=%s (%d bytes)\n",
+				outfmt.Sanitize(attachment.ContentID), outfmt.Sanitize(attachment.Name), len(attachment.Content))
+		}
+	} else {
+		fmt.Printf("Would %s to message %s as %s\n", action, outfmt.Sanitize(c.ID), describeMailbox(target))
+	}
+	if len(c.CC) > 0 {
+		fmt.Printf("  Add Cc: %s\n", strings.Join(c.CC, ", "))
+	}
+	if len(c.BCC) > 0 {
+		fmt.Printf("  Add Bcc: %s\n", strings.Join(c.BCC, ", "))
+	}
 }

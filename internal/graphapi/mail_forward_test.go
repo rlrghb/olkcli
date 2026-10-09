@@ -72,7 +72,7 @@ func TestForwardMessageCarriesCcInsideTheMessage(t *testing.T) {
 				if payload.Comment != nil || payload.Message.Body == nil || payload.Message.Body.Content != "See below" {
 					t.Errorf("HTML forward payload = %+v, want the comment as message body only", payload)
 				}
-			} else if payload.Comment == nil || *payload.Comment != "See below" || payload.Message.Body != nil {
+			} else if payload.Comment == nil || *payload.Comment != "<div>See below</div>" || payload.Message.Body != nil {
 				t.Errorf("plain forward payload = %+v, want the comment field and no message body", payload)
 			}
 		})
@@ -112,7 +112,7 @@ func TestCreateForwardDraftRoutesAndKeepsTheForwardedOriginal(t *testing.T) {
 					if tc.html && payload.Comment != nil {
 						t.Errorf("HTML forward draft sent comment %q; the fragment belongs in the generated body", *payload.Comment)
 					}
-					if !tc.html && (payload.Comment == nil || *payload.Comment != tc.content) {
+					if !tc.html && (payload.Comment == nil || *payload.Comment != plainTextHTML(tc.content)) {
 						t.Errorf("plain forward draft comment = %v, want %q", payload.Comment, tc.content)
 					}
 					return graphJSONResponse(req, `{"id":"draft-id","subject":"FW: Original subject",`+

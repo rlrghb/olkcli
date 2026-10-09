@@ -12,6 +12,7 @@ type MailForwardCmd struct {
 	ID      string   `arg:"" help:"Message ID to forward"`
 	To      []string `help:"Recipient email addresses" required:"" short:"t"`
 	CC      []string `help:"CC recipients"`
+	BCC     []string `help:"BCC recipients"`
 	Comment string   `help:"Comment to include" short:"c"`
 	HTML    bool     `help:"Comment is HTML"`
 	Draft   bool     `help:"Create a forward draft instead of sending"`
@@ -28,7 +29,7 @@ func (c *MailForwardCmd) Run(ctx *RunContext) error {
 		return err
 	}
 
-	for _, addr := range append(append([]string{}, c.To...), c.CC...) {
+	for _, addr := range append(append(append([]string{}, c.To...), c.CC...), c.BCC...) {
 		if err := graphapi.ValidateEmail(addr); err != nil {
 			return err
 		}
@@ -45,10 +46,13 @@ func (c *MailForwardCmd) Run(ctx *RunContext) error {
 		if len(c.CC) > 0 {
 			fmt.Printf("  Cc: %s\n", strings.Join(c.CC, ", "))
 		}
+		if len(c.BCC) > 0 {
+			fmt.Printf("  Bcc: %s\n", strings.Join(c.BCC, ", "))
+		}
 		return nil
 	}
 
-	opts := &graphapi.ForwardOptions{To: c.To, Cc: c.CC, Comment: c.Comment, IsHTML: c.HTML}
+	opts := &graphapi.ForwardOptions{To: c.To, Cc: c.CC, Bcc: c.BCC, Comment: c.Comment, IsHTML: c.HTML}
 	if c.Draft {
 		draft, err := client.CreateForwardDraft(ctx.Ctx, target, c.ID, opts)
 		if err != nil {

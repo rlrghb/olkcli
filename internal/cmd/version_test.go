@@ -40,6 +40,8 @@ func TestVersionJSONAdvertisesStructuredMailCapabilities(t *testing.T) {
 		"mail.message-observations-v1",
 		"mail.move.structured-receipt-v1",
 		"mail.forward.draft-v1",
+		"mail.reply.plain-line-breaks-v1",
+		"mail.reply.added-recipients-v1",
 		"mail.provider-body-format-v1",
 		"mail.thread.complete-v1",
 		"mail.attachments.inline-identity-v1",

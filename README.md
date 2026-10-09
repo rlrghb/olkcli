@@ -52,6 +52,7 @@ olk auth login --enterprise
 | List task lists | `olk todo lists list` |
 | Browse OneDrive | `olk drive ls` |
 | Send mail | `olk mail send --to person@example.com --subject "Hi" --body "Hello"` |
+| Draft a reply-all with an extra Cc | `olk mail reply <ID> --reply-all --draft --body "$(cat reply.txt)" --cc person@example.com` |
 | Draft HTML with an inline image | `olk mail drafts create --to person@example.com --subject "Steps" --html --body '<img src="cid:steps">' --inline steps=steps.png` |
 | Synchronize changes | `olk changes --json` |
 | Use JSON for scripts | `olk mail list --json --results-only` |

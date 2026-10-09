@@ -41,12 +41,12 @@ olk mail batch <ID> [--id ID ...]
 olk mail thread <CONVERSATION_ID>
 olk mail delta [--token TOKEN]
 olk mail send --to EMAIL --subject SUBJECT --body BODY [--html]
-olk mail reply <ID> --body BODY [--reply-all] [--html] [--draft] [--inline CID=PATH ...]
+olk mail reply <ID> --body BODY [--reply-all] [--html] [--draft] [--cc EMAIL ...] [--bcc EMAIL ...] [--inline CID=PATH ...]
 olk mail reply <ID> --body "Thanks" --draft
 olk mail reply <ID> --body '<p>Thanks</p>' --html --draft
 olk mail reply <ID> --body '<p>Thanks all</p>' --reply-all --html --draft
 olk mail reply <ID> --body '<p><img src="cid:steps"></p>' --html --draft --inline steps=steps.png
-olk mail forward <ID> --to EMAIL [--cc EMAIL] [--comment COMMENT] [--html] [--draft]
+olk mail forward <ID> --to EMAIL [--cc EMAIL] [--bcc EMAIL] [--comment COMMENT] [--html] [--draft]
 olk mail mark <ID> read|unread
 olk mail move <ID> ID_OR_PATH [--mailbox EMAIL]
 olk mail delete <ID> --force [--mailbox EMAIL]
@@ -139,21 +139,34 @@ not-found error that reads like a missing send permission.
 `mail reply --draft` creates a true threaded Outlook reply or reply-all draft,
 including Outlook's quoted history, and returns its draft ID and subject. For
 HTML drafts, `olk` inserts the supplied HTML ahead of that generated history
-instead of replacing it. It does not send; without `--draft`, replies retain
 instead of replacing it. Graph writes the quoted `Sent:` line in UTC with a
 weekday and seconds; HTML drafts rewrite it in the display time zone (`--tz`,
 `OLK_TIMEZONE`, config, or the local zone) in Outlook on the web's
 `14 September 2026 08:45` layout. That costs one extra read of the original
 message's `sentDateTime`. A `Sent:` line in any other layout is left as Graph
-wrote it. Use `--json` for a structured draft response. It does not send;
-without `--draft`, replies retain their immediate-send behavior. Use `--json`
-for a structured draft response, which reports the `to`, `cc` and `bcc` lists
-Outlook returned for the draft. `mail drafts list --json` reports the same
-three lists; its table shows To and CC.
+wrote it. It does not send; without `--draft`, replies retain their
+immediate-send behavior. Use `--json` for a structured draft response, which
+reports the `to`, `cc` and `bcc` lists Outlook returned for the draft.
+`mail drafts list --json` reports the same three lists; its table shows To and
+CC.
+
+A plain (non-`--html`) reply or forward comment keeps its line breaks. Graph
+interprets comments as HTML even when the original message is plain text, so
+`olk` escapes the text and writes each line as a `<div>`, each blank line as
+`<div><br></div>`, and leading or repeated spaces as `&nbsp;`. This preserves
+literal angle brackets and indentation without an extra read of the original.
+
+`--cc` and `--bcc` on `mail reply` add recipients to those Outlook generates for
+the reply or reply-all; they do not replace them, and an address already
+present is not repeated. A reply that is sent at once with added recipients is
+created as a draft, extended, and then sent, so it also needs write access to
+the mailbox and is refused under `--no-write`. Immediate HTML replies accept
+complete HTML documents with or without added recipients; explicit `--draft`
+HTML bodies must still be fragments to insert ahead of the quoted history.
 
 `mail forward --draft` does the same for a forward: Outlook generates the
 forwarded original, an HTML comment is inserted ahead of it, and the draft is
-left unsent. `--cc` adds Cc recipients to a forward, sent or drafted.
+left unsent. `--cc` and `--bcc` add recipients to a forward, sent or drafted.
 
 `--inline CID=PATH` is repeatable on `mail reply --html --draft` and
 `mail drafts create --html`. Reference every supplied CID in the HTML as

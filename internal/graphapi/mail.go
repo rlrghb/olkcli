@@ -568,6 +568,17 @@ func delegatedMessageNotFound(err error, message string) bool {
 		strings.Contains(lower, "item not found") || status == 404
 }
 
+// ReplyOptions carries the content, reply mode and added recipients for a
+// reply that is sent at once. Cc and Bcc are added to the recipients Graph
+// generates for the reply.
+type ReplyOptions struct {
+	Body     string
+	ReplyAll bool
+	IsHTML   bool
+	Cc       []string
+	Bcc      []string
+}
+
 // ReplyMessage replies to a message in the target mailbox, or in the signed-in
 // user's own mailbox when target is empty.
 //
@@ -576,22 +587,36 @@ func delegatedMessageNotFound(err error, message string) bool {
 // was listed from. Without a target, an ID belonging to a shared mailbox fails to
 // resolve at all, which is why replying from one was previously impossible rather
 // than merely mis-attributed.
-func (c *Client) ReplyMessage(ctx context.Context, target, messageID, comment string, replyAll, isHTML bool) error {
+//
+// A reply with added recipients is created as a draft, extended, and sent,
+// because the recipients a reply-all generates are known only once Graph has
+// created it. That path also needs write access to the mailbox.
+func (c *Client) ReplyMessage(ctx context.Context, target, messageID string, opts *ReplyOptions) error {
 	if err := c.ensureMaySend(); err != nil {
 		return err
 	}
 	if err := validateID(messageID, "message ID"); err != nil {
 		return err
 	}
+	if opts == nil {
+		return fmt.Errorf("reply options are required")
+	}
+	if len(opts.Cc) > 0 || len(opts.Bcc) > 0 {
+		return c.replyThroughDraft(ctx, target, messageID, opts)
+	}
 	action := "reply"
-	if replyAll {
+	if opts.ReplyAll {
 		action = "reply all"
 	}
 
+	comment := opts.Body
 	var err error
-	if replyAll {
+	if !opts.IsHTML {
+		comment = plainTextHTML(opts.Body)
+	}
+	if opts.ReplyAll {
 		body := users.NewItemMessagesItemReplyAllPostRequestBody()
-		if isHTML {
+		if opts.IsHTML {
 			body.SetMessage(htmlMessageBody(comment))
 		} else {
 			body.SetComment(&comment)
@@ -599,7 +624,7 @@ func (c *Client) ReplyMessage(ctx context.Context, target, messageID, comment st
 		err = c.targetUser(target).Messages().ByMessageId(messageID).ReplyAll().Post(ctx, body, nil)
 	} else {
 		body := users.NewItemMessagesItemReplyPostRequestBody()
-		if isHTML {
+		if opts.IsHTML {
 			body.SetMessage(htmlMessageBody(comment))
 		} else {
 			body.SetComment(&comment)
@@ -611,6 +636,24 @@ func (c *Client) ReplyMessage(ctx context.Context, target, messageID, comment st
 			return sharedMailboxError(action, target, replyGrantHint, err)
 		}
 		return fmt.Errorf("%s: %w", action, err)
+	}
+	return nil
+}
+
+func (c *Client) replyThroughDraft(ctx context.Context, target, messageID string, opts *ReplyOptions) error {
+	draft, err := c.CreateReplyDraft(ctx, target, messageID, &CreateReplyDraftOptions{
+		replaceBody: opts.IsHTML,
+		Body:        opts.Body,
+		ReplyAll:    opts.ReplyAll,
+		IsHTML:      opts.IsHTML,
+		Cc:          opts.Cc,
+		Bcc:         opts.Bcc,
+	})
+	if err != nil {
+		return err
+	}
+	if err := c.SendDraft(ctx, target, draft.ID); err != nil {
+		return c.cleanupFailedDraft(ctx, target, draft.ID, replyDraftKind, err)
 	}
 	return nil
 }

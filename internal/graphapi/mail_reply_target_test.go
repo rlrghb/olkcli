@@ -11,7 +11,7 @@ import (
 func TestReplyMessage_NoSendGuardBeatsTarget(t *testing.T) {
 	c := &Client{}
 	c.SetGuards(false, true)
-	err := c.ReplyMessage(context.Background(), "shared@example.com", "AAA", "body", false, false)
+	err := c.ReplyMessage(context.Background(), "shared@example.com", "AAA", &ReplyOptions{Body: "body"})
 	if err == nil {
 		t.Fatal("expected --no-send to block a reply from a shared mailbox target")
 	}
@@ -30,7 +30,7 @@ func TestForwardMessage_NoSendGuardBeatsTarget(t *testing.T) {
 // shared mailbox is targeted.
 func TestReplyMessage_InvalidIDRejected(t *testing.T) {
 	c := &Client{}
-	err := c.ReplyMessage(context.Background(), "shared@example.com", "", "body", false, false)
+	err := c.ReplyMessage(context.Background(), "shared@example.com", "", &ReplyOptions{Body: "body"})
 	if err == nil || !strings.Contains(err.Error(), "message ID") {
 		t.Fatalf("want a message ID error, got %v", err)
 	}
