@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"net/http"
-	"os"
 	"path/filepath"
 
 	"github.com/rlrghb/olkcli/internal/graphapi"
@@ -77,22 +76,9 @@ func (c *CalendarAttachmentsAddCmd) Run(ctx *RunContext) error {
 	if err != nil {
 		return err
 	}
-	info, err := os.Stat(c.File)
+	content, err := readLocalFile(c.File, graphapi.MaxCalendarAttachmentBytes-1)
 	if err != nil {
-		return fmt.Errorf("reading file: %w", err)
-	}
-	if !info.Mode().IsRegular() {
-		return fmt.Errorf("file %q is not a regular file", c.File)
-	}
-	if info.Size() >= graphapi.MaxCalendarAttachmentBytes {
-		return fmt.Errorf("file is %d bytes; event attachments must be under 3 MB", info.Size())
-	}
-	content, err := os.ReadFile(c.File)
-	if err != nil {
-		return fmt.Errorf("reading file: %w", err)
-	}
-	if len(content) >= graphapi.MaxCalendarAttachmentBytes {
-		return fmt.Errorf("file is %d bytes; event attachments must be under 3 MB", len(content))
+		return fmt.Errorf("reading file (event attachments must be under 3 MB): %w", err)
 	}
 
 	name := filepath.Base(c.File)

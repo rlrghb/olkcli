@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"net/http"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -62,17 +61,10 @@ func (c *MailSendCmd) Run(ctx *RunContext) error {
 	if len(c.Attach) > 0 {
 		var totalSize int64
 		for _, path := range c.Attach {
-			info, err := os.Stat(path)
+			// Each file may use what the earlier ones left of the limit.
+			data, err := readLocalFile(path, maxAttachmentTotal-totalSize)
 			if err != nil {
 				return fmt.Errorf("attachment %q: %w", path, err)
-			}
-			if info.IsDir() {
-				return fmt.Errorf("attachment %q is a directory", path)
-			}
-
-			data, err := os.ReadFile(path)
-			if err != nil {
-				return fmt.Errorf("reading attachment %q: %w", path, err)
 			}
 
 			totalSize += int64(len(data))

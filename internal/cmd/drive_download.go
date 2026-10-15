@@ -116,19 +116,15 @@ func (c *DriveDownloadCmd) Run(ctx *RunContext) error {
 		return fmt.Errorf("download failed: HTTP %d", resp.StatusCode)
 	}
 
-	// Limit read to declared file size + 1 byte to detect server sending more than expected.
-	limitedReader := io.LimitReader(resp.Body, item.Size+1)
-	written, err := io.Copy(f, limitedReader)
-	if err != nil {
+	if err := copyDeclared(f, resp.Body, item.Size); err != nil {
 		cleanupFile()
-		return fmt.Errorf("writing file: %w", err)
-	}
-	if written > item.Size {
-		cleanupFile()
-		return fmt.Errorf("server sent more data than expected (%s declared), aborting", formatBytes(item.Size))
+		return err
 	}
 
-	f.Close()
+	if err := f.Close(); err != nil {
+		os.Remove(finalPath)
+		return fmt.Errorf("writing file: %w", err)
+	}
 	fmt.Printf("Downloaded %s (%s)\n", outfmt.Sanitize(filepath.Base(finalPath)), formatBytes(item.Size))
 	return nil
 }
@@ -158,4 +154,20 @@ func safeCreateFile(path string) (*os.File, string, error) {
 		}
 	}
 	return nil, "", fmt.Errorf("could not find available filename for %s after 1000 attempts", filepath.Base(path))
+}
+
+// copyDeclared copies exactly size bytes from src, refusing a body that is
+// longer or shorter than the size the item's metadata declared.
+func copyDeclared(dst io.Writer, src io.Reader, size int64) error {
+	// One byte past the size shows a body that runs long.
+	written, err := io.Copy(dst, io.LimitReader(src, size+1))
+	switch {
+	case err != nil:
+		return fmt.Errorf("writing file: %w", err)
+	case written > size:
+		return fmt.Errorf("server sent more data than expected (%s declared), aborting", formatBytes(size))
+	case written < size:
+		return fmt.Errorf("download ended after %s of %s, aborting", formatBytes(written), formatBytes(size))
+	}
+	return nil
 }
