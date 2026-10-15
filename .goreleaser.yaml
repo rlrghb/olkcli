@@ -59,9 +59,11 @@ homebrew_casks:
     # flag on install. This is the goreleaser-documented pattern for unsigned
     # casks (cf. gibo, GraalVM, Stream CLI). Remove once the build is
     # Developer ID-signed + notarized.
-    hooks:
-      post:
-        install: |
-          if OS.mac?
-            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/olk"]
-          end
+    # GoReleaser's dedicated install_steps hook requires v2.19 (unreleased).
+    # Use the supported custom block so stable releases emit Homebrew's new DSL.
+    custom_block: |
+      postflight_steps do
+        on_macos do
+          run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{ "{{staged_path}}" }}/olk"]
+        end
+      end
