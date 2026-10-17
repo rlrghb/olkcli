@@ -90,6 +90,15 @@ func isRemoved(additionalData map[string]any) bool {
 	return ok
 }
 
+// mailDeltaSelect is the field set requested on the first delta call. Graph bakes
+// the $select into the continuation tokens, so it applies to the whole sync. It
+// includes the sender, received time and read state so callers can act on new
+// mail without a second per-message fetch.
+var mailDeltaSelect = []string{
+	"id", "subject", "changeKey", "internetMessageId", "createdDateTime", "lastModifiedDateTime",
+	"from", "receivedDateTime", "isRead",
+}
+
 // DeltaMessages returns message changes in a mail folder (default "inbox")
 // since token. Pass an empty token to start a fresh sync.
 func (c *Client) DeltaMessages(ctx context.Context, target, folderID, token string, top int32) ([]MailDelta, DeltaPage, error) {
@@ -101,7 +110,7 @@ func (c *Client) DeltaMessages(ctx context.Context, target, folderID, token stri
 	if token == "" {
 		cfg := &users.ItemMailFoldersItemMessagesDeltaRequestBuilderGetRequestConfiguration{
 			Headers:         c.messageIDHeaders(maxPageSizeHeaders(top)),
-			QueryParameters: &users.ItemMailFoldersItemMessagesDeltaRequestBuilderGetQueryParameters{Select: []string{"id", "subject", "changeKey", "internetMessageId", "createdDateTime", "lastModifiedDateTime"}},
+			QueryParameters: &users.ItemMailFoldersItemMessagesDeltaRequestBuilderGetQueryParameters{Select: mailDeltaSelect},
 		}
 		resp, err = c.targetUser(target).MailFolders().ByMailFolderId(folderID).Messages().Delta().GetAsDeltaGetResponse(ctx, cfg)
 	} else {
