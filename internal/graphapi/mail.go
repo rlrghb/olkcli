@@ -83,7 +83,7 @@ type MailFollowupFlag struct {
 var messageDetailSelect = []string{
 	"id", "subject", "from", "toRecipients", "ccRecipients", "bccRecipients", "replyTo",
 	"receivedDateTime", "isRead", "hasAttachments", "body", "bodyPreview", "conversationId",
-	"parentFolderId", "changeKey", "flag", "internetMessageId", "createdDateTime", "lastModifiedDateTime",
+	"parentFolderId", "changeKey", "flag", "categories", "internetMessageId", "createdDateTime", "lastModifiedDateTime",
 }
 
 // MailFolder is a simplified folder representation
