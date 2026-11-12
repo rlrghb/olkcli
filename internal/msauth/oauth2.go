@@ -37,7 +37,7 @@ func (e *RefreshError) Error() string {
 }
 
 var oauthCodePattern = regexp.MustCompile(`^[a-z_]{1,64}$`)
-var aadstsPattern = regexp.MustCompile(`\bAADSTS([0-9]{4,8})\b`)
+var aadstsPattern = regexp.MustCompile(`\bAADSTS(\d{4,8})\b`)
 
 func refreshError(resp *http.Response, body []byte) *RefreshError {
 	err := &RefreshError{Status: resp.StatusCode, Code: "unknown_oauth_error"}
