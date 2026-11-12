@@ -3,7 +3,8 @@
 ## Credential protection
 
 - Refresh tokens use the OS keychain or credential manager.
-- Access tokens are held in memory only.
+- Access tokens and their expiry are retained in the existing credential store
+  alongside refresh tokens so separate CLI processes can reuse a valid token.
 - OAuth flows use PKCE; browser callbacks validate state and bind to loopback.
 - Never paste tokens, Keychain values, or verbose logs into issues or chat.
 

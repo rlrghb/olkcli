@@ -108,9 +108,18 @@ directory for both builds shares the config and any file-backend tokens.
 
 ## Token storage
 
-Refresh tokens are stored in the OS credential manager. Access tokens are held
-in memory and are not persisted. Headless file-backend environments must set
+Access and refresh tokens, together with the access-token expiry, are stored in
+the existing OS credential manager. Separate CLI processes reuse an access
+token until it is within five minutes of expiry instead of contacting the token
+endpoint for every command. Existing refresh-only entries refresh once on first
+use and then retain the pair. Headless file-backend environments must set
 `OLK_KEYRING_PASSWORD` and protect the config directory.
+
+Failed refreshes leave stored credentials unchanged. JSON failures identify the
+`token_refresh` stage and preserve the HTTP status, OAuth error name, numeric
+AADSTS codes and `Retry-After` seconds when available. Response descriptions and
+tokens are never included in these diagnostics. Refresh is attempted once; the
+caller chooses when to retry.
 
 ### Concurrent processes on Linux
 

@@ -124,9 +124,8 @@ func (a *Authenticator) LoginDeviceCode(ctx context.Context, scopes []string, ve
 // fetches the user profile and persists the token and account info. This is
 // the shared tail of every login flow.
 func (a *Authenticator) finishLogin(ctx context.Context, tokenResp *TokenResponse) (*AccountInfo, error) {
-	// Only the refresh token is persisted (StoreToken), and LoadToken rejects
-	// an empty one — a login without it would appear to succeed and then fail
-	// on first use, so reject it up front.
+	// LoadToken requires a refresh token so the account remains usable after
+	// its cached access token expires. Reject incomplete logins up front.
 	if tokenResp.RefreshToken == "" {
 		return nil, fmt.Errorf("no refresh token returned — ensure the offline_access scope was granted")
 	}
@@ -137,7 +136,7 @@ func (a *Authenticator) finishLogin(ctx context.Context, tokenResp *TokenRespons
 		return nil, fmt.Errorf("fetching user profile: %w", err)
 	}
 
-	// Store refresh token in keyring.
+	// Store the token pair and expiry in the existing credential store.
 	expiresAt := time.Now().Add(time.Duration(safeExpiresIn(tokenResp.ExpiresIn)) * time.Second)
 	tokenData := &TokenData{
 		AccessToken:  tokenResp.AccessToken,
@@ -195,7 +194,7 @@ func (a *Authenticator) GetCredential(ctx context.Context, email string) (azcore
 	}
 
 	// Step 2: If expired (or about to expire within 5 minutes), refresh.
-	if time.Now().Add(5 * time.Minute).After(tokenData.ExpiresAt) {
+	if tokenData.AccessToken == "" || time.Now().Add(5*time.Minute).After(tokenData.ExpiresAt) {
 		tokenResp, err := RefreshAccessToken(ctx, a.ClientID, a.TenantID, tokenData.RefreshToken)
 		if err != nil {
 			return nil, fmt.Errorf("refreshing token for %s: %w", email, err)

@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -20,6 +22,47 @@ type TokenData struct {
 	RefreshToken string    `json:"refresh_token"`
 	ExpiresAt    time.Time `json:"expires_at"`
 	Email        string    `json:"email"`
+}
+
+// RefreshError preserves safe OAuth diagnostics without retaining response bodies.
+type RefreshError struct {
+	Status            int
+	Code              string
+	AADSTSCodes       []int
+	RetryAfterSeconds int
+}
+
+func (e *RefreshError) Error() string {
+	return fmt.Sprintf("refresh token failed: %s (HTTP %d; AADSTS codes %v)", e.Code, e.Status, e.AADSTSCodes)
+}
+
+var oauthCodePattern = regexp.MustCompile(`^[a-z_]{1,64}$`)
+var aadstsPattern = regexp.MustCompile(`\bAADSTS([0-9]{4,8})\b`)
+
+func refreshError(resp *http.Response, body []byte) *RefreshError {
+	err := &RefreshError{Status: resp.StatusCode, Code: "unknown_oauth_error"}
+	var value ErrorResponse
+	if json.Unmarshal(body, &value) == nil {
+		if oauthCodePattern.MatchString(value.Error) {
+			err.Code = value.Error
+		}
+		seen := map[int]bool{}
+		for _, match := range aadstsPattern.FindAllStringSubmatch(value.ErrorDescription, -1) {
+			code, parseErr := strconv.Atoi(match[1])
+			if parseErr == nil && !seen[code] {
+				err.AADSTSCodes = append(err.AADSTSCodes, code)
+				seen[code] = true
+			}
+		}
+	}
+	if seconds, parseErr := strconv.Atoi(resp.Header.Get("Retry-After")); parseErr == nil && seconds > 0 {
+		err.RetryAfterSeconds = seconds
+	} else if until, parseErr := http.ParseTime(resp.Header.Get("Retry-After")); parseErr == nil {
+		if remaining := time.Until(until); remaining > 0 {
+			err.RetryAfterSeconds = int((remaining + time.Second - 1) / time.Second)
+		}
+	}
+	return err
 }
 
 // RefreshAccessToken exchanges a refresh token for a new access token.
@@ -56,14 +99,7 @@ func RefreshAccessToken(ctx context.Context, clientID, tenantID, refreshToken st
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		var errResp ErrorResponse
-		if jsonErr := json.Unmarshal(body, &errResp); jsonErr == nil && errResp.Error != "" {
-			if isVerbose {
-				fmt.Fprintf(os.Stderr, "[verbose] refresh failed: status=%d error=%s description=%s\n", resp.StatusCode, sanitizeStr(errResp.Error), sanitizeStr(errResp.ErrorDescription))
-			}
-			return nil, fmt.Errorf("refresh token failed: %s: %s", sanitizeStr(errResp.Error), sanitizeStr(errResp.ErrorDescription))
-		}
-		return nil, fmt.Errorf("refresh token failed with status %d", resp.StatusCode)
+		return nil, refreshError(resp, body)
 	}
 
 	if isVerbose {
@@ -83,13 +119,10 @@ func RefreshAccessToken(ctx context.Context, clientID, tenantID, refreshToken st
 
 // StoreToken serializes TokenData to JSON and persists it in the keyring.
 func StoreToken(store secrets.Store, email string, data *TokenData) error {
-	// Only persist the refresh token — access tokens are short-lived
-	persist := &TokenData{
-		RefreshToken: data.RefreshToken,
-		Email:        data.Email,
-		// ExpiresAt intentionally zero to trigger refresh on next load
-	}
-	jsonData, err := json.Marshal(persist)
+	// Reuse the short-lived access token across CLI processes. The existing
+	// credential store protects it alongside the longer-lived refresh token.
+	// GetCredential holds the account lock across this load-refresh-store cycle.
+	jsonData, err := json.Marshal(data)
 	if err != nil {
 		return fmt.Errorf("marshaling token data: %w", err)
 	}

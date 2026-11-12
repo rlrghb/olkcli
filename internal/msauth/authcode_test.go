@@ -398,8 +398,8 @@ func TestLoginAuthCodeEndToEnd(t *testing.T) {
 	if data.RefreshToken != "rt" {
 		t.Errorf("stored refresh token = %q, want rt", data.RefreshToken)
 	}
-	if data.AccessToken != "" {
-		t.Error("access token must not be persisted")
+	if data.AccessToken != "at" || data.ExpiresAt.Before(time.Now().Add(50*time.Minute)) {
+		t.Error("access token and expiry must be retained in the credential store")
 	}
 }
 

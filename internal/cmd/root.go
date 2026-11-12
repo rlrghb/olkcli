@@ -325,10 +325,22 @@ func writeCommandError(
 		code, status := graphapi.ErrorMetadata(err)
 		value := struct {
 			Error struct {
-				Code   string `json:"code"`
-				Status int    `json:"status"`
+				Code              string `json:"code"`
+				Status            int    `json:"status"`
+				Stage             string `json:"stage,omitempty"`
+				OAuthError        string `json:"oauth_error,omitempty"`
+				AADSTSCodes       []int  `json:"aadsts_codes,omitempty"`
+				RetryAfterSeconds int    `json:"retry_after_seconds,omitempty"`
 			} `json:"error"`
 		}{}
+		var refreshErr *msauth.RefreshError
+		if errors.As(err, &refreshErr) {
+			code, status = "OAuthRefreshFailed", refreshErr.Status
+			value.Error.Stage = "token_refresh"
+			value.Error.OAuthError = refreshErr.Code
+			value.Error.AADSTSCodes = refreshErr.AADSTSCodes
+			value.Error.RetryAfterSeconds = refreshErr.RetryAfterSeconds
+		}
 		value.Error.Code = code
 		value.Error.Status = status
 		if encodeErr := json.NewEncoder(stdout).Encode(value); encodeErr != nil {

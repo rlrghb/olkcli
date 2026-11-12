@@ -100,8 +100,8 @@ fields where supported. See [scripting and sync](docs/scripting.md).
 - MCP exposes curated tools and requires explicit opt-in for mutations.
 - External mail, calendar, contact, and file text can be wrapped with
   `--wrap-untrusted` for agent-safe consumption.
-- Refresh tokens are stored in the OS keychain; access tokens are kept in
-  memory only.
+- Access and refresh tokens are stored in the existing OS credential manager;
+  CLI processes reuse valid access tokens instead of refreshing on every call.
 
 Read the [security and privacy guide](docs/security.md) before connecting an
 agent or sharing logs.
