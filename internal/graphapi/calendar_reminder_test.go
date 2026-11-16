@@ -77,13 +77,10 @@ func TestGetEventReminderJSON(t *testing.T) {
 	}
 }
 
-func TestDeltaCalendarViewSelectsReminderFields(t *testing.T) {
+func TestDeltaCalendarViewReturnsReminderFields(t *testing.T) {
 	client := testGraphClient(t, func(req *http.Request) *http.Response {
-		selectFields := req.URL.Query().Get("$select")
-		for _, field := range []string{"isReminderOn", "reminderMinutesBeforeStart"} {
-			if !strings.Contains(selectFields, field) {
-				t.Errorf("$select = %q, missing %q", selectFields, field)
-			}
+		if got := req.URL.Query().Get("$select"); got != "" {
+			t.Errorf("calendar delta must not send $select, got %q", got)
 		}
 		return graphJSONResponse(req, `{"value":[{"id":"event-id","isReminderOn":true,"reminderMinutesBeforeStart":0}],"@odata.deltaLink":"https://graph.microsoft.com/v1.0/me/calendarView/delta?$deltatoken=done"}`)
 	})

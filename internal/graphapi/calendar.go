@@ -18,37 +18,39 @@ var dayNameTitle = cases.Title(language.English)
 
 // CalendarEvent is a simplified calendar event for output
 type CalendarEvent struct {
-	ID                string               `json:"id"`
-	Subject           string               `json:"subject" untrusted:"true"`
-	Start             string               `json:"start"`
-	End               string               `json:"end"`
-	StartTimeZone     string               `json:"startTimeZone,omitempty" untrusted:"true"`
-	EndTimeZone       string               `json:"endTimeZone,omitempty" untrusted:"true"`
-	Location          string               `json:"location" untrusted:"true"`
-	Organizer         string               `json:"organizer" untrusted:"true"`
-	Attendees         []string             `json:"attendees,omitempty" untrusted:"true" concise:"omit"`
-	IsAllDay          bool                 `json:"isAllDay"`
-	IsOnline          bool                 `json:"isOnlineMeeting"`
-	OnlineURL         string               `json:"onlineMeetingUrl,omitempty" untrusted:"true"`
-	Status            string               `json:"showAs"`
-	Recurrence        string               `json:"recurrence,omitempty"`
-	BodyPreview       string               `json:"bodyPreview,omitempty" untrusted:"true" concise:"omit"`
-	Body              string               `json:"body,omitempty" untrusted:"true" concise:"omit"`
-	BodyType          string               `json:"bodyType,omitempty"`
-	ICalUID           string               `json:"iCalUId,omitempty"`
-	ChangeKey         string               `json:"changeKey,omitempty"`
-	CreatedAt         string               `json:"createdDateTime,omitempty"`
-	ModifiedAt        string               `json:"lastModifiedDateTime,omitempty"`
-	EventType         string               `json:"type,omitempty"`
-	SeriesMasterID    string               `json:"seriesMasterId,omitempty"`
-	OriginalStart     string               `json:"originalStart,omitempty"`
-	IsCancelled       bool                 `json:"isCancelled"`
-	IsReminderOn      *bool                `json:"isReminderOn,omitempty"`
-	ReminderMinutes   *int32               `json:"reminderMinutesBeforeStart,omitempty"`
-	TransactionID     string               `json:"transactionId,omitempty"`
-	AttendeeDetails   []AttendeeDetails    `json:"attendeeDetails,omitempty" concise:"omit"`
-	ResponseStatus    *EventResponseStatus `json:"responseStatus,omitempty" concise:"omit"`
-	RecurrenceDetails *RecurrenceDetails   `json:"recurrenceDetails,omitempty" concise:"omit"`
+	ID                    string               `json:"id"`
+	Subject               string               `json:"subject" untrusted:"true"`
+	Start                 string               `json:"start"`
+	End                   string               `json:"end"`
+	StartTimeZone         string               `json:"startTimeZone,omitempty" untrusted:"true"`
+	EndTimeZone           string               `json:"endTimeZone,omitempty" untrusted:"true"`
+	OriginalStartTimeZone string               `json:"originalStartTimeZone,omitempty" untrusted:"true"`
+	OriginalEndTimeZone   string               `json:"originalEndTimeZone,omitempty" untrusted:"true"`
+	Location              string               `json:"location" untrusted:"true"`
+	Organizer             string               `json:"organizer" untrusted:"true"`
+	Attendees             []string             `json:"attendees,omitempty" untrusted:"true" concise:"omit"`
+	IsAllDay              bool                 `json:"isAllDay"`
+	IsOnline              bool                 `json:"isOnlineMeeting"`
+	OnlineURL             string               `json:"onlineMeetingUrl,omitempty" untrusted:"true"`
+	Status                string               `json:"showAs"`
+	Recurrence            string               `json:"recurrence,omitempty"`
+	BodyPreview           string               `json:"bodyPreview,omitempty" untrusted:"true" concise:"omit"`
+	Body                  string               `json:"body,omitempty" untrusted:"true" concise:"omit"`
+	BodyType              string               `json:"bodyType,omitempty"`
+	ICalUID               string               `json:"iCalUId,omitempty"`
+	ChangeKey             string               `json:"changeKey,omitempty"`
+	CreatedAt             string               `json:"createdDateTime,omitempty"`
+	ModifiedAt            string               `json:"lastModifiedDateTime,omitempty"`
+	EventType             string               `json:"type,omitempty"`
+	SeriesMasterID        string               `json:"seriesMasterId,omitempty"`
+	OriginalStart         string               `json:"originalStart,omitempty"`
+	IsCancelled           bool                 `json:"isCancelled"`
+	IsReminderOn          *bool                `json:"isReminderOn,omitempty"`
+	ReminderMinutes       *int32               `json:"reminderMinutesBeforeStart,omitempty"`
+	TransactionID         string               `json:"transactionId,omitempty"`
+	AttendeeDetails       []AttendeeDetails    `json:"attendeeDetails,omitempty" concise:"omit"`
+	ResponseStatus        *EventResponseStatus `json:"responseStatus,omitempty" concise:"omit"`
+	RecurrenceDetails     *RecurrenceDetails   `json:"recurrenceDetails,omitempty" concise:"omit"`
 }
 
 type AttendeeDetails struct {
@@ -141,7 +143,7 @@ func (c *Client) ListEvents(ctx context.Context, target string, startTime, endTi
 		StartDateTime: &startStr,
 		EndDateTime:   &endStr,
 		Top:           &top,
-		Select:        []string{"id", "subject", "start", "end", "location", "organizer", "attendees", "isAllDay", "isOnlineMeeting", "onlineMeetingUrl", "showAs", "bodyPreview", "recurrence", "iCalUId", "changeKey", "type", "seriesMasterId", "originalStart", "isCancelled", "isReminderOn", "reminderMinutesBeforeStart", "responseStatus", "transactionId"},
+		Select:        []string{"id", "subject", "start", "end", "originalStartTimeZone", "originalEndTimeZone", "location", "organizer", "attendees", "isAllDay", "isOnlineMeeting", "onlineMeetingUrl", "showAs", "bodyPreview", "recurrence", "iCalUId", "changeKey", "type", "seriesMasterId", "originalStart", "isCancelled", "isReminderOn", "reminderMinutesBeforeStart", "responseStatus", "transactionId"},
 		Orderby:       []string{"start/dateTime"},
 	}
 	if preference != BodyDefault {
@@ -630,6 +632,8 @@ func (c *Client) ListCalendars(ctx context.Context, target string) ([]CalendarIn
 
 func convertEvent(e models.Eventable) CalendarEvent {
 	ev := CalendarEvent{}
+	ev.OriginalStartTimeZone = derefStr(e.GetOriginalStartTimeZone())
+	ev.OriginalEndTimeZone = derefStr(e.GetOriginalEndTimeZone())
 	if e.GetId() != nil {
 		ev.ID = *e.GetId()
 	}
