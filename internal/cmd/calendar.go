@@ -147,7 +147,7 @@ func (c *CalendarGetCmd) Run(ctx *RunContext) error {
 	fmt.Printf("Start:     %s\n", outfmt.Sanitize(displayCalendarBoundary(event.Start, event.IsAllDay, loc)))
 	fmt.Printf("End:       %s\n", outfmt.Sanitize(displayCalendarBoundary(event.End, event.IsAllDay, loc)))
 	if event.IsAllDay && event.StartTimeZone != "" {
-		fmt.Printf("Time Zone: %s\n", outfmt.Sanitize(event.StartTimeZone))
+		fmt.Printf("Response Time Zone: %s\n", outfmt.Sanitize(event.StartTimeZone))
 	}
 	fmt.Printf("Location:  %s\n", outfmt.Sanitize(event.Location))
 	fmt.Printf("Organizer: %s\n", outfmt.Sanitize(event.Organizer))

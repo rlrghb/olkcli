@@ -231,7 +231,15 @@ them there.
 All-day event boundaries must be midnight, with the end date exclusive. Use
 `--event-timezone IANA_ZONE` on create or when updating with `--all-day` to send
 both boundaries at midnight in that zone. JSON event output includes
-`startTimeZone` and `endTimeZone` when Graph returns timezone metadata.
+`startTimeZone` and `endTimeZone` when Graph returns timezone metadata; these
+describe the returned start and end values, which Graph normally returns in UTC
+on reads. `originalStartTimeZone` and `originalEndTimeZone` preserve Graph's
+original timezone properties when present, including Windows or custom zone
+identifiers. Graph describes these as the zones set at creation; do not rely on
+them alone to verify a later timezone update. A create response can echo the
+requested zone even when a subsequent read differs. In a personal-account test,
+Graph returned UTC for both original zones after creating and updating an
+all-day event with a named zone. Enterprise behavior may differ.
 
 `--reminder-minutes N` enables a reminder N minutes before the event (0 means
 at the start). It cannot be combined with `--no-reminder`, and N must be
